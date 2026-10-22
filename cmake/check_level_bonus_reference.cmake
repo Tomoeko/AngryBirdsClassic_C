@@ -1,0 +1,17 @@
+file(SHA256 "${REFERENCE}" reference_hash)
+if(KIND STREQUAL "live")
+    set(expected_hash "2a479f91038135242c6bcb853a5e78b90c040f6ed07b0d6abc431a860d92a3f4")
+    set(options --live)
+else()
+    set(expected_hash
+        "c4618ef3e830292bb7a5edddf698aa3d6dbf8c3ddde1d3afb90b31f8103b018d")
+endif()
+if(NOT reference_hash STREQUAL expected_hash)
+    message(FATAL_ERROR "Expected the recorded original level-bonus corpus")
+endif()
+execute_process(COMMAND "${CHECKER}" ${options} "${REFERENCE}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 10)
+if(NOT status STREQUAL "0")
+    message(FATAL_ERROR "Original level-bonus comparison failed: ${output}${diagnostics}")
+endif()
+message(STATUS "${output}")

@@ -1,0 +1,20 @@
+file(SHA256 "${REFERENCE}" reference_hash)
+if(NOT reference_hash STREQUAL
+    "748f4f4fb04132bd0c32a1c594dc3fb041e095c9af7f54d10435fffcd82ee0d3")
+    message(FATAL_ERROR "Expected the original reset-state GL_Context fill output")
+endif()
+set(arguments "${REFERENCE}")
+if(APK)
+    file(SHA256 "${APK}" apk_hash)
+    if(NOT apk_hash STREQUAL
+        "b524b6b4b0ad999f46828546dee1bb047d6e00f724285a2e8c9f4b34a8bee7ad")
+        message(FATAL_ERROR "Expected the pinned APK shader resources")
+    endif()
+    set(arguments "${APK}" "${REFERENCE}")
+endif()
+execute_process(COMMAND "${CHECKER}" ${arguments}
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 30)
+if(NOT status STREQUAL "0")
+    message(FATAL_ERROR "Native fill rectangle comparison failed: ${output}${diagnostics}")
+endif()
+message(STATUS "${output}")

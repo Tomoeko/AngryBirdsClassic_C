@@ -1,0 +1,25 @@
+file(SHA256 "${APK}" apk_hash)
+if(NOT apk_hash STREQUAL
+    "b524b6b4b0ad999f46828546dee1bb047d6e00f724285a2e8c9f4b34a8bee7ad")
+    message(FATAL_ERROR "Expected the pinned Android 5.2.0 live resource APK")
+endif()
+file(SHA256 "${REFERENCE}" reference_hash)
+if(NOT reference_hash STREQUAL
+    "7eeeca7a19812399b8a39b353e314fc69a1f2666d1d967fde67c75699d242c75")
+    message(FATAL_ERROR "Expected the recorded original live resource state")
+endif()
+set(arguments "${APK}" "${REFERENCE}")
+if(IMAGES)
+    file(SHA256 "${IMAGES}" image_hash)
+    if(NOT image_hash STREQUAL
+        "1a4b08a7730bcaf139498eff41bc1b171757fae3e5b26d382399cfff07413ebb")
+        message(FATAL_ERROR "Expected the recorded original live image descriptors")
+    endif()
+    list(APPEND arguments "${IMAGES}")
+endif()
+execute_process(COMMAND "${CHECKER}" ${arguments}
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 60)
+if(NOT status STREQUAL "0")
+    message(FATAL_ERROR "Original live resource comparison failed: ${output}${diagnostics}")
+endif()
+message(STATUS "${output}")

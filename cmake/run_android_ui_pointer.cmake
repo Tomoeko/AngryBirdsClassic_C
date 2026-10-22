@@ -1,0 +1,35 @@
+cmake_minimum_required(VERSION 3.22)
+foreach(required AB_ADB AB_ADB_SERIAL AB_REFERENCE_UI_POINTER_CHUNKS)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+        message(FATAL_ERROR "Supply ${required} explicitly")
+    endif()
+endforeach()
+if(NOT DEFINED AB_ADB_PORT)
+    set(AB_ADB_PORT 5041)
+endif()
+get_filename_component(private_directory "${CMAKE_CURRENT_LIST_DIR}/../Files" REALPATH)
+get_filename_component(chunks "${AB_REFERENCE_UI_POINTER_CHUNKS}" REALPATH)
+cmake_path(IS_PREFIX private_directory "${chunks}" NORMALIZE private_chunks)
+if(NOT private_chunks)
+    message(FATAL_ERROR "Keep original UI pointer bytecode under Files")
+endif()
+execute_process(COMMAND "${AB_ADB}" -P "${AB_ADB_PORT}" -s "${AB_ADB_SERIAL}"
+    shell mkdir -p /data/local/tmp/ab520/ui
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 30)
+if(NOT status STREQUAL "0")
+    message(FATAL_ERROR "Cannot prepare UI pointer reference: ${output}${diagnostics}")
+endif()
+file(SHA256 "${chunks}/frame-pointer-oracle.lua" actual)
+if(NOT actual STREQUAL
+    "61495274776bee6843a16b26570fc8edf4a1bf31471186130a3cbe4dc9c4793b")
+    message(FATAL_ERROR "Expected pinned original UI Frame.onPointerEvent")
+endif()
+execute_process(COMMAND "${AB_ADB}" -P "${AB_ADB_PORT}" -s "${AB_ADB_SERIAL}"
+    push "${chunks}/frame-pointer-oracle.lua"
+        "/data/local/tmp/ab520/ui/frame-pointer-oracle.lua"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 30)
+if(NOT status STREQUAL "0")
+    message(FATAL_ERROR "Cannot stage UI pointer prototype: ${output}${diagnostics}")
+endif()
+set(AB_ANDROID_ORACLE_KIND ui-pointer)
+include("${CMAKE_CURRENT_LIST_DIR}/run_android_oracle.cmake")

@@ -1,1 +1,62 @@
-/Files
+/Files/
+.DS_Store
+Thumbs.db
+/ROADMAP.md
+
+# Private inputs and locally generated artifacts belong in Files/.
+# These patterns also prevent accidental commits from local work directories.
+/Files/
+/build*/
+/cmake-build-*/
+/generated/
+/recovered/
+/captures/
+/logs/
+/out/
+
+# Build products and compiler caches.
+CMakeFiles/
+CMakeCache.txt
+CTestTestfile.cmake
+Testing/
+compile_commands.json
+.cache/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.app/
+*.dSYM/
+*.gcda
+*.gcno
+*.profraw
+*.profdata
+
+# Original distributions, analysis databases, derived content, and user state.
+*.apk
+*.7z
+*.rar
+*.zip
+*.bndb
+*.bndb.*
+*.idb
+*.i64
+*.abpack
+*.save
+*.sav
+
+# Local editor, interpreter, and operating-system files.
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Shared first-party platform code is pinned by the Common submodule.

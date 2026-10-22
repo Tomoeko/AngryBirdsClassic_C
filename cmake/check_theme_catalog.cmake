@@ -1,0 +1,20 @@
+file(SHA256 "${APK}" apk_hash)
+if(NOT apk_hash STREQUAL
+    "b524b6b4b0ad999f46828546dee1bb047d6e00f724285a2e8c9f4b34a8bee7ad")
+    message(FATAL_ERROR "Expected the pinned Angry Birds 5.2.0 APK")
+endif()
+set(arguments "${APK}")
+if(REFERENCE)
+    file(SHA256 "${REFERENCE}" reference_hash)
+    if(NOT reference_hash STREQUAL
+        "a33e1c650bb34534dadade061d37004d75168644246469c6c03de4752bba1165")
+        message(FATAL_ERROR "Expected the original complete classic theme catalog")
+    endif()
+    list(APPEND arguments "${REFERENCE}")
+endif()
+execute_process(COMMAND "${CHECKER}" ${arguments}
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 30)
+if(NOT status STREQUAL "0")
+    message(FATAL_ERROR "APK theme catalog failed: ${output}${diagnostics}")
+endif()
+message(STATUS "${output}")

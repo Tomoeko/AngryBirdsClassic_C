@@ -1,0 +1,40 @@
+cmake_minimum_required(VERSION 3.22)
+
+foreach(required AB_ADB AB_ADB_SERIAL AB_REFERENCE_LOADER_FUNCTIONS)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+        message(FATAL_ERROR "Supply ${required} explicitly")
+    endif()
+endforeach()
+if(NOT DEFINED AB_ADB_PORT)
+    set(AB_ADB_PORT 5041)
+endif()
+get_filename_component(private_directory "${CMAKE_CURRENT_LIST_DIR}/../Files" REALPATH)
+set(names event finish update)
+set(hashes "784b4808e3b4621ca648ae67be4f7b1938664cbd9ce69a9dfb5048f585f2e1ff"
+    "a3a5cbacb3943429f836a9451d3117c8acf8f7f811eb2fc707dde3f67464d65b"
+    "a09bdf3bf58751ab8940fe0616ac4d481beb06498af6bc847574ec91038292c0")
+set(adb "${AB_ADB}" -P "${AB_ADB_PORT}" -s "${AB_ADB_SERIAL}")
+execute_process(COMMAND ${adb} shell mkdir -p /data/local/tmp/ab520/loader
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 30)
+if(NOT status STREQUAL "0")
+    message(FATAL_ERROR "Cannot prepare original Loader: ${output}${diagnostics}")
+endif()
+foreach(index RANGE 0 2)
+    list(GET names ${index} name)
+    list(GET hashes ${index} expected)
+    get_filename_component(chunk
+        "${AB_REFERENCE_LOADER_FUNCTIONS}/runtime-loader-${name}-oracle.lua" REALPATH)
+    cmake_path(IS_PREFIX private_directory "${chunk}" NORMALIZE private_chunk)
+    file(SHA256 "${chunk}" actual)
+    if(NOT private_chunk OR NOT actual STREQUAL expected)
+        message(FATAL_ERROR "Expected private original Loader ${name} prototype")
+    endif()
+    execute_process(COMMAND ${adb} push "${chunk}"
+        "/data/local/tmp/ab520/loader/${name}.lua"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 30)
+    if(NOT status STREQUAL "0")
+        message(FATAL_ERROR "Cannot stage original Loader ${name}: ${output}${diagnostics}")
+    endif()
+endforeach()
+set(AB_ANDROID_ORACLE_KIND loader)
+include("${CMAKE_CURRENT_LIST_DIR}/run_android_oracle.cmake")

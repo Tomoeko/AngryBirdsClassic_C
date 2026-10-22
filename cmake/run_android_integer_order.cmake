@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.22)
+set(AB_MENU_POINTER_STAGE_ONLY TRUE)
+include("${CMAKE_CURRENT_LIST_DIR}/run_android_menu_pointer.cmake")
+set(AB_ANDROID_ORACLE_KIND integer-order)
+include("${CMAKE_CURRENT_LIST_DIR}/run_android_oracle.cmake")

@@ -1,0 +1,45 @@
+cmake_minimum_required(VERSION 3.22)
+
+foreach(required AB_ADB AB_ADB_SERIAL AB_REFERENCE_LEVEL_FLOW_CHUNKS)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+        message(FATAL_ERROR "Supply ${required} explicitly")
+    endif()
+endforeach()
+if(NOT DEFINED AB_ADB_PORT)
+    set(AB_ADB_PORT 5041)
+endif()
+get_filename_component(private_directory "${CMAKE_CURRENT_LIST_DIR}/../Files" REALPATH)
+get_filename_component(chunks "${AB_REFERENCE_LEVEL_FLOW_CHUNKS}" REALPATH)
+cmake_path(IS_PREFIX private_directory "${chunks}" NORMALIZE private_chunks)
+if(NOT private_chunks)
+    message(FATAL_ERROR "Keep original level-flow-reference chunks under Files")
+endif()
+set(chunk_names check-level-complete check-level-goals before-level-ending)
+set(chunk_hashes
+    "e583b778e77ba33fc8c2de7b212dd01c43f8a5d539e21d553efcb00cb11cbdeb"
+    "873fd96d91be358bde2731fd9e14c895a3ed771e93a50e43a8c13029ba2e1505"
+    "8ea3d4a102bbcd656fc2ed1a07917dc512742e90407d25667784fc1ff415f11f")
+foreach(index RANGE 0 2)
+    list(GET chunk_names ${index} name)
+    list(GET chunk_hashes ${index} expected_hash)
+    file(SHA256 "${chunks}/${name}-oracle.lua" actual_hash)
+    if(NOT actual_hash STREQUAL expected_hash)
+        message(FATAL_ERROR "Expected the recovered target ${name} prototype")
+    endif()
+endforeach()
+execute_process(COMMAND "${AB_ADB}" -P "${AB_ADB_PORT}" -s "${AB_ADB_SERIAL}"
+    shell mkdir -p /data/local/tmp/ab520/flow RESULT_VARIABLE status
+    OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 30)
+if(NOT status STREQUAL "0")
+    message(FATAL_ERROR "Cannot prepare level-flow oracle: ${output}${diagnostics}")
+endif()
+foreach(name IN LISTS chunk_names)
+    execute_process(COMMAND "${AB_ADB}" -P "${AB_ADB_PORT}" -s "${AB_ADB_SERIAL}"
+        push "${chunks}/${name}-oracle.lua" "/data/local/tmp/ab520/flow/${name}-oracle.lua"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 30)
+    if(NOT status STREQUAL "0")
+        message(FATAL_ERROR "Cannot stage level-flow prototype: ${output}${diagnostics}")
+    endif()
+endforeach()
+set(AB_ANDROID_ORACLE_KIND level-flow)
+include("${CMAKE_CURRENT_LIST_DIR}/run_android_oracle.cmake")

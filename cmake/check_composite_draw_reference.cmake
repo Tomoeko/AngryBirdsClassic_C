@@ -1,0 +1,11 @@
+file(SHA256 "${REFERENCE}" reference_hash)
+if(NOT reference_hash STREQUAL
+    "31ff6d55e43f7446c7cdce7b80a183b74a1ef7a78feb179901bf6a02428a0f29")
+    message(FATAL_ERROR "Expected the recorded original composite draw corpus")
+endif()
+execute_process(COMMAND "${CHECKER}" "${REFERENCE}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 30)
+if(NOT status STREQUAL "0")
+    message(FATAL_ERROR "Original composite draw comparison failed: ${output}${diagnostics}")
+endif()
+message(STATUS "${output}")

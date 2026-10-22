@@ -1,0 +1,47 @@
+cmake_minimum_required(VERSION 3.22)
+foreach(required AB_ADB AB_ADB_SERIAL AB_REFERENCE_TEXT_CATALOG_RAW)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+        message(FATAL_ERROR "Supply ${required} explicitly")
+    endif()
+endforeach()
+if(NOT DEFINED AB_ADB_PORT)
+    set(AB_ADB_PORT 5041)
+endif()
+get_filename_component(private_directory "${CMAKE_CURRENT_LIST_DIR}/../Files" REALPATH)
+get_filename_component(raw "${AB_REFERENCE_TEXT_CATALOG_RAW}" REALPATH)
+cmake_path(IS_PREFIX private_directory "${raw}" NORMALIZE private_raw)
+if(NOT private_raw)
+    message(FATAL_ERROR "Keep original text data under Files")
+endif()
+set(catalogs TEXTS_APPRATER TEXTS_BASIC TEXTS_SUGOTOKU_CUSTOMISATION TEXTS_UPDATE)
+set(hashes
+    636822773ec630f1f00a8e213df973e75b9959b8bb0b2561a089044b43808645
+    a48c8f90d71dc64390172b28b2bda9acc1ef728561861ae27f9253c8945de665
+    35010dad59e8dd3d047ddeed7a094031d5acfc05af381bd9b002ae9663bbe71e
+    0635acb59692c48e52468238ac5453ab990431520ac73998d362f6d4e0cd5639)
+foreach(index RANGE 0 3)
+    list(GET catalogs ${index} catalog)
+    list(GET hashes ${index} expected)
+    file(SHA256 "${raw}/${catalog}.dat" actual)
+    if(NOT actual STREQUAL expected)
+        message(FATAL_ERROR "Expected pinned original ${catalog} data")
+    endif()
+endforeach()
+execute_process(COMMAND "${AB_ADB}" -P "${AB_ADB_PORT}" -s "${AB_ADB_SERIAL}"
+    shell mkdir -p /data/local/tmp/ab520/text/raw
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 30)
+if(NOT status STREQUAL "0")
+    message(FATAL_ERROR "Cannot prepare native TEXT reference: ${output}${diagnostics}")
+endif()
+foreach(catalog IN LISTS catalogs)
+    execute_process(COMMAND "${AB_ADB}" -P "${AB_ADB_PORT}" -s "${AB_ADB_SERIAL}"
+        push "${raw}/${catalog}.dat" "/data/local/tmp/ab520/text/raw/${catalog}.dat"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 30)
+    if(NOT status STREQUAL "0")
+        message(FATAL_ERROR "Cannot stage original TEXT data: ${output}${diagnostics}")
+    endif()
+endforeach()
+if(NOT DEFINED AB_ANDROID_ORACLE_KIND)
+    set(AB_ANDROID_ORACLE_KIND text-catalog)
+endif()
+include("${CMAKE_CURRENT_LIST_DIR}/run_android_oracle.cmake")

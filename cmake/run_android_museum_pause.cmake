@@ -1,0 +1,41 @@
+cmake_minimum_required(VERSION 3.22)
+
+foreach(required AB_ADB AB_ADB_SERIAL CHECKER AB_REFERENCE_MUSEUM_PAUSE
+        AB_REFERENCE_MUSEUM_LEVEL)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+        message(FATAL_ERROR "Supply ${required} explicitly")
+    endif()
+endforeach()
+if(NOT DEFINED AB_ADB_PORT)
+    set(AB_ADB_PORT 5041)
+endif()
+get_filename_component(private_directory "${CMAKE_CURRENT_LIST_DIR}/../Files" REALPATH)
+set(adb "${AB_ADB}" -P "${AB_ADB_PORT}" -s "${AB_ADB_SERIAL}")
+
+function(stage_original variable name expected_hash)
+    get_filename_component(chunk "${${variable}}" REALPATH)
+    cmake_path(IS_PREFIX private_directory "${chunk}" NORMALIZE private_chunk)
+    file(SHA256 "${chunk}" actual)
+    if(NOT private_chunk OR NOT actual STREQUAL expected_hash)
+        message(FATAL_ERROR "Expected pinned private original ${name}")
+    endif()
+    execute_process(COMMAND ${adb} push "${chunk}" "/data/local/tmp/ab520/${name}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 30)
+    if(NOT status STREQUAL "0")
+        message(FATAL_ERROR "Cannot stage ${name}: ${output}${diagnostics}")
+    endif()
+endfunction()
+
+execute_process(COMMAND ${adb} shell mkdir -p /data/local/tmp/ab520
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 30)
+if(NOT status STREQUAL "0")
+    message(FATAL_ERROR "Cannot prepare original Museum/pause queries: ${output}${diagnostics}")
+endif()
+stage_original(AB_REFERENCE_MUSEUM_PAUSE museum-pause-query.lua
+    "56ff3247c6155760b56c9ccdf64afb360c7a0e48c29287c0c768a40ba66ea305")
+stage_original(AB_REFERENCE_MUSEUM_LEVEL museum-level-query.lua
+    "0a12d20044191284c9489c18296e8984457f5958d96f86d63951ed2628d091b5")
+set(AB_ANDROID_ORACLE_KIND museum-pause)
+include("${CMAKE_CURRENT_LIST_DIR}/run_android_oracle.cmake")
+set(REFERENCE "${AB_ANDROID_TRACE}")
+include("${CMAKE_CURRENT_LIST_DIR}/check_classic_museum_pause_reference.cmake")

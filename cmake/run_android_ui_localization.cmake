@@ -1,0 +1,35 @@
+cmake_minimum_required(VERSION 3.22)
+foreach(required AB_ADB AB_ADB_SERIAL AB_REFERENCE_UI_LOCALIZATION_CHUNKS)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+        message(FATAL_ERROR "Supply ${required} explicitly")
+    endif()
+endforeach()
+if(NOT DEFINED AB_ADB_PORT)
+    set(AB_ADB_PORT 5041)
+endif()
+get_filename_component(private_directory "${CMAKE_CURRENT_LIST_DIR}/../Files" REALPATH)
+get_filename_component(chunks "${AB_REFERENCE_UI_LOCALIZATION_CHUNKS}" REALPATH)
+cmake_path(IS_PREFIX private_directory "${chunks}" NORMALIZE private_chunks)
+if(NOT private_chunks)
+    message(FATAL_ERROR "Keep original localization bytecode under Files")
+endif()
+file(SHA256 "${chunks}/localization-string-oracle.lua" actual)
+if(NOT actual STREQUAL
+    "e176cf1c6a8aa5e87c2cf3c8673bacfee9ec8317f73b0e2cf84cc5df541e4495")
+    message(FATAL_ERROR "Expected pinned original localization helper")
+endif()
+execute_process(COMMAND "${AB_ADB}" -P "${AB_ADB_PORT}" -s "${AB_ADB_SERIAL}"
+    shell mkdir -p /data/local/tmp/ab520/ui
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 30)
+if(NOT status STREQUAL "0")
+    message(FATAL_ERROR "Cannot prepare localization reference: ${output}${diagnostics}")
+endif()
+execute_process(COMMAND "${AB_ADB}" -P "${AB_ADB_PORT}" -s "${AB_ADB_SERIAL}"
+    push "${chunks}/localization-string-oracle.lua"
+        /data/local/tmp/ab520/ui/localization-string-oracle.lua
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 30)
+if(NOT status STREQUAL "0")
+    message(FATAL_ERROR "Cannot stage localization helper: ${output}${diagnostics}")
+endif()
+set(AB_ANDROID_ORACLE_KIND ui-localization)
+include("${CMAKE_CURRENT_LIST_DIR}/run_android_oracle.cmake")
