@@ -26,6 +26,16 @@ typedef struct {
 bool ab_data_string_order(const AbDataTable *table, size_t hash_capacity,
                           AbStringOrderWorkspace *workspace, AbError *error);
 
+/* The same constructor layout after nil writes to existing entries. Rebuild
+ * every original key, including deleted ones, then emit only live values.
+ * The caller retains the complete original insertion sequence and capacity;
+ * no later insertion, growth, collection or reinsertion is modeled. count and
+ * indices change only on success. This models level onLoad pruning without
+ * compacting the hash layout or changing surviving iteration order. */
+bool ab_data_string_order_pruned(const AbDataTable *table, size_t hash_capacity,
+                                 AbStringOrderWorkspace *workspace, size_t *count,
+                                 AbError *error);
+
 /* The same unique string insertions starting from an empty hash part, growing
  * at native power-of-two boundaries. Rehash old physical slots in reverse
  * order. Scratch nodes cover the final power-of-two capacity and indices cover

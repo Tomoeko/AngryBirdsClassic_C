@@ -46,6 +46,7 @@ typedef struct {
     float size[2];
     float opacity;
     float coordinates_are_clip;
+    float mask[4];
 } MetalParameters;
 
 typedef struct {
@@ -75,7 +76,7 @@ struct AbMetal {
 };
 
 _Static_assert(sizeof(uintptr_t) == 8, "Apple Metal boundary requires 64-bit ABI");
-_Static_assert(sizeof(AbDrawVertex) == 16 && sizeof(MetalParameters) == 32 &&
+_Static_assert(sizeof(AbDrawVertex) == 16 && sizeof(MetalParameters) == 48 &&
                    offsetof(MetalParameters, size) == 16 &&
                    offsetof(MetalParameters, opacity) == 24 &&
                    offsetof(MetalParameters, coordinates_are_clip) == 28,
@@ -329,6 +330,9 @@ bool ab_metal_render(AbMetal *renderer, void *encoder, const AbDrawList *list,
         const AbDrawCommand *command = list->commands + index;
         if (!valid_texture(renderer, command->texture) ||
             !renderer->textures[command->texture - 1].object ||
+            (command->mask.texture &&
+             (!valid_texture(renderer, command->mask.texture) ||
+              !renderer->textures[command->mask.texture - 1].object)) ||
             !ab_draw_command_check(command, NULL)) {
             return ab_fail(error, "Invalid Metal draw command at index %zu", index);
         }
@@ -367,7 +371,8 @@ bool ab_metal_render(AbMetal *renderer, void *encoder, const AbDrawList *list,
         MetalParameters parameters = {.size = {(float)width, (float)height},
                                       .opacity = command->opacity,
                                       .coordinates_are_clip =
-                                          command->coordinates == AB_DRAW_CLIP};
+                                          command->coordinates == AB_DRAW_CLIP,
+                                      .mask = {command->mask.texture ? 1 : 0}};
         memcpy(parameters.color, command->color, sizeof(parameters.color));
         bind_object(native_encoder, renderer->set_pipeline,
                     renderer->pipelines[command->blend]);
@@ -375,11 +380,19 @@ bool ab_metal_render(AbMetal *renderer, void *encoder, const AbDrawList *list,
                    sizeof(command->quad), 0);
         bind_bytes(native_encoder, renderer->set_vertex_bytes, &parameters,
                    sizeof(parameters), 1);
+        bind_bytes(native_encoder, renderer->set_vertex_bytes, command->mask.uv,
+                   sizeof(command->mask.uv), 2);
         bind_bytes(native_encoder, renderer->set_fragment_bytes, &parameters,
                    sizeof(parameters), 1);
         bind_indexed(native_encoder, renderer->set_texture, texture->object, 0);
         bind_indexed(native_encoder, renderer->set_sampler,
                      renderer->samplers[texture->sampler], 0);
+        const MetalTexture *mask =
+            renderer->textures +
+            (command->mask.texture ? command->mask.texture : command->texture) - 1;
+        bind_indexed(native_encoder, renderer->set_texture, mask->object, 1);
+        bind_indexed(native_encoder, renderer->set_sampler,
+                     renderer->samplers[mask->sampler], 1);
         draw(native_encoder, renderer->draw, 4, 0, 4);
     }
     return true;

@@ -8,9 +8,11 @@
 
 attribute highp vec2 vertex_position;
 attribute AB_UV_PRECISION vec2 vertex_uv;
+attribute AB_UV_PRECISION vec2 vertex_mask_uv;
 uniform highp vec2 framebuffer_size;
 uniform lowp float coordinates_are_clip;
 varying AB_UV_PRECISION vec2 sampled_uv;
+varying AB_UV_PRECISION vec2 sampled_mask_uv;
 
 void main() {
     highp vec2 clip_position = vertex_position;
@@ -21,4 +23,5 @@ void main() {
     }
     gl_Position = vec4(clip_position, 0.0, 1.0);
     sampled_uv = vertex_uv;
+    sampled_mask_uv = vertex_mask_uv;
 }

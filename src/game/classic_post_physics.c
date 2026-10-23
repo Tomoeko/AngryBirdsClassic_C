@@ -251,8 +251,8 @@ bool ab_classic_post_physics_recreate_circle(AbClassicPostPhysics *post, size_t 
     return true;
 }
 
-bool ab_classic_post_physics_register_circle(AbClassicPostPhysics *post, size_t object,
-                                             AbError *error) {
+static bool register_object(AbClassicPostPhysics *post, size_t object, bool box,
+                            AbError *error) {
     AbClassicLevelView level = ab_classic_level_view(post ? post->level : NULL);
     if (!post || object != post->count || object >= post->capacity || !level.bodies ||
         object >= level.bodies->count || object >= level.frame->count ||
@@ -260,9 +260,12 @@ bool ab_classic_post_physics_register_circle(AbClassicPostPhysics *post, size_t 
         return ab_fail(error, "Invalid new direct-circle post-physics binding");
     const AbLevelObject *source = level.bodies->objects + object;
     const AbGameFrameObject *frame = level.frame->objects + object;
-    if (source->placement || source->physics.dimensions.radius < 0 ||
-        !source->name.data || !source->name.size || frame->collider == 5 ||
-        frame->body != source->physics.body ||
+    bool unsupported = box ? source->physics.dimensions.radius != -1 ||
+                                 source->physics.dimensions.width <= 0 ||
+                                 source->physics.dimensions.height <= 0
+                           : source->physics.dimensions.radius < 0;
+    if (source->placement || unsupported || !source->name.data || !source->name.size ||
+        frame->collider == 5 || frame->body != source->physics.body ||
         !ab_world_has_body(level.world, source->physics.body))
         return ab_fail(error, "Unsupported direct-circle post-physics identity");
     size_t rank = 0;
@@ -270,15 +273,24 @@ bool ab_classic_post_physics_register_circle(AbClassicPostPhysics *post, size_t 
         ++rank;
     if (rank < post->count && !name_order(post->entries[rank].name, source->name))
         return ab_fail(error, "Duplicate direct-circle post-physics name");
-    if (!post->rolling_count || post->rolling[0].name.size) {
+    AbSpan name = {0};
+    if (box && !initial_rolling(level, source, &name, error))
+        return false;
+    size_t rolling = 0;
+    while (rolling < post->rolling_count &&
+           name_order(post->rolling[rolling].name, name) < 0)
+        ++rolling;
+    if (rolling == post->rolling_count ||
+        name_order(post->rolling[rolling].name, name)) {
         if (post->rolling_count == post->capacity)
-            return ab_fail(error, "Direct-circle rolling name storage exhausted");
-        memmove(post->rolling + 1, post->rolling,
-                post->rolling_count * sizeof(*post->rolling));
-        post->rolling[0] = (RollingEntry){0};
+            return ab_fail(error, "New object rolling name storage exhausted");
+        memmove(post->rolling + rolling + 1, post->rolling + rolling,
+                (post->rolling_count - rolling) * sizeof(*post->rolling));
+        post->rolling[rolling] = (RollingEntry){.name = name};
         ++post->rolling_count;
         for (size_t index = 0; index < post->count; ++index)
-            ++post->entries[index].rolling;
+            if (post->entries[index].rolling >= rolling)
+                ++post->entries[index].rolling;
     }
     size_t shifted = post->count - rank;
     memmove(post->entries + rank + 1, post->entries + rank,
@@ -287,12 +299,23 @@ bool ab_classic_post_physics_register_circle(AbClassicPostPhysics *post, size_t 
             shifted * sizeof(*post->source_indices));
     post->entries[rank] = (PostEntry){.name = source->name,
                                       .source = object,
-                                      .rolling = 0,
+                                      .rolling = rolling,
                                       .collider = frame->collider,
+                                      .shape = box ? 1u : 0u,
                                       .radius = source->physics.dimensions.radius};
     post->source_indices[rank] = object;
     ++post->count;
     return true;
+}
+
+bool ab_classic_post_physics_register_circle(AbClassicPostPhysics *post, size_t object,
+                                             AbError *error) {
+    return register_object(post, object, false, error);
+}
+
+bool ab_classic_post_physics_register_box(AbClassicPostPhysics *post, size_t object,
+                                          AbError *error) {
+    return register_object(post, object, true, error);
 }
 
 static bool update_object(AbClassicPostPhysics *post, AbClassicLevelView level,

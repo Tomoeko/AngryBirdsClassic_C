@@ -330,11 +330,20 @@ typedef struct {
     const AbThemeLayerBinding *layer;
     AbThemeLayerImage image;
     void *context;
+    bool align_integer_pivots;
 } BaseDraw;
 
 static bool draw_sprite(BaseDraw *draw, const AbSpriteBinding *sprite, AbVec2 position,
                         AbVec2 scale, const float tint[4], AbError *error) {
     AbVec2 vertices[4];
+    if (draw->align_integer_pivots) {
+        /* DAT pivots are integers. The legacy add-half/truncate getter moves
+         * negative ones toward zero, opening a one-source-pixel cut between
+         * authored adjoining parts. Compensate before the common transform;
+         * do not round screen coordinates or change atlas UVs/sampling. */
+        position.x += sprite->region->pivot_x < 0 ? 1 : 0;
+        position.y += sprite->region->pivot_y < 0 ? 1 : 0;
+    }
     return ab_theme_sprite_vertices(sprite->region, position, scale, vertices, error) &&
            draw->image(draw->context, sprite, vertices, tint, error);
 }
@@ -375,7 +384,7 @@ bool ab_theme_layers_draw_base(const AbThemeLayers *layers, uintptr_t handle,
     }
     AbThemeLayerTransform transform = {input->camera, input->viewport_width,
                                        layer->definition.parallax};
-    BaseDraw draw = {layer, image, context};
+    BaseDraw draw = {layer, image, context, input->align_integer_pivots};
     return ab_theme_layer_draw_base(&layer->definition.base, &transform, input->time,
                                     state, input->placement_limit, draw_placement,
                                     &draw, error);

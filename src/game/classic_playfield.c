@@ -57,11 +57,13 @@ static bool open_scene(AbClassicPlayfield *owner, AbError *error) {
             &view->visuals, error) ||
         !ab_classic_render_scene_open(
             config->level,
-            (AbClassicRenderSceneConfig){.provider = config->sprites,
-                                         .id_counter = config->renderer_counter,
-                                         .extra_renderers = limits.extra_renderers,
-                                         .storage_bytes = limits.scene,
-                                         .object_blend = config->object_blend},
+            (AbClassicRenderSceneConfig){
+                .provider = config->sprites,
+                .id_counter = config->renderer_counter,
+                .extra_renderers = limits.extra_renderers,
+                .storage_bytes = limits.scene,
+                .object_blend = config->object_blend,
+                .terrain = config->terrain ? *config->terrain : (AbMaskTexture){0}},
             &view->scene, error) ||
         !ab_classic_scene_sync_visuals(ab_classic_render_scene_objects(view->scene),
                                        view->visuals, error))

@@ -69,6 +69,9 @@ typedef struct {
     int32_t viewport_width;
     float time;
     size_t placement_limit;
+    /* Preserve integer DAT attachment coordinates at adjoining scenery edges.
+     * False retains the original add-half/truncate getter for native probes. */
+    bool align_integer_pivots;
 } AbThemeLayerDrawInput;
 
 typedef bool (*AbThemeLayerImage)(void *context, const AbSpriteBinding *sprite,

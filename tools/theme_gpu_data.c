@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
     }
     okay = okay && ab_zip_open((AbSpan){bytes.data, bytes.size}, &archive, &error) &&
            level_preview_open(&archive, &level, &error) &&
-           ab_draw_list_init(PREVIEW_THEME_DRAWS + 32, 65536, &list, &error);
+           ab_draw_list_init(PREVIEW_THEME_DRAWS + 32, 128 * 1024, &list, &error);
     if (okay && argc == 4) {
         char *end;
         unsigned long value = strtoul(argv[3], &end, 10);

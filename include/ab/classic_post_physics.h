@@ -100,6 +100,9 @@ bool ab_classic_post_physics_recreate_circle(AbClassicPostPhysics *post, size_t 
  * the view's count/order after registration; objects retains creation indices. */
 bool ab_classic_post_physics_register_circle(AbClassicPostPhysics *post, size_t object,
                                              AbError *error);
+/* Defined box counterpart, including its shape and material rolling-sound key. */
+bool ab_classic_post_physics_register_box(AbClassicPostPhysics *post, size_t object,
+                                          AbError *error);
 
 /* Enabled phase: publish eligible script properties, calculate activity and
  * shared per-name rolling maxima, then finish each object's old-awake flag.

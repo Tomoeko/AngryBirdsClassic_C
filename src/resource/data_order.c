@@ -65,7 +65,8 @@ static bool insert_entry(const AbDataTable *table, size_t entry, size_t capacity
 }
 
 static bool valid_storage(const AbDataTable *table, size_t hash_capacity,
-                          const AbStringOrderWorkspace *workspace, AbError *error) {
+                          const AbStringOrderWorkspace *workspace, bool allow_nil,
+                          AbError *error) {
     if (!table || !workspace || table->count > table->capacity ||
         (table->count && (!table->entries || !workspace->indices)) ||
         table->count > workspace->index_capacity || table->count > hash_capacity ||
@@ -79,7 +80,7 @@ static bool valid_storage(const AbDataTable *table, size_t hash_capacity,
         const AbDataEntry *entry = table->entries + index;
         if (entry->key.kind != AB_DATA_STRING || entry->key.string.size > UINT32_MAX ||
             (entry->key.string.size && !entry->key.string.data) ||
-            entry->value.kind == AB_DATA_NIL) {
+            (!allow_nil && entry->value.kind == AB_DATA_NIL)) {
             return ab_fail(error,
                            "String ordering requires unique non-nil string keys");
         }
@@ -105,7 +106,7 @@ static void write_indices(const AbStringOrderNode *nodes, size_t capacity,
 
 bool ab_data_string_order(const AbDataTable *table, size_t hash_capacity,
                           AbStringOrderWorkspace *workspace, AbError *error) {
-    if (!valid_storage(table, hash_capacity, workspace, error)) {
+    if (!valid_storage(table, hash_capacity, workspace, false, error)) {
         return false;
     }
     clear_nodes(workspace->nodes, hash_capacity);
@@ -119,6 +120,30 @@ bool ab_data_string_order(const AbDataTable *table, size_t hash_capacity,
     return true;
 }
 
+bool ab_data_string_order_pruned(const AbDataTable *table, size_t hash_capacity,
+                                 AbStringOrderWorkspace *workspace, size_t *count,
+                                 AbError *error) {
+    if (!count || !valid_storage(table, hash_capacity, workspace, true, error)) {
+        return ab_fail(error, "Invalid pruned string-order storage");
+    }
+    clear_nodes(workspace->nodes, hash_capacity);
+    size_t last_free = hash_capacity;
+    for (size_t entry = 0; entry < table->count; ++entry) {
+        if (!insert_entry(table, entry, hash_capacity, workspace->nodes, &last_free)) {
+            return ab_fail(error, "Duplicate key or unsupported pruned string layout");
+        }
+    }
+    size_t live = 0;
+    for (size_t slot = 0; slot < hash_capacity; ++slot) {
+        size_t entry = workspace->nodes[slot].entry;
+        if (entry != SIZE_MAX && table->entries[entry].value.kind != AB_DATA_NIL) {
+            workspace->indices[live++] = entry;
+        }
+    }
+    *count = live;
+    return true;
+}
+
 bool ab_data_string_order_growing(const AbDataTable *table,
                                   AbStringOrderWorkspace *workspace,
                                   size_t *final_capacity, AbError *error) {
@@ -129,7 +154,7 @@ bool ab_data_string_order_growing(const AbDataTable *table,
     while (maximum < table->count) {
         maximum *= 2;
     }
-    if (!valid_storage(table, maximum, workspace, error)) {
+    if (!valid_storage(table, maximum, workspace, false, error)) {
         return false;
     }
     size_t capacity = 0, last_free = 0;

@@ -281,8 +281,8 @@ bool ab_classic_forces_recreate_circle(AbClassicForces *forces, size_t object,
     return true;
 }
 
-bool ab_classic_forces_register_circle(AbClassicForces *forces, size_t object,
-                                       AbError *error) {
+static bool register_object(AbClassicForces *forces, size_t object, bool box,
+                            AbError *error) {
     AbClassicLevelView level = ab_classic_level_view(forces ? forces->level : NULL);
     if (!forces || object != forces->count || object >= forces->capacity ||
         !level.bodies || object >= level.bodies->count ||
@@ -290,8 +290,11 @@ bool ab_classic_forces_register_circle(AbClassicForces *forces, size_t object,
         level.world->failed || level.world->locked)
         return ab_fail(error, "Invalid new direct-circle force binding");
     const AbLevelObject *source = level.bodies->objects + object;
-    if (source->placement || source->physics.dimensions.radius < 0 ||
-        !source->name.size || !source->name.data ||
+    bool unsupported = box ? source->physics.dimensions.radius != -1 ||
+                                 source->physics.dimensions.width <= 0 ||
+                                 source->physics.dimensions.height <= 0
+                           : source->physics.dimensions.radius < 0;
+    if (source->placement || unsupported || !source->name.size || !source->name.data ||
         !ab_world_has_body(level.world, source->physics.body) ||
         find_entry(forces, source->name))
         return ab_fail(error, "Unsupported direct-circle force identity");
@@ -301,6 +304,17 @@ bool ab_classic_forces_register_circle(AbClassicForces *forces, size_t object,
         .name = source->name, .source = object, .rank = rank, .owner = forces};
     entry->data.forces.gravity_enabled = source->physics.gravity_enabled;
     entry->data.forces.object_mass = source->initial_mass;
+    if (box) {
+        AbObjectDefinition definition;
+        if (!ab_object_definition_open(level.catalog, source->definition_name, NULL,
+                                       &definition, error) ||
+            !ab_object_force_data(
+                &definition, source->initial_mass, source->physics.gravity_enabled,
+                level.initial_sprites[object].sprite, &entry->data, error))
+            return false;
+        if (entry->data.sound_choices || entry->data.sound.count)
+            return ab_fail(error, "New box requires reserved force sound choices");
+    }
     size_t shifted = forces->count - rank;
     memmove(forces->objects + rank + 1, forces->objects + rank,
             shifted * sizeof(*forces->objects));
@@ -308,21 +322,34 @@ bool ab_classic_forces_register_circle(AbClassicForces *forces, size_t object,
             shifted * sizeof(*forces->source_indices));
     memmove(forces->order + rank + 1, forces->order + rank,
             shifted * sizeof(*forces->order));
-    forces->objects[rank] =
-        (AbGamePhysicsObject){.body = source->physics.body,
-                              .forces = entry->data.forces,
-                              .gravity_enabled = &source->physics.gravity_enabled,
-                              .sound = &entry->data.sound,
-                              .random = forces->random,
-                              .resource_host = resource_request,
-                              .resource_context = entry,
-                              .removed = level.removed_objects + object};
+    forces->objects[rank] = (AbGamePhysicsObject){
+        .body = source->physics.body,
+        .prepare_forces = entry->data.prepare_forces,
+        .friction = entry->data.friction,
+        .forces = entry->data.forces,
+        .gravity_enabled = &source->physics.gravity_enabled,
+        .interval = entry->data.interval_present ? &entry->data.interval : NULL,
+        .sound = &entry->data.sound,
+        .random = forces->random,
+        .resource_host = resource_request,
+        .resource_context = entry,
+        .removed = level.removed_objects + object};
     forces->source_indices[rank] = object;
     forces->order[rank] = entry;
     ++forces->count;
     for (size_t index = rank + 1; index < forces->count; ++index)
         forces->order[index]->rank = index;
     return true;
+}
+
+bool ab_classic_forces_register_circle(AbClassicForces *forces, size_t object,
+                                       AbError *error) {
+    return register_object(forces, object, false, error);
+}
+
+bool ab_classic_forces_register_box(AbClassicForces *forces, size_t object,
+                                    AbError *error) {
+    return register_object(forces, object, true, error);
 }
 
 static bool queued_object_exists(void *context, AbSpan name, bool *present,

@@ -7,8 +7,10 @@
 #endif
 
 attribute AB_PRECISION vec4 sprite_vertex;
+attribute AB_UV_PRECISION vec4 sprite_mask_uv;
 uniform AB_PRECISION vec4 sprite_viewport;
 varying AB_UV_PRECISION vec2 sampled_uv;
+varying AB_UV_PRECISION vec2 sampled_mask_uv;
 #ifdef GL_ES
 #ifdef GL_FRAGMENT_PRECISION_HIGH
 #define AB_CLIP_PRECISION highp
@@ -29,5 +31,6 @@ void main() {
     }
     gl_Position = vec4(clip_position, 0.0, 1.0);
     sampled_uv = sprite_vertex.zw;
+    sampled_mask_uv = sprite_mask_uv.xy;
     screen_clip_position = clip_position;
 }

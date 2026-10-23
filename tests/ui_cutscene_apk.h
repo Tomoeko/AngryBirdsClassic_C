@@ -2,6 +2,7 @@
 #define AB_UI_CUTSCENE_APK_TEST_H
 
 #include "ab/ui_cutscene.h"
+#include "ab/hash.h"
 
 static bool cutscene_save_boundary(void *context, AbError *error) {
     (void)error;
@@ -59,6 +60,7 @@ static bool cutscene_widgets(PreviewMenu *menu, AbMetal *renderer, const char *p
         goto release;
     stage = "source intro construction and entry";
     AbUiCutsceneHost host = {.scaling = &menu->scaling,
+                             .content_scaling = &menu->cutscene_scaling,
                              .shared = &shared,
                              .audio = menu->audio,
                              .mixer = menu->mixer,
@@ -142,9 +144,10 @@ release:
     return okay;
 }
 
-static bool cutscene_catalog_widgets(PreviewMenu *menu, AbMetal *renderer,
-                                     AbError *error) {
-    if (!menu_preview_resize(menu, (AbVec2){1024, 768}, error))
+static bool cutscene_catalog_widgets_at(PreviewMenu *menu, AbMetal *renderer,
+                                        AbVec2 screen, bool require_pan,
+                                        AbError *error) {
+    if (!menu_preview_resize(menu, screen, error))
         return false;
     for (size_t pack = 1; pack <= 9; ++pack) {
         char name[32];
@@ -175,6 +178,7 @@ static bool cutscene_catalog_widgets(PreviewMenu *menu, AbMetal *renderer,
         AbUiCutscene owner = {0};
         AbUiCutsceneClass shared = {0};
         AbUiCutsceneHost host = {.scaling = &menu->scaling,
+                                 .content_scaling = &menu->cutscene_scaling,
                                  .shared = &shared,
                                  .audio = menu->audio,
                                  .mixer = menu->mixer,
@@ -190,21 +194,75 @@ static bool cutscene_catalog_widgets(PreviewMenu *menu, AbMetal *renderer,
             !ab_ui_widget_lifecycle(&owner.widget, AB_UI_FRAME_ENTRY, error))
             return false;
         bool okay = true;
+        AbVec2 previous = {0};
+        float movement = 0;
+        bool scroll_command = false;
+        uint32_t first_pixels = 0;
+        bool pixels_changed = false;
         size_t frames = (size_t)ceilf(menu_real(deadline.bits) * 30) + 2;
         for (size_t frame = 0; okay && frame < frames; ++frame) {
             okay =
                 ab_ui_widget_update(&owner.widget, 1.0f / 30, (float)frame / 30, error);
-            if (okay && (frame == 0 || frame + 1 == frames)) {
+            if (frame) {
+                movement += fabsf(owner.scroll.x - previous.x) +
+                            fabsf(owner.scroll.y - previous.y);
+                scroll_command = scroll_command || owner.scrolling;
+            }
+            previous = owner.scroll;
+            if (okay && (frame == 0 || frame == frames / 2 || frame + 1 == frames)) {
                 ab_draw_list_clear(menu->context.draw_list);
                 AbUiDrawInput input = {0};
                 AbImage image = {0};
                 const float clear[] = {0, 0, 0, 1};
                 okay = ab_ui_widget_draw(&owner.widget, &input, error) &&
-                       ab_metal_capture(renderer, menu->context.draw_list, 1024, 768,
-                                        clear, 16 * 1024 * 1024, &image, error);
+                       ab_metal_capture(renderer, menu->context.draw_list,
+                                        (uint32_t)screen.x, (uint32_t)screen.y, clear,
+                                        64 * 1024 * 1024, &image, error);
+                if (okay) {
+                    uint32_t pixels =
+                        ab_crc32((AbSpan){image.rgba.data, image.rgba.size});
+                    if (!frame)
+                        first_pixels = pixels;
+                    else
+                        pixels_changed = pixels_changed || pixels != first_pixels;
+                    const char *prefix = getenv("AB_COMIC_PAN_CAPTURE_PREFIX");
+                    if (prefix && require_pan && pack == 1 && screen.x == 1920) {
+                        char path[1024];
+                        int length =
+                            snprintf(path, sizeof(path), "%s-%zu.ppm", prefix, frame);
+                        okay = length > 0 && (size_t)length < sizeof(path) &&
+                               save(path, &image, error);
+                    }
+                    if (okay && require_pan && pack == 1) {
+                        size_t last = ((size_t)image.width - 1) * 4;
+                        if (memcmp(image.rgba.data, image.rgba.data + 16, 3) ||
+                            memcmp(image.rgba.data + last, image.rgba.data + last - 16,
+                                   3))
+                            okay =
+                                ab_fail(error, "Comic edge leaves a background pixel");
+                        if (frame + 1 == frames)
+                            for (size_t row = 0; okay && row < image.height; ++row) {
+                                const uint8_t *edge =
+                                    image.rgba.data + row * image.width * 4 + last;
+                                if (!(edge[0] || edge[1] || edge[2]) &&
+                                    (edge[-16] || edge[-15] || edge[-14]))
+                                    okay = ab_fail(
+                                        error,
+                                        "Comic right edge is uncovered at row %zu",
+                                        row);
+                            }
+                    }
+                }
                 ab_image_free(&image);
             }
         }
+        if (okay && require_pan && scroll_command && (movement < 1 || !pixels_changed))
+            okay = ab_fail(error,
+                           "Pack%zu comic did not pan at %.0fx%.0f: scale %.4f, "
+                           "reference %.0fx%.0f, class %.4f, no_scroll %u",
+                           pack, screen.x, screen.y, owner.scale, owner.reference.x,
+                           owner.reference.y, shared.reference_scale,
+                           (unsigned)owner.no_scroll);
         AbError cleanup = {0};
         bool exited = ab_ui_widget_lifecycle(&owner.widget, AB_UI_FRAME_EXIT, &cleanup);
         if (!okay || !exited || saves != 1)
@@ -215,6 +273,32 @@ static bool cutscene_catalog_widgets(PreviewMenu *menu, AbMetal *renderer,
     puts("All nine source pack intros play to their actual end times and render on "
          "Metal, including vertical fit, initial scroll and direction restrictions.");
     return true;
+}
+
+static bool cutscene_catalog_widgets(PreviewMenu *menu, AbMetal *renderer,
+                                     AbError *error) {
+    return cutscene_catalog_widgets_at(menu, renderer, (AbVec2){1024, 768}, false,
+                                       error);
+}
+
+static bool cutscene_catalog_pan_widgets(const AbZip *zip, PreviewMenu *menu,
+                                         AbMetal *renderer, AbDrawList *list,
+                                         AbError *error) {
+    menu_preview_free(menu);
+    menu->highest_resources = true;
+    menu->screen = (AbVec2){1920, 1080};
+    bool okay =
+        menu_preview_open(zip, (AbAssetTextureHost){renderer, upload, remove_texture},
+                          list, menu, error) &&
+        menu_background_open(menu, error) &&
+        cutscene_catalog_widgets_at(menu, renderer, menu->screen, true, error) &&
+        cutscene_catalog_widgets_at(menu, renderer, (AbVec2){2560, 1440}, true,
+                                    error) &&
+        cutscene_catalog_widgets_at(menu, renderer, (AbVec2){3840, 2160}, true,
+                                    error) &&
+        cutscene_catalog_widgets_at(menu, renderer, (AbVec2){1919, 1079}, true, error);
+    menu_preview_free(menu);
+    return okay;
 }
 
 #endif

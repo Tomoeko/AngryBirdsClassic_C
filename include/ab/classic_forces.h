@@ -69,6 +69,10 @@ bool ab_classic_forces_recreate_circle(AbClassicForces *forces, size_t object,
  * change. Reject gaps/duplicates/removed or non-circle identities. */
 bool ab_classic_forces_register_circle(AbClassicForces *forces, size_t object,
                                        AbError *error);
+/* Defined explicit box counterpart; resolve its real force/material fields.
+ * New sound-choice arrays require separate reserved storage and reject here. */
+bool ab_classic_forces_register_box(AbClassicForces *forces, size_t object,
+                                    AbError *error);
 
 /* Replay a queue against this owner's registered object map and live body
  * slots. Unknown/removed names skip, static bodies ignore force. Numeric point

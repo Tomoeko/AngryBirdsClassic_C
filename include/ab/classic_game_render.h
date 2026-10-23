@@ -12,6 +12,7 @@ typedef struct {
     const AbParticles *particles;
     const AbSpriteProvider *provider;
     const AbDataTable *theme, *settings, *extra_draw_functions;
+    AbExtraDraws *extra_draws;
     const AbDataValue *physics_to_world;
     AbClassicGameDrawState *state;
     AbSpan basic_font, *current_font;

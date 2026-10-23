@@ -86,6 +86,8 @@ bool ab_classic_simulation_recreate_circle(AbClassicSimulation *simulation,
  * discard on error. Calls during a simulation pass reject. */
 bool ab_classic_simulation_register_circle(AbClassicSimulation *simulation,
                                            size_t object, AbError *error);
+bool ab_classic_simulation_register_box(AbClassicSimulation *simulation, size_t object,
+                                        AbError *error);
 
 /* Plan timing, repeat queued forces/friction/force-adder/water/script/physics/
  * glue/after-step/history in recovered order, clear the force queue once after all

@@ -112,12 +112,12 @@ static bool draw(AbThemeDraw *owner, AbThemeDrawInput input, bool foreground,
         input.height > INT32_MAX)
         return ab_fail(error, "Invalid or reentrant theme draw");
     owner->calling = true;
-    DrawCall call = {
-        owner,
-        {input.camera, (int32_t)input.width, input.time, owner->config.placement_limit},
-        input.height,
-        list,
-        false};
+    DrawCall call = {owner,
+                     {input.camera, (int32_t)input.width, input.time,
+                      owner->config.placement_limit, true},
+                     input.height,
+                     list,
+                     false};
     bool okay;
     if (foreground) {
         AbThemeForeground view;

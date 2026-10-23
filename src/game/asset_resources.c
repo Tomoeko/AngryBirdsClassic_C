@@ -169,6 +169,18 @@ bool ab_asset_resources_host(void *context, AbAssetCall *call, AbError *error) {
     return okay;
 }
 
+bool ab_asset_resources_find_image(const AbAssetResources *resources, AbSpan name,
+                                   AbSpriteAtlasImage *output) {
+    if (!resources || resources->failed || resources->busy || !output)
+        return false;
+    const AbResourceSource *source =
+        ab_resource_owners_find(&resources->owners, AB_SPRITE_REGISTRY_SPRITE, name);
+    const AbSpriteResource *resource = ab_sprite_resource_from_source(source);
+    const AbSpriteAtlas *atlas = ab_sprite_resource_atlas(resource);
+    return atlas && ab_sprite_atlas_count(atlas) == 1 &&
+           ab_sprite_atlas_image(atlas, 0, output);
+}
+
 bool ab_asset_resources_find_sprite(const AbAssetResources *resources, AbSpan name,
                                     AbSpriteAtlasBinding *output) {
     if (!resources || !output) {

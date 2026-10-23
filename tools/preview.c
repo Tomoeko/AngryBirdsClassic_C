@@ -112,7 +112,8 @@ static bool options_read(int argc, char **argv, PreviewOptions *output) {
 
 static bool menu_upload(void *context, uint32_t texture, AbSpriteAtlasImage image,
                         AbError *error) {
-    return ab_common_upload(context, texture, image.image, false, false, error);
+    return ab_common_upload(context, texture, image.image, image.repeat_s,
+                            image.repeat_t, error);
 }
 
 static bool menu_remove(void *context, uint32_t texture, AbError *error) {

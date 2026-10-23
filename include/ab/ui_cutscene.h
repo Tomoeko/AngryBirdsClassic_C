@@ -13,6 +13,10 @@ typedef struct {
 
 typedef struct {
     AbUiScaling *scaling;
+    /* Optional authored story-canvas scaling for getScaleNum. Skip controls
+     * continue using scaling above; story artwork can have a different profile
+     * from the application's menu atlas. Borrow through this widget's lifetime. */
+    AbUiScaling *content_scaling;
     AbUiCutsceneClass *shared;
     AbAudioBank *audio;
     AbAudioMixer *mixer;

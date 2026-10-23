@@ -278,6 +278,12 @@ bool ab_classic_world_runtime_open(AbClassicWorldRuntimeConfig config,
     if (!allocate(runtime, level.bodies->count, error) ||
         !ab_classic_block_scripts_open(
             (AbClassicBlockScriptConfig){.level = playfield.level,
+                                         .visuals = playfield.visuals,
+                                         .random = config.random,
+                                         .particles = config.particles,
+                                         .scene = playfield.scene,
+                                         .extra_draws = config.extra_draws,
+                                         .physics_scale = config.physics_scale,
                                          .physics_enabled = config.physics_enabled,
                                          .storage_bytes = config.script_bytes,
                                          .object_capacity = runtime->capacity,
@@ -294,8 +300,8 @@ bool ab_classic_world_runtime_open(AbClassicWorldRuntimeConfig config,
     return true;
 }
 
-bool ab_classic_world_runtime_register_circle(AbClassicWorldRuntime *runtime,
-                                              size_t object, AbError *error) {
+static bool register_object(AbClassicWorldRuntime *runtime, size_t object, bool box,
+                            AbError *error) {
     AbClassicLevelView level = runtime ? ab_classic_level_view(runtime->playfield.level)
                                        : (AbClassicLevelView){0};
     if (!runtime || object != runtime->count || object >= runtime->capacity ||
@@ -306,20 +312,35 @@ bool ab_classic_world_runtime_register_circle(AbClassicWorldRuntime *runtime,
     runtime->physical_values[object] = value;
     runtime->contacts[object].script_table_present = true;
     AbClassicDynamicsView dynamics = ab_classic_dynamics_view(runtime->view.dynamics);
-    if (!ab_classic_block_scripts_register_circle(runtime->view.scripts, object,
-                                                  error) ||
+    bool scripts = box ? ab_classic_block_scripts_register_box(runtime->view.scripts,
+                                                               object, error)
+                       : ab_classic_block_scripts_register_circle(runtime->view.scripts,
+                                                                  object, error);
+    if (!scripts ||
         !ab_classic_scores_register_object(runtime->view.scores, object, error) ||
         !ab_classic_block_collisions_register_object(runtime->view.blocks, object,
                                                      error) ||
         !ab_classic_bird_collisions_register_object(runtime->view.birds, object,
                                                     error) ||
-        !ab_classic_simulation_register_circle(dynamics.simulation, object, error) ||
+        !(box ? ab_classic_simulation_register_box(dynamics.simulation, object, error)
+              : ab_classic_simulation_register_circle(dynamics.simulation, object,
+                                                      error)) ||
         !ab_classic_removals_register_object(dynamics.removals, object, error) ||
         !ab_classic_contacts_register_object(dynamics.contacts, object, error))
         return false;
     ++runtime->count;
     runtime->view.physical_count = runtime->count;
     return true;
+}
+
+bool ab_classic_world_runtime_register_circle(AbClassicWorldRuntime *runtime,
+                                              size_t object, AbError *error) {
+    return register_object(runtime, object, false, error);
+}
+
+bool ab_classic_world_runtime_register_box(AbClassicWorldRuntime *runtime,
+                                           size_t object, AbError *error) {
+    return register_object(runtime, object, true, error);
 }
 
 bool ab_classic_world_runtime_close(AbClassicWorldRuntime **pointer, AbError *error) {

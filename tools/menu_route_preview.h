@@ -194,6 +194,7 @@ static bool menu_route_level(PreviewMenu *menu, AbError *error) {
                                              .highscores = menu->statistics.highscores,
                                              .release_build = true};
     AbUiLevelSelectionHost host = {
+        .free_version = menu->free_version,
         .levels = {.buttons = buttons,
                    .progress = &menu->level_progress,
                    .scroll = {.events = menu->events,

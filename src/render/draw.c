@@ -168,6 +168,10 @@ bool ab_draw_command_check(const AbDrawCommand *command, AbError *error) {
           command->scissor.bottom < command->scissor.top))) {
         return ab_fail(error, "Invalid draw command");
     }
+    if (command->mask.texture)
+        for (size_t index = 0; index < 8; ++index)
+            if (!isfinite(command->mask.uv[index]))
+                return ab_fail(error, "Nonfinite alpha-mask coordinate");
     return true;
 }
 

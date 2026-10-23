@@ -88,6 +88,11 @@ typedef struct {
     AbDrawCoordinates coordinates;
     /* Integer top-left screen bounds, independent of vertex coordinates. */
     AbDrawClip scissor;
+    /* Optional alpha mask, sampled independently of the primary texture. */
+    struct {
+        uint32_t texture;
+        float uv[8];
+    } mask;
 } AbDrawCommand;
 
 /* Intersect the retained screen request with the framebuffer for backend APIs.

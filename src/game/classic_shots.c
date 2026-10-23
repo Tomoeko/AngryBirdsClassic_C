@@ -182,8 +182,8 @@ static bool truthy(AbDataValue value) {
     return value.kind != AB_DATA_NIL && (value.kind != AB_DATA_BOOLEAN || value.bits);
 }
 
-bool ab_classic_shots_register_circle(AbClassicShots *shots, size_t object,
-                                      AbError *error) {
+static bool register_object(AbClassicShots *shots, size_t object, bool box,
+                            AbError *error) {
     if (!shots || shots->launching || object != shots->count ||
         object >= shots->capacity || object >= shots->level.bodies->count ||
         object >= shots->level.properties->count || shots->level.world->failed ||
@@ -192,7 +192,11 @@ bool ab_classic_shots_register_circle(AbClassicShots *shots, size_t object,
     const AbLevelObject *source = shots->level.bodies->objects + object;
     AbLevelPropertyObject *properties = shots->level.properties->objects + object;
     AbDataValue script = field(&properties->physical, "gameObjectScript");
-    if (source->placement || source->physics.dimensions.radius < 0 ||
+    bool unsupported = box ? source->physics.dimensions.radius != -1 ||
+                                 source->physics.dimensions.width <= 0 ||
+                                 source->physics.dimensions.height <= 0
+                           : source->physics.dimensions.radius < 0;
+    if (source->placement || unsupported ||
         !ab_world_has_body(shots->level.world, source->physics.body) ||
         (truthy(script) &&
          (script.kind != AB_DATA_TABLE || script.table != &properties->script)))
@@ -226,6 +230,16 @@ bool ab_classic_shots_register_circle(AbClassicShots *shots, size_t object,
     shots->string_used = shots->string_size - remaining;
     ++shots->count;
     return true;
+}
+
+bool ab_classic_shots_register_circle(AbClassicShots *shots, size_t object,
+                                      AbError *error) {
+    return register_object(shots, object, false, error);
+}
+
+bool ab_classic_shots_register_box(AbClassicShots *shots, size_t object,
+                                   AbError *error) {
+    return register_object(shots, object, true, error);
 }
 
 static bool object_index(AbClassicShots *shots, const AbShotBird *bird, size_t *output,

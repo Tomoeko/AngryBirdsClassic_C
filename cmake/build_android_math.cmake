@@ -99,6 +99,8 @@ build_android_probe(ab_android_reload_geometry arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1 -DAB_ORACLE_RELOAD_GEOMETRY_ONLY=1)
 build_android_probe(ab_android_create_circle arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1 -DAB_ORACLE_CREATE_CIRCLE_ONLY=1)
+build_android_probe(ab_android_create_box arm.c oracle_main
+    -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1 -DAB_ORACLE_CREATE_BOX_ONLY=1)
 build_android_probe(ab_android_blues_child arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1 -DAB_ORACLE_BLUES_CHILD_ONLY=1)
 build_android_probe(ab_android_blues_split arm.c oracle_main
@@ -1046,7 +1048,7 @@ if(DEFINED AB_ANDROID_PROBE AND AB_ANDROID_PROBE STREQUAL "ab_android_theme_gpu"
             "static const char ${symbol}[] =\n    \"${shader_text}\";\n")
     endforeach()
     set(gpu_sources tools/oracle/android_theme_gpu.c src/render/gles2.c
-        src/render/draw.c src/core/base.c src/core/hash.c)
+        src/render/draw.c src/render/screen_clip.c src/core/base.c src/core/hash.c)
     set(gpu_objects)
     foreach(source IN LISTS gpu_sources)
         get_filename_component(name "${source}" NAME_WE)
@@ -1074,6 +1076,25 @@ build_android_probe(ab_android_superseed_radius arm.c oracle_main
 build_android_probe(ab_android_sling_scope arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
     -DAB_ORACLE_SLING_SCOPE_ONLY=1)
+
+build_android_probe(ab_android_mask_draw arm.c oracle_main
+    -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
+    -DAB_ORACLE_MASK_DRAW_ONLY=1)
+build_android_probe(ab_android_z_order arm.c oracle_main
+    -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
+    -DAB_ORACLE_Z_ORDER_ONLY=1)
+build_android_probe(ab_android_extra_draw arm.c oracle_main
+    -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
+    -DAB_ORACLE_EXTRA_DRAW_ONLY=1)
+build_android_probe(ab_android_level_egg arm.c oracle_main
+    -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
+    -DAB_ORACLE_LEVEL_EGG_ONLY=1)
+build_android_probe(ab_android_level_clock arm.c oracle_main
+    -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
+    -DAB_ORACLE_LEVEL_CLOCK_ONLY=1)
+build_android_probe(ab_android_bird_hat arm.c oracle_main
+    -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
+    -DAB_ORACLE_BIRD_HAT_ONLY=1)
 
 if(NOT android_probe_built)
     message(FATAL_ERROR "No matching Android reference probe was selected")

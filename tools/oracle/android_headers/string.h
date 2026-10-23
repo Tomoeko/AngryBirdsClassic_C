@@ -2,6 +2,7 @@
 #define AB_ORACLE_ANDROID_STRING_H
 
 #include <stddef.h>
+int strcmp(const char *left, const char *right);
 
 void *memcpy(void *destination, const void *source, size_t size);
 void *memset(void *destination, int value, size_t size);

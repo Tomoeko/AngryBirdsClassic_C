@@ -3,12 +3,14 @@
 
 #include "ab/classic_scene.h"
 #include "ab/lua_asset_renderer.h"
+#include "ab/mask_draw.h"
 
 typedef struct AbClassicRenderScene AbClassicRenderScene;
 
 typedef enum {
     AB_CLASSIC_RENDER_OBJECT,
     AB_CLASSIC_RENDER_LUA,
+    AB_CLASSIC_RENDER_MASK,
 } AbClassicRenderKind;
 
 typedef struct {
@@ -21,6 +23,7 @@ typedef struct {
     uint32_t *id_counter;
     size_t extra_renderers, storage_bytes;
     AbBlend object_blend;
+    AbMaskTexture terrain;
 } AbClassicRenderSceneConfig;
 
 typedef struct {
@@ -34,13 +37,13 @@ typedef struct {
     size_t object_count;
 } AbClassicRenderSceneView;
 
-/* Own one ordered scene for ordinary object renderers and a bounded number of
- * later ordinary Lua asset renderers. Reserve the level's full object capacity
- * for explicit dynamic object registration. Ground has no renderer.
- * Initial IDs follow body-object creation order; layer order stays separate.
- * Collider 7 membership is not recovered for this owner and rejects explicitly.
- * Level, provider/context, source resources/textures and the application-wide
- * counter stay borrowed until close. Close before releasing those owners.
+/* Own one ordered scene for ordinary and terrain-mask object renderers and a bounded
+ * number of later ordinary Lua asset renderers. Reserve the level's full object
+ * capacity for explicit dynamic object registration. Ground has no renderer. Initial
+ * IDs follow body-object creation order; layer order stays separate. Collider 7
+ * membership is not recovered for this owner and rejects explicitly. Level,
+ * provider/context, source resources/textures and the application-wide counter stay
+ * borrowed until close. Close before releasing those owners.
  *
  * Extra renderer slots remain stable until close, including after scene removal;
  * they are not recycled while callers may hold property views. Resource names
@@ -105,12 +108,26 @@ bool ab_classic_render_scene_sync(AbClassicRenderScene *scene, AbError *error);
 bool ab_classic_render_scene_update_gfx(AbClassicRenderScene *scene, float seconds,
                                         AbError *error);
 
-/* Append ordinary objects and Lua sprites in one shared order, using the last
- * synchronized poses. No lookup/allocation. Failure restores list.count while
+/* Append ordinary objects, terrain masks and Lua sprites in one shared order, using the
+ * last synchronized poses. No lookup/allocation. Failure restores list.count while
  * storage beyond it may change. All resource/source owners remain stable. */
 bool ab_classic_render_scene_draw(const AbClassicRenderScene *scene,
                                   AbCoordinateCamera camera, uint32_t viewport_width,
                                   uint32_t viewport_height, AbDrawList *list,
                                   AbError *error);
+
+typedef struct {
+    void *context;
+    /* Native Camera.drawGame invokes drawZOrdered before each scene layer.
+     * The callback may append commands; scene membership stays fixed. */
+    bool (*before_layer)(void *context, int32_t layer, AbCoordinateCamera camera,
+                         uint32_t width, uint32_t height, AbDrawList *list,
+                         AbError *error);
+} AbClassicRenderLayerHost;
+
+bool ab_classic_render_scene_draw_layers(const AbClassicRenderScene *scene,
+                                         AbCoordinateCamera camera, uint32_t width,
+                                         uint32_t height, AbClassicRenderLayerHost host,
+                                         AbDrawList *list, AbError *error);
 
 #endif

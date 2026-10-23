@@ -64,6 +64,7 @@ static bool game_open_level(PreviewGame *game, AbError *error) {
                       .next_bird_sound = &game->next_sound,
                       .renderer_counter = &game->renderer_counter,
                       .object_blend = AB_BLEND_PREMULTIPLIED,
+                      .terrain = &game->terrain,
                       .camera = {.pixel_size = game->screen,
                                  .input_context = game,
                                  .input = game_camera_input,
@@ -112,7 +113,47 @@ static bool game_open_level(PreviewGame *game, AbError *error) {
     return true;
 }
 
+static bool game_joint_print(void *context, AbSpan name, AbError *error) {
+    (void)context;
+    return fprintf(stderr, "Destroying joint %.*s\n", (int)name.size, name.data) >= 0 ||
+           ab_fail(error, "Cannot write joint destruction diagnostic");
+}
+
+static bool game_joint_defer(void *context, AbSpan name, AbError *error) {
+    return ab_classic_joint_updates_defer(((PreviewGame *)context)->joint_updates, name,
+                                          error);
+}
+
+static bool game_open_joints(PreviewGame *game, AbError *error) {
+    AbClassicLevelView level = ab_classic_level_view(game->playfield.level);
+    size_t capacity =
+        level.joints->storage.joint_capacity + level.joints->storage.glue_capacity;
+    if (capacity < 64)
+        capacity = 64;
+    if (!ab_classic_joint_updates_open(
+            (AbClassicJointUpdateConfig){
+                .joints = level.joints,
+                .level_data = level.data,
+                .events = game->menu->events,
+                .destroyed_event = menu_event(game->menu, "EID_JOINT_DESTROYED"),
+                .context = game,
+                .print_destroy = game_joint_print,
+                .names = capacity,
+                .requests = 65536,
+                .storage_bytes = 16 * 1024 * 1024},
+            &game->joint_updates, error))
+        return false;
+    game->tail.joints = ab_classic_joint_updates_tail(game->joint_updates);
+    return true;
+}
+
 static bool game_open_world(PreviewGame *game, AbError *error) {
+    size_t extra_nodes = 1;
+    size_t object_count = ab_classic_level_view(game->playfield.level).bodies->count;
+    while (extra_nodes < object_count)
+        extra_nodes *= 2;
+    if (!ab_extra_draws_open(extra_nodes, 1024 * 1024, &game->extra_draws, error))
+        return false;
     PreviewMenu *menu = game->menu;
     AbClassicParticleNames names = {game->particle_names, 0, 256, 65536};
     const char *const result_particles[] = {"levelCompleteStars1",
@@ -174,7 +215,7 @@ static bool game_open_world(PreviewGame *game, AbError *error) {
                                                   .settings = menu->settings,
                                                   .events = menu->events,
                                                   .eagle_bait_launched =
-                                                      &game->disabled,
+                                                      &game->eagle_bait_launched,
                                                   .special_game_mode = &game->absent,
                                                   .context = game,
                                                   .start_position = game_start_position,
@@ -184,8 +225,8 @@ static bool game_open_world(PreviewGame *game, AbError *error) {
         return false;
     /* The source registry lookup has been checked by game_scripts_available.
      * No selected level hook is replaced by an empty callback. */
-    game->removal_notifications =
-        (AbObjectRemovalNotifyHost){.context = game, .level = game_removal_level};
+    game->removal_notifications = (AbObjectRemovalNotifyHost){
+        .context = game, .level = game_removal_level, .call = game_removal_call};
     AbClassicWorldRuntimeConfig config = {
         .playfield = ab_classic_level_runtime_view(game->level).playfield,
         .object_capacity = ab_classic_level_view(game->playfield.level).bodies->count +
@@ -197,6 +238,9 @@ static bool game_open_world(PreviewGame *game, AbError *error) {
         .globals = &game->globals,
         .random = &menu->random,
         .physics_enabled = &game->physics,
+        .extra_draws = game->extra_draws,
+        .physics_scale = 0.05f,
+        .museum = {.context = game, .break_joint = game_joint_defer},
         .blocks = {.sound_force_threshold = &game->threshold,
                    .sprite_workspace = &game->workspace,
                    .sound = game_sound,
@@ -231,7 +275,7 @@ static bool game_open_world(PreviewGame *game, AbError *error) {
                                .notification_sent = &game->goal_sent,
                                .notifications = 32,
                                .storage_bytes = 65536},
-                     .statistics = {.eagle_bait_launched = &game->disabled,
+                     .statistics = {.eagle_bait_launched = &game->eagle_bait_launched,
                                     .device_model = &game->model,
                                     .gamer_service = &game->absent,
                                     .total_blocks = &game->total_blocks,
@@ -317,7 +361,7 @@ static bool game_open_update(PreviewGame *game, AbError *error) {
         .conditions = {.prevent_ending = &game->prevent_ending,
                        .bird_sound = &game->bird_sound,
                        .pig_sound = &game->pig_sound,
-                       .eagle_launched = &game->disabled,
+                       .eagle_launched = &game->eagle_bait_launched,
                        .eagle_timer = &game->absent},
         .effects = {.shake = &game->shake, .hero = &game->hero, .burn = &game->burn},
         .prelude = {.do_not_timeout = &game->absent,
@@ -390,6 +434,10 @@ static bool game_open_update(PreviewGame *game, AbError *error) {
         .storage_bytes = 8 * 1024 * 1024};
     if (!ab_classic_game_runtime_open(config, &game->game, error))
         return false;
+    AbClassicGameRuntimeView view = ab_classic_game_runtime_view(game->game);
+    if (!ab_classic_flames_bind(ab_classic_block_scripts_view(world.scripts).flames,
+                                view.controller, &game->tail.hooks, error))
+        return false;
     if (!ab_classic_highscores_open(
             (AbClassicHighscoresConfig){.storage = menu->highscores,
                                         .events = menu->events,
@@ -404,7 +452,6 @@ static bool game_open_update(PreviewGame *game, AbError *error) {
                                         .storage_bytes = 65536},
             &game->highscores, error))
         return false;
-    AbClassicGameRuntimeView view = ab_classic_game_runtime_view(game->game);
     game->draw.current_game_mode =
         (AbDataValue){.kind = AB_DATA_OBJECT, .object = view.update};
     game->draw.editor_mode = (AbDataValue){.kind = AB_DATA_OBJECT, .object = menu};
@@ -418,6 +465,7 @@ static bool game_open_update(PreviewGame *game, AbError *error) {
             .theme = game->theme,
             .settings = ab_settings_statistics_root(menu->local_settings),
             .extra_draw_functions = &game->extra_draw,
+            .extra_draws = game->extra_draws,
             .physics_to_world = &game->physics_to_world,
             .state = &game->draw,
             .basic_font = menu_span("FONT_BASIC"),
@@ -462,6 +510,11 @@ static bool game_session_open(PreviewMenu *menu, AbError *error) {
     game->disabled = (AbDataValue){.kind = AB_DATA_BOOLEAN};
     game->prevent_ending = game->disabled;
     game->level_name = menu->level_request.name;
+    game->full_version = !menu->free_version;
+    game->egg_script = ab_level_egg_script(game->level_name.string);
+    if (game->egg_script)
+        game->level_removal.on_remove =
+            (AbUiPointerValue){.kind = AB_UI_POINTER_FUNCTION, .function = 1};
     game->next_sound = game_text("bird_next_military");
     game->bird_sound = game_text("bird_misc");
     game->pig_sound = game_text("piglette");
@@ -520,7 +573,7 @@ static bool game_session_open(PreviewMenu *menu, AbError *error) {
                 ab_camera_touch_init(&game->camera_input, &game->camera_shared) &&
                 ab_hero_screen_tinter_init(&game->hero) &&
                 ab_powerup_uses_open(64, 64, 16384, &game->uses, error) &&
-                game_open_level(game, error) &&
+                game_open_level(game, error) && game_open_joints(game, error) &&
                 game_load_phase(game, &clock, "resources/world/playfield", error) &&
                 game_open_world(game, error) &&
                 game_load_phase(game, &clock, "particles/collisions", error) &&

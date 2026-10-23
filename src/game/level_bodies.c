@@ -203,12 +203,14 @@ bool ab_level_bodies_create(AbPhysicsWorld *world, const AbLevelBodySource *sour
     }
     const AbDataTableLayout *layout =
         ab_lua_table_layout(source->level, placements.table);
+    size_t live_count = 0;
     if (!layout || !layout->no_nil_assignments ||
-        !ab_data_string_order(placements.table, layout->hash_capacity, order, error)) {
+        !ab_data_string_order_pruned(placements.table, layout->hash_capacity, order,
+                                     &live_count, error)) {
         return ab_fail(error, "Unsupported classic world constructor ordering");
     }
     bool ground_entry = field(placements.table, "ground").kind != AB_DATA_NIL;
-    size_t needed = placements.table->count;
+    size_t needed = live_count;
     if (!ground_entry) {
         if (needed == SIZE_MAX) {
             return ab_fail(error, "Classic level object count overflows");
@@ -220,7 +222,7 @@ bool ab_level_bodies_create(AbPhysicsWorld *world, const AbLevelBodySource *sour
         return ab_fail(error, "Classic level body storage is too small");
     }
     float left = 100000, right = -100000, bird_counter = 0;
-    for (size_t cursor = 0; cursor < placements.table->count; ++cursor) {
+    for (size_t cursor = 0; cursor < live_count; ++cursor) {
         const AbDataEntry *entry = placements.table->entries + order->indices[cursor];
         if (named(entry->key, "ground")) {
             continue;

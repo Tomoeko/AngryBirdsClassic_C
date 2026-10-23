@@ -190,6 +190,16 @@ bool ab_classic_simulation_register_circle(AbClassicSimulation *simulation,
            ab_classic_post_physics_register_circle(simulation->post, object, error);
 }
 
+bool ab_classic_simulation_register_box(AbClassicSimulation *simulation, size_t object,
+                                        AbError *error) {
+    if (!simulation || simulation->advancing ||
+        ab_classic_forces_view(simulation->forces).count != object ||
+        ab_classic_post_physics_view(simulation->post).count != object)
+        return ab_fail(error, "Invalid new simulation box binding");
+    return ab_classic_forces_register_box(simulation->forces, object, error) &&
+           ab_classic_post_physics_register_box(simulation->post, object, error);
+}
+
 bool ab_classic_simulation_advance(AbClassicSimulation *simulation,
                                    const AbFrameClockInput *timing,
                                    AbFrameClockPlan *output, AbError *error) {

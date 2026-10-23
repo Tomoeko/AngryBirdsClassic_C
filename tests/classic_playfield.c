@@ -34,6 +34,7 @@ typedef struct {
     AbAndroidAssets *planning;
     AbAssetResources *resources;
     AbAssetTextures *textures;
+    AbMaskTexture terrain;
     AbAssetSpriteProvider grouped_sprites;
     AbTargetData themes;
     AbThemeAssets theme_assets;
@@ -207,6 +208,14 @@ static bool open_game_resources(PlayfieldTest *test, float width, float height,
                                      manage_group, test, error) &&
           ab_asset_textures_sync(test->textures,
                                  ab_asset_resources_owners(test->resources), error));
+    AbDataValue terrain = field(theme.table, "texture");
+    AbSpriteAtlasImage image;
+    CHECK(terrain.kind == AB_DATA_STRING &&
+          ab_asset_resources_find_image(test->resources, terrain.string, &image) &&
+          ab_asset_textures_find(test->textures, image.image, &test->terrain.texture) &&
+          ab_asset_textures_set_wrap(test->textures, image.image, true, true, error));
+    test->terrain.width = image.image->width;
+    test->terrain.height = image.image->height;
     return true;
 }
 
@@ -305,6 +314,7 @@ static AbClassicPlayfieldConfig configuration(PlayfieldTest *test,
     return (AbClassicPlayfieldConfig){
         .level = test->level,
         .sprites = &test->sprites,
+        .terrain = &test->terrain,
         .audio = test->audio,
         .statistics = test->statistics,
         .events = test->events,
@@ -372,6 +382,7 @@ static bool fresh_runtime(PlayfieldTest *test, bool exercise_physics, AbError *e
         CHECK(open_game_resources(test, 1024, 768, error));
     uint32_t controls[8] = {0}, data[17] = {0}, renderer_counter = 0;
     AbClassicPlayfieldConfig playfield = configuration(test, controls, data);
+    playfield.limits.behaviors = 256 * 1024;
     AbShotState shot = {0};
     AbClassicGameGlobals globals = {.time = {.kind = AB_DATA_NUMBER},
                                     .score = {.kind = AB_DATA_NUMBER},
@@ -412,6 +423,7 @@ static bool fresh_runtime(PlayfieldTest *test, bool exercise_physics, AbError *e
                          .contacts = 1024,
                          .storage_bytes = 4 * 1024 * 1024},
         .resource_bytes = 16 * 1024 * 1024,
+        .dynamic_objects_per_bird = 3,
         .playfield = playfield};
     CHECK(ab_classic_level_runtime_open(config, &runtime, error));
     AbClassicLevelRuntimeView view = ab_classic_level_runtime_view(runtime);

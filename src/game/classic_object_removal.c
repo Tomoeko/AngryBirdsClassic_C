@@ -209,8 +209,8 @@ ab_classic_object_removal_registry(AbClassicObjectRemoval *owner) {
     return owner ? &owner->registry : NULL;
 }
 
-bool ab_classic_object_removal_register_circle(AbClassicObjectRemoval *owner,
-                                               size_t object, AbError *error) {
+static bool register_object(AbClassicObjectRemoval *owner, size_t object, bool box,
+                            AbError *error) {
     if (!owner || owner->calling || owner->invalid || object > owner->count ||
         (object < owner->count && owner->objects[object].references) ||
         object >= owner->capacity || object >= owner->level.bodies->count ||
@@ -222,9 +222,13 @@ bool ab_classic_object_removal_register_circle(AbClassicObjectRemoval *owner,
     const AbObjectVisual *visual =
         ab_classic_visuals_object(owner->config.visuals, object);
     const AbGameFrameObject *frame = owner->level.frame->objects + object;
-    if (source->placement || source->physics.dimensions.radius < 0 || !visual ||
-        !source->name.data || !source->name.size ||
-        frame->collider >= AB_GAME_COLLIDER_TYPES ||
+    bool unsupported = box ? source->physics.dimensions.radius != -1 ||
+                                 source->physics.dimensions.width <= 0 ||
+                                 source->physics.dimensions.height <= 0 ||
+                                 source->physics.controllable
+                           : source->physics.dimensions.radius < 0;
+    if (source->placement || unsupported || !visual || !source->name.data ||
+        !source->name.size || frame->collider >= AB_GAME_COLLIDER_TYPES ||
         frame->body != source->physics.body ||
         !ab_world_has_body(owner->level.world, source->physics.body) ||
         object >= ab_classic_render_scene_view(owner->config.scene).object_count ||
@@ -252,6 +256,16 @@ bool ab_classic_object_removal_register_circle(AbClassicObjectRemoval *owner,
     if (source->physics.controllable)
         owner->birds[owner->registry.bird_count++] = &entry->core;
     return true;
+}
+
+bool ab_classic_object_removal_register_circle(AbClassicObjectRemoval *owner,
+                                               size_t object, AbError *error) {
+    return register_object(owner, object, false, error);
+}
+
+bool ab_classic_object_removal_register_box(AbClassicObjectRemoval *owner,
+                                            size_t object, AbError *error) {
+    return register_object(owner, object, true, error);
 }
 
 bool ab_classic_object_removal_call(void *context, AbSpan name, AbError *error) {

@@ -10,6 +10,8 @@ static bool powerup_test_tick(PreviewMenu *menu, size_t frames, AbError *error) 
     return true;
 }
 
+#include "ui_aim_paths_apk.h"
+
 static bool powerup_king_widgets(PreviewMenu *menu, AbMetal *renderer, AbError *error) {
     for (unsigned infinite = 0; infinite < 2; ++infinite) {
         menu->infinite_powerups = infinite != 0;
@@ -385,9 +387,12 @@ static bool powerup_quake_widgets(PreviewMenu *menu, AbMetal *renderer,
 
 static bool powerup_scope_widgets(PreviewMenu *menu, AbMetal *renderer,
                                   AbError *error) {
-    for (unsigned infinite = 0; infinite < 2; ++infinite) {
-        menu->infinite_powerups = infinite != 0;
-        if (!ability_test_level(menu, infinite ? "Level15" : "Level1", error))
+    for (unsigned profile = 0; profile < 3; ++profile) {
+        bool infinite = profile != 0;
+        menu->infinite_powerups = infinite;
+        if (!(profile == 2
+                  ? ability_test_episode_level(menu, 2, "LevelP2_100", error)
+                  : ability_test_level(menu, infinite ? "Level15" : "Level1", error)))
             return false;
         PreviewGame *game = menu->game;
         PreviewPowerups *powers = game->powerups;
@@ -416,7 +421,7 @@ static bool powerup_scope_widgets(PreviewMenu *menu, AbMetal *renderer,
             available)
             return ab_fail(error,
                            "Sling Scope lost activation/passive/inventory state");
-        if (infinite) {
+        if (profile == 1) {
             for (size_t index = 0; index < 2; ++index)
                 if (!game_test_click_widget(menu, &powers->bar.powerups[index].button,
                                             error) ||
@@ -449,12 +454,14 @@ static bool powerup_scope_widgets(PreviewMenu *menu, AbMetal *renderer,
             live.band.scope_sound_eligible || menu->scope_state.velocity.x <= 0)
             return ab_fail(error,
                            "Sling Scope did not reach its real aiming draw/sound");
+        if (!aim_scope_visible(menu, renderer, profile, error))
+            return false;
         AbImage image = {0};
         float clear[4];
         menu_background_clear(menu, clear);
         bool okay = ab_metal_capture(renderer, menu->context.draw_list, 1024, 768,
                                      clear, 16 * 1024 * 1024, &image, error);
-        const char *capture = infinite ? getenv("AB_SCOPE_CAPTURE") : NULL;
+        const char *capture = profile == 1 ? getenv("AB_SCOPE_CAPTURE") : NULL;
         if (okay && capture)
             okay = save(capture, &image, error);
         ab_image_free(&image);
@@ -462,7 +469,8 @@ static bool powerup_scope_widgets(PreviewMenu *menu, AbMetal *renderer,
         if (!okay ||
             !menu_preview_pointer(menu, menu_span("LRELEASE"), (AbVec2){400, 400},
                                   &reply, error) ||
-            !powerup_test_tick(menu, 180, error) || game->shot.birds_shot != 1)
+            !aim_flight_visible(menu, renderer, profile, error) ||
+            game->shot.birds_shot != 1)
             return false;
         float timer = menu->scope_state.timer;
         game_session_free(menu);

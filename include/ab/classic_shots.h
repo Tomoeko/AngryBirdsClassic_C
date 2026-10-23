@@ -69,6 +69,9 @@ AbShotBird *ab_classic_shots_bird(AbClassicShots *shots, size_t object);
  * retains private scratch and requires discard. Do not call during launch. */
 bool ab_classic_shots_register_circle(AbClassicShots *shots, size_t object,
                                       AbError *error);
+/* Reserve lookup/pose metadata for a defined box without adding a launch bird. */
+bool ab_classic_shots_register_box(AbClassicShots *shots, size_t object,
+                                   AbError *error);
 
 /* Canonical position boundary for shot services: update the owned level's body,
  * pose history and physical table, then this shot view. Callback changes to other

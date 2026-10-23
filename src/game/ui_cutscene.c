@@ -450,8 +450,25 @@ static bool draw(void *context, AbUiWidget *widget, const AbUiDrawInput *input,
         AbVec2 pivot = {0};
         if (!ui->images.pivot(ui->images.context, owner->image, &pivot, error))
             return false;
+        float scroll_x = floorf(owner->scroll.x);
+        if (owner->fit_height && !owner->no_scroll && pivot.x > 0) {
+            AbVec2 size = {0};
+            if (!bounds(owner,
+                        (AbDataValue){.kind = AB_DATA_STRING, .string = owner->image},
+                        &size, error))
+                return false;
+            /* Composite width includes its negative left extent. The right
+             * edge is width minus pivot, so a width-based scroll target can
+             * pan beyond the artwork. Inset one logical pixel for the integer
+             * bounds' fractional/filtered part edges. Clamp presentation without
+             * changing command timing or interpolated scroll state. */
+            float limit = owner->position.x + size.x - pivot.x - 1 -
+                          (width - owner->offset.x * 2) / owner->scale;
+            if (limit >= 0)
+                scroll_x = fminf(scroll_x, floorf(limit));
+        }
         ui->render_state->geometry.translation_x =
-            -floorf(owner->scroll.x) +
+            -scroll_x +
             (owner->offset.x + owner->position.x * owner->scale) / owner->scale;
         ui->render_state->geometry.translation_y =
             -floorf(owner->scroll.y) +
@@ -532,7 +549,9 @@ bool ab_ui_cutscene_init(AbUiCutscene *owner, AbUiWidgetContext *context,
         return false;
     if (view.screen.x <= 1024 && equal(host.device, span("android")))
         host.shared->reference_scale = view.screen.x / 480;
-    else if (!ab_ui_scaling_get(host.scaling, &host.shared->reference_scale, error))
+    else if (!ab_ui_scaling_get(host.content_scaling ? host.content_scaling
+                                                     : host.scaling,
+                                &host.shared->reference_scale, error))
         return false;
     AbUiImageButtonArguments skip = {.image.frame.name = text("skip_button"),
                                      .return_value = text("SKIP_TO_LEVEL"),

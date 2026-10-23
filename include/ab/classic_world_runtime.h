@@ -17,6 +17,8 @@ typedef struct {
     AbEventManager *events;
     AbClassicGameGlobals *globals;
     AbRandom48 *random;
+    AbExtraDraws *extra_draws;
+    float physics_scale;
     const bool *physics_enabled;
     /* These retain their actual service contexts, raw flags and numeric
      * settings. Shared owners, attachment rows, maps and score bindings are
@@ -76,5 +78,9 @@ AbClassicWorldRuntimeView ab_classic_world_runtime_view(AbClassicWorldRuntime *r
  * construction. Reserve object_capacity at open. No gameplay effects or RNG. */
 bool ab_classic_world_runtime_register_circle(AbClassicWorldRuntime *runtime,
                                               size_t object, AbError *error);
+/* Defined box factory counterpart, including component application and the
+ * actual box force/post-physics metadata. Reserve all rows at open. */
+bool ab_classic_world_runtime_register_box(AbClassicWorldRuntime *runtime,
+                                           size_t object, AbError *error);
 
 #endif

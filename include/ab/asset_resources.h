@@ -42,6 +42,10 @@ bool ab_asset_resources_host(void *context, AbAssetCall *call, AbError *error);
  * Missing/invalid queries preserve output. No GPU upload/drawing occurs. */
 bool ab_asset_resources_find_sprite(const AbAssetResources *resources, AbSpan name,
                                     AbSpriteAtlasBinding *output);
+/* Native getSpriteSheet(name).getImage(), independent of sprite-name masking.
+ * Borrow the single decoded sheet image until the next resource mutation. */
+bool ab_asset_resources_find_image(const AbAssetResources *resources, AbSpan name,
+                                   AbSpriteAtlasImage *output);
 bool ab_asset_resources_find_composite(const AbAssetResources *resources, AbSpan name,
                                        AbResolvedComposite *output);
 /* Resolve an existing cached part's exact sheet/region into live pixels. This

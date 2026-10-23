@@ -64,7 +64,7 @@ typedef struct {
     AbAssetSpriteProvider sprites;
     AbUiWidgetResources adapter;
     AbEventManager *events;
-    AbUiScaling scaling;
+    AbUiScaling scaling, cutscene_scaling;
     AbUiImageRenderState render;
     AbUiWidgetContext context;
     AbUiWidget root, play, logo, options_button;
@@ -80,6 +80,7 @@ typedef struct {
     float time;
     AbVec2 screen;
     bool highest_resources;
+    bool free_version;
     bool infinite_powerups, keep_powerups_open;
     AbSlingScopeState scope_state;
     bool entered;
@@ -211,6 +212,17 @@ static AbUiWidget *menu_active_root(PreviewMenu *menu) {
     return menu->episode_active ? &menu->episodes->widget : &menu->root;
 }
 
+static bool menu_cutscene_environment(void *context, AbUiScalingEnvironment *output,
+                                      AbError *error) {
+    if (!menu_environment(context, output, error))
+        return false;
+    /* The story sheets retain the APK's 480x320 canvas. Menu atlas selection
+     * must not shrink the comic until the source layout disables its pan. */
+    output->reference_size = (AbVec2){480, 320};
+    output->template_layout = true;
+    return true;
+}
+
 static bool menu_route_event(PreviewMenu *menu, AbDataTable *event, AbError *error);
 static bool menu_route_apply(PreviewMenu *menu, AbError *error);
 static bool menu_route_update(PreviewMenu *menu, AbError *error);
@@ -282,6 +294,7 @@ static bool menu_preview_resize(PreviewMenu *menu, AbVec2 screen, AbError *error
     menu->context.render.viewport_height = (uint32_t)screen.y;
     menu->fonts.screen_width = screen.x;
     if (!ab_ui_scaling_update(&menu->scaling, error) ||
+        !ab_ui_scaling_update(&menu->cutscene_scaling, error) ||
         !menu_main_layout(menu, error) ||
         (menu->episode_active &&
          !ab_ui_widget_lifecycle(&menu->episodes->widget, AB_UI_FRAME_LAYOUT, error)) ||
@@ -377,6 +390,7 @@ static void menu_preview_free(PreviewMenu *menu) {
     ab_powerup_catalog_close(menu->powerup_catalog);
     menu_background_free(menu);
     (void)ab_ui_scaling_detach(&menu->scaling, &error);
+    (void)ab_ui_scaling_detach(&menu->cutscene_scaling, &error);
     ab_event_manager_close(menu->events);
     (void)ab_asset_textures_close(&menu->textures, &error);
     ab_asset_resources_close(menu->resources);
@@ -486,7 +500,11 @@ static bool menu_preview_open(const AbZip *zip, AbAssetTextureHost textures,
         !ab_ui_scaling_init(
             &menu->scaling,
             (AbUiScalingHost){menu->events, *resolution, menu, menu_environment},
-            error))
+            error) ||
+        !ab_ui_scaling_init(&menu->cutscene_scaling,
+                            (AbUiScalingHost){menu->events, *resolution, menu,
+                                              menu_cutscene_environment},
+                            error))
         return false;
     menu_audio_bind(menu);
     return menu_graph(menu, *slider, error);

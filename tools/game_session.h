@@ -1,6 +1,8 @@
 #ifndef AB_GAME_SESSION_H
 #define AB_GAME_SESSION_H
 
+#include "ab/classic_joint_updates.h"
+
 #include "ab/classic_balloons.h"
 #include "ab/classic_collision_achievements.h"
 #include "ab/classic_collision_hooks.h"
@@ -11,6 +13,8 @@
 #include "ab/classic_level5.h"
 #include "ab/classic_shot_effects.h"
 #include "ab/level_effect.h"
+#include "ab/level_egg.h"
+#include "ab/level_clock.h"
 #include "ab/classic_highscores.h"
 #include "ab/camera_touch.h"
 #include "ab/ui_hud_buttons.h"
@@ -28,6 +32,10 @@ typedef struct PreviewPowerups PreviewPowerups;
 struct PreviewGame {
     PreviewMenu *menu;
     AbClassicLevel5 level5;
+    const AbLevelEggScript *egg_script;
+    AbObjectRemovalLevel level_removal;
+    bool full_version;
+    AbMaskTexture terrain;
     uint8_t blues_names[65536];
     AbDataTable egg_event, egg_data;
     AbDataEntry egg_event_fields[2], egg_count;
@@ -67,12 +75,14 @@ struct PreviewGame {
     AbHeroScreenTinter hero;
     AbBurnManager burn;
     AbDataValue enabled, disabled, absent, flying, goal_sent, will_end;
+    AbDataValue eagle_bait_launched;
     AbDataValue prevent_ending;
     AbDataValue next_sound, bird_sound, pig_sound, start_sound, clear_sound;
     AbDataValue failed_sound, song, music, model, level_name, level_effect;
     AbDataValue physics_to_world, level_particles, level_particles_enabled;
     AbDataValue previous_score;
     AbDataTable effect_fields, extra_draw;
+    AbExtraDraws *extra_draws;
     const AbDataTable *theme;
     AbDataTable pressed, held, released;
     AbDataEntry pressed_key, held_key, released_key;
@@ -99,6 +109,7 @@ struct PreviewGame {
     bool physics, ended, result_listening, updating, failed, paused;
     bool first_clear, result_complete, save_pending;
     bool goals_listening;
+    AbClassicJointUpdates *joint_updates;
 };
 
 static AbDataValue game_text(const char *name) {
@@ -216,6 +227,10 @@ static bool game_scripts_available(const AbClassicLevelRequest *level, AbError *
         menu_route_equal(level->page_number, menu_route_number(2)))
         return ab_fail(error,
                        "Selected level requires its registered construction hook");
+    if (level->name.kind == AB_DATA_STRING && ab_level_egg_script(level->name.string))
+        return true;
+    if (menu_route_equal(level->name, game_text("LevelGE_20")))
+        return true;
     for (size_t index = 0; index < sizeof(registered) / sizeof(*registered); ++index)
         if (menu_route_equal(level->name, game_text(registered[index])))
             return ab_fail(error, "Selected level requires its registered script: %s",
@@ -230,11 +245,16 @@ static bool game_group(PreviewMenu *menu, const char *name, AbError *error) {
                                     ab_asset_resources_host, menu->resources, error);
 }
 
+static bool game_level_script_prepare(PreviewGame *game, const AbLuaData *level,
+                                      AbError *error);
+
 static bool game_prepare(void *context, const AbLuaData *level,
                          const AbLuaData *catalog, AbError *error) {
     PreviewGame *game = context;
     PreviewMenu *menu = game->menu;
     (void)catalog;
+    if (!game_level_script_prepare(game, level, error))
+        return false;
     AbDataValue theme = menu_route_field(level->globals, "theme");
     if (theme.kind != AB_DATA_STRING || !game_group(menu, "INGAME", error) ||
         !game_group(menu, "INGAME_PIGS_NEW", error) ||
@@ -250,8 +270,24 @@ static bool game_prepare(void *context, const AbLuaData *level,
     game->theme = record.table;
     game->draw.current_theme = theme;
     game->music = menu_route_field(record.table, "music");
-    return ab_asset_textures_sync(menu->textures,
-                                  ab_asset_resources_owners(menu->resources), error);
+    if (!ab_asset_textures_sync(menu->textures,
+                                ab_asset_resources_owners(menu->resources), error))
+        return false;
+    AbDataValue terrain = menu_route_field(record.table, "texture");
+    if (terrain.kind == AB_DATA_NIL ||
+        (terrain.kind == AB_DATA_BOOLEAN && !terrain.bits))
+        return true;
+    AbSpriteAtlasImage image;
+    if (terrain.kind != AB_DATA_STRING ||
+        !ab_asset_resources_find_image(menu->resources, terrain.string, &image) ||
+        !ab_asset_textures_find(menu->textures, image.image, &game->terrain.texture) ||
+        !ab_asset_textures_set_wrap(menu->textures, image.image, true, true, error))
+        return error && error->message[0]
+                   ? false
+                   : ab_fail(error, "Missing selected level terrain texture image");
+    game->terrain.width = image.image->width;
+    game->terrain.height = image.image->height;
+    return true;
 }
 
 static bool game_particle_sprite(void *context, AbSpan name, uintptr_t *output,
@@ -321,16 +357,6 @@ static bool game_contact_particles(void *context, size_t object, AbDataValue des
                                         descriptor, error);
 }
 
-static bool game_removal_level(void *context, AbDataValue name,
-                               AbObjectRemovalLevel **output, AbError *error) {
-    PreviewGame *game = context;
-    if (!menu_route_equal(name, game->level_name))
-        return ab_fail(error, "Game level-script registry identity changed");
-    /* Construction has checked this actual absent source registration. */
-    *output = NULL;
-    return true;
-}
-
 static bool game_bird_volume(void *context, AbDataValue receiver, size_t object,
                              AbDataValue *output, AbError *error) {
     (void)context;
@@ -364,6 +390,9 @@ static bool game_explosion(void *context, AbDataValue object, AbDataValue defini
 
 static bool game_service(void *context, AbGameTailCall *call, AbError *error) {
     PreviewGame *game = context;
+    if (call->operation == AB_GAME_TAIL_CHECK_JOINT_LIMIT ||
+        call->operation == AB_GAME_TAIL_DESTROY_JOINT)
+        return ab_classic_joint_updates_call(game->joint_updates, call, error);
     if (call->operation == AB_GAME_TAIL_ANIMATION && call->object)
         return ab_classic_object_animation_update(
             game->playfield.level, game->playfield.visuals, &game->workspace,
@@ -460,9 +489,11 @@ static void game_session_free(PreviewMenu *menu) {
     game_skip_free(game);
     ab_classic_game_render_close(game->render);
     ab_classic_game_runtime_close(game->game);
+    ab_classic_joint_updates_close(game->joint_updates);
     ab_classic_highscores_close(game->highscores);
     ab_classic_balloons_close(game->balloons);
     ab_classic_game_updates_close(game->updates);
+    ab_extra_draws_close(game->extra_draws);
     (void)ab_classic_world_runtime_close(&game->world, &error);
     ab_classic_collision_achievements_close(game->achievements);
     ab_classic_particles_close(game->particles);
@@ -545,13 +576,14 @@ static bool game_session_draw(PreviewMenu *menu, float seconds, AbError *error) 
     AbClassicWorldRuntimeView world = ab_classic_world_runtime_view(game->world);
     AbClassicDynamicsView dynamics = ab_classic_dynamics_view(world.dynamics);
     AbFrameClockPlan plan;
-    bool okay =
-        ab_classic_simulation_advance(
-            dynamics.simulation,
-            &(AbFrameClockInput){.seconds = seconds, .physics_enabled = game->physics},
-            &plan, error) &&
-        ab_event_manager_tick(menu->events, seconds, error) &&
-        ab_classic_game_globals_advance_time(&game->globals, seconds, error);
+    bool okay = ab_classic_simulation_advance(
+        dynamics.simulation,
+        &(AbFrameClockInput){.seconds = seconds, .physics_enabled = game->physics},
+        &plan, error);
+    if (!okay && error && dynamics.contacts->listener.failed)
+        *error = dynamics.contacts->listener.error;
+    okay = okay && ab_event_manager_tick(menu->events, seconds, error) &&
+           ab_classic_game_globals_advance_time(&game->globals, seconds, error);
     if (okay && game->save_pending) {
         okay = menu_preview_flush(menu, error);
         if (okay)
@@ -563,11 +595,13 @@ static bool game_session_draw(PreviewMenu *menu, float seconds, AbError *error) 
         okay = game_results_update(game, seconds, error);
     if (okay && !game->ended && !game->paused) {
         AbClassicGameRuntimeView view = ab_classic_game_runtime_view(game->game);
-        okay = ab_classic_game_update(
-            view.update, (AbClassicGameTouchInput){0}, seconds, game->globals.time,
-            (AbCameraSystemInput){
-                .moving_objects = menu_route_truthy(game->globals.has_moving_objects)},
-            error);
+        okay =
+            ab_classic_joint_updates_refresh(game->joint_updates, error) &&
+            ab_classic_game_update(
+                view.update, (AbClassicGameTouchInput){0}, seconds, game->globals.time,
+                (AbCameraSystemInput){.moving_objects = menu_route_truthy(
+                                          game->globals.has_moving_objects)},
+                error);
     } else if (okay && game->paused) {
         okay = game_service(game, &(AbGameTailCall){.operation = AB_GAME_TAIL_DRAW},
                             error);

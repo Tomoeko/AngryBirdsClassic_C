@@ -1,4 +1,6 @@
 #include "ab/classic_render_scene.h"
+#include "ab/object_definition.h"
+#include "ab/rotation.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -23,7 +25,8 @@ bool ab_classic_render_scene_update_gfx(AbClassicRenderScene *scene, float secon
         return ab_fail(error, "Invalid ordinary scene GFX update");
     for (size_t index = 0; index < scene->membership.count; ++index) {
         AbClassicRenderRoute route = scene->routes[index];
-        if (route.kind == AB_CLASSIC_RENDER_OBJECT) {
+        if (route.kind == AB_CLASSIC_RENDER_OBJECT ||
+            route.kind == AB_CLASSIC_RENDER_MASK) {
             if (route.index >= scene->object_count || !scene->initial_live[route.index])
                 return ab_fail(error, "Stale ordinary object GFX membership");
         } else if (route.kind != AB_CLASSIC_RENDER_LUA ||
@@ -69,7 +72,7 @@ static bool remove_id(AbClassicRenderScene *scene, int32_t id, bool *found,
     if (!*found)
         return true;
     AbClassicRenderRoute route = scene->routes[index];
-    if (route.kind == AB_CLASSIC_RENDER_OBJECT)
+    if (route.kind == AB_CLASSIC_RENDER_OBJECT || route.kind == AB_CLASSIC_RENDER_MASK)
         scene->initial_live[route.index] = false;
     memmove(scene->routes + index, scene->routes + index + 1,
             (scene->membership.count - index) * sizeof(*scene->routes));
@@ -84,6 +87,18 @@ static bool initial_members(AbClassicRenderScene *scene, AbError *error) {
             continue;
         if (objects.items[index].collider == 7)
             return ab_fail(error, "Collider 7 scene construction remains separate");
+        const AbLevelObject *object = level.bodies->objects + index;
+        AbObjectDefinition definition;
+        if (!ab_object_definition_open(level.catalog, object->definition_name,
+                                       object->placement, &definition, error))
+            return false;
+        AbDataValue texture =
+            ab_object_property(&definition, (AbSpan){(const uint8_t *)"texture", 7});
+        bool masked = texture.kind != AB_DATA_NIL &&
+                      (texture.kind != AB_DATA_BOOLEAN || texture.bits);
+        if (masked && (!scene->config.terrain.texture || !scene->config.terrain.width ||
+                       !scene->config.terrain.height))
+            return ab_fail(error, "Terrain mask requires its actual theme texture");
         if (!ab_scene_id_next(scene->config.id_counter, scene->initial_ids + index,
                               error))
             return false;
@@ -93,7 +108,9 @@ static bool initial_members(AbClassicRenderScene *scene, AbError *error) {
         if (!ab_scene_membership_insert(&scene->membership, member, error))
             return false;
         insert_route(scene, member.object,
-                     (AbClassicRenderRoute){AB_CLASSIC_RENDER_OBJECT, index});
+                     (AbClassicRenderRoute){masked ? AB_CLASSIC_RENDER_MASK
+                                                   : AB_CLASSIC_RENDER_OBJECT,
+                                            index});
         scene->initial_live[index] = true;
     }
     return true;
@@ -295,10 +312,68 @@ bool ab_classic_render_scene_sync(AbClassicRenderScene *scene, AbError *error) {
     return ab_classic_scene_sync_poses(scene->objects, error);
 }
 
+static bool draw_mask(const AbClassicRenderScene *scene, const AbSceneSprite *sprite,
+                      AbCoordinateCamera camera, uint32_t width, uint32_t height,
+                      AbDrawList *list, AbError *error) {
+    if (!sprite->visible || sprite->unbound)
+        return true;
+    AbRotation rotation;
+    if (!sprite->region ||
+        !ab_rotation_from_angle(sprite->pose.angle_radians, &rotation))
+        return ab_fail(error, "Invalid terrain mask sprite/rotation");
+    const AbSpriteRegion *region = sprite->region;
+    AbMaskTexture terrain = scene->config.terrain;
+    AbMaskDrawInput input = {
+        .mask = region,
+        .position = {20 * sprite->pose.physics_position.x,
+                     20 * sprite->pose.physics_position.y},
+        .scale = camera.zoom,
+        .rotation_origin = {(float)(int32_t)((float)region->pivot_x + 0.5f),
+                            (float)(int32_t)((float)region->pivot_y + 0.5f)},
+        .transform = {rotation.cosine, -rotation.sine, -camera.top_left.x,
+                      rotation.sine, rotation.cosine, -camera.top_left.y},
+        .width = width,
+        .height = height,
+        .texture_width = terrain.width,
+        .texture_height = terrain.height,
+        .mask_width = sprite->texture_width,
+        .mask_height = sprite->texture_height};
+    AbMaskDrawPlan plan;
+    if (!ab_mask_draw_plan(input, &plan, error))
+        return false;
+    if (!plan.visible)
+        return true;
+    AbDrawCommand command = {.blend = AB_BLEND_STRAIGHT,
+                             .texture = terrain.texture,
+                             .quad = plan.quad,
+                             .color = {1, 1, 1, 1},
+                             .opacity = 1,
+                             .coordinates = AB_DRAW_CLIP,
+                             .mask.texture = sprite->texture};
+    for (size_t vertex = 0; vertex < 4; ++vertex) {
+        command.mask.uv[vertex * 2] = plan.quad.vertices[vertex].u;
+        command.mask.uv[vertex * 2 + 1] = plan.quad.vertices[vertex].v;
+        command.quad.vertices[vertex].u = plan.texture_uv[vertex * 2];
+        command.quad.vertices[vertex].v = plan.texture_uv[vertex * 2 + 1];
+    }
+    return ab_draw_list_push(list, &command, error);
+}
+
 bool ab_classic_render_scene_draw(const AbClassicRenderScene *scene,
                                   AbCoordinateCamera camera, uint32_t viewport_width,
                                   uint32_t viewport_height, AbDrawList *list,
                                   AbError *error) {
+    return ab_classic_render_scene_draw_layers(
+        scene, camera, viewport_width, viewport_height, (AbClassicRenderLayerHost){0},
+        list, error);
+}
+
+bool ab_classic_render_scene_draw_layers(const AbClassicRenderScene *scene,
+                                         AbCoordinateCamera camera,
+                                         uint32_t viewport_width,
+                                         uint32_t viewport_height,
+                                         AbClassicRenderLayerHost host,
+                                         AbDrawList *list, AbError *error) {
     if (!scene || !list || list->count > list->capacity ||
         (list->capacity && !list->commands) || !viewport_width || !viewport_height)
         return ab_fail(error, "Invalid classic render scene draw bindings");
@@ -306,10 +381,20 @@ bool ab_classic_render_scene_draw(const AbClassicRenderScene *scene,
     size_t original_count = list->count;
     const size_t first = 0;
     for (size_t index = 0; index < scene->membership.count; ++index) {
+        int32_t layer = scene->membership.items[index].layer;
+        if (host.before_layer &&
+            (!index || layer != scene->membership.items[index - 1].layer) &&
+            !host.before_layer(host.context, layer, camera, viewport_width,
+                               viewport_height, list, error))
+            goto restore_list;
         AbClassicRenderRoute route = scene->routes[index];
         if (route.kind == AB_CLASSIC_RENDER_OBJECT) {
             if (!ab_sprite_scene_draw(objects.items + route.index, 1, &first, camera,
                                       viewport_width, viewport_height, list, error))
+                goto restore_list;
+        } else if (route.kind == AB_CLASSIC_RENDER_MASK) {
+            if (!draw_mask(scene, objects.items + route.index, camera, viewport_width,
+                           viewport_height, list, error))
                 goto restore_list;
         } else {
             AbDrawCommand command = {0};

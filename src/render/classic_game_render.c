@@ -66,6 +66,7 @@ bool ab_classic_game_render_open(AbClassicGameRenderConfig config,
                                       .local_settings = config.settings,
                                       .extra_draw_functions =
                                           config.extra_draw_functions,
+                                      .extra_draws = config.extra_draws,
                                       .state = config.state,
                                       .basic_font = config.basic_font,
                                       .current_font = config.current_font,

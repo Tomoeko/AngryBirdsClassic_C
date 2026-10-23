@@ -106,4 +106,49 @@ static bool game_level5_update(void *context, float seconds, float time,
         game_golden_egg, game, error);
 }
 
+static bool game_egg_unlocked(void *context, AbSpan egg, AbDataValue *output,
+                              AbError *error) {
+    PreviewGame *game = context;
+    return ab_settings_golden_egg_unlocked(game->menu->highscores, egg, output, error);
+}
+
+static AbLevelEggHost game_egg_host(PreviewGame *game) {
+    return (AbLevelEggHost){.context = game,
+                            .full_version = game->full_version,
+                            .eagle_bait_launched = &game->eagle_bait_launched,
+                            .unlocked = game_egg_unlocked,
+                            .achieve = game_golden_egg};
+}
+
+static bool game_level_script_prepare(PreviewGame *game, const AbLuaData *level,
+                                      AbError *error) {
+    if (menu_route_equal(game->level_name, game_text("LevelGE_20"))) {
+        AbCalendarTime time;
+        return ab_calendar_time_now(&time, error) &&
+               ab_level_clock_prepare(level, &time, error);
+    }
+    return !game->egg_script ||
+           ab_level_egg_prepare(game->egg_script, level, game_egg_host(game), error);
+}
+
+static bool game_removal_level(void *context, AbDataValue name,
+                               AbObjectRemovalLevel **output, AbError *error) {
+    PreviewGame *game = context;
+    if (!menu_route_equal(name, game->level_name))
+        return ab_fail(error, "Game level-script registry identity changed");
+    *output = game->egg_script ? &game->level_removal : NULL;
+    return true;
+}
+
+static bool game_removal_call(void *context, AbObjectRemovalNotice notice,
+                              AbUiPointerValue function, AbObjectRemovalObject *object,
+                              AbError *error) {
+    PreviewGame *game = context;
+    if (notice != AB_OBJECT_REMOVAL_LEVEL || !game->egg_script || !object ||
+        function.kind != AB_UI_POINTER_FUNCTION || function.function != 1)
+        return ab_fail(error, "Unbound actual level removal callback");
+    return ab_level_egg_removed(game->egg_script, object->context, game_egg_host(game),
+                                error);
+}
+
 #endif

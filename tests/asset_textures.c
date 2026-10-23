@@ -23,6 +23,7 @@
 
 typedef struct {
     const AbImage *images[32];
+    bool repeat_s[32], repeat_t[32];
     size_t uploads, removals, attempts;
     uint32_t fail_upload, fail_remove;
 #if defined(AB_ASSET_TEXTURES_COMMON)
@@ -46,12 +47,14 @@ static bool upload(void *context, uint32_t texture, AbSpriteAtlasImage image,
         return ab_fail(error, "Invalid controlled texture upload/view");
     }
 #if defined(AB_ASSET_TEXTURES_COMMON)
-    if (host->renderer &&
-        !ab_common_upload(host->renderer, texture, image.image, false, false, error)) {
+    if (host->renderer && !ab_common_upload(host->renderer, texture, image.image,
+                                            image.repeat_s, image.repeat_t, error)) {
         return false;
     }
 #endif
     host->images[texture - 1] = image.image;
+    host->repeat_s[texture - 1] = image.repeat_s;
+    host->repeat_t[texture - 1] = image.repeat_t;
     ++host->uploads;
     return true;
 }
@@ -156,6 +159,54 @@ static bool failure_checks(const AbResourceOwners *owners) {
           ab_asset_textures_count(textures) == 1 && host.removals == 21);
     host.fail_remove = 0;
     CHECK(ab_asset_textures_close(&textures, NULL) && !textures && host.removals == 22);
+    return true;
+}
+
+static bool wrap_checks(const AbResourceOwners *owners) {
+    for (size_t scenario = 0; scenario < 3; ++scenario) {
+        Host host = {0};
+        AbAssetTextures *textures = NULL;
+        CHECK(ab_asset_textures_open(callbacks(&host), 32, 128 * 1024 * 1024, &textures,
+                                     NULL) &&
+              ab_asset_textures_sync(textures, owners, NULL));
+        size_t index = 0;
+        while (index < 32 &&
+               (!host.images[index] ||
+                ((host.images[index]->width - 1) & host.images[index]->width) ||
+                ((host.images[index]->height - 1) & host.images[index]->height)))
+            ++index;
+        CHECK(index < 32);
+        const AbImage *image = host.images[index];
+        uint32_t texture = (uint32_t)index + 1, actual = 0;
+        size_t uploads = host.uploads, retained = ab_asset_textures_bytes(textures);
+        CHECK(ab_asset_textures_set_wrap(textures, image, false, false, NULL) &&
+              host.uploads == uploads && !host.removals);
+        if (scenario) {
+            host.fail_remove = scenario == 1 ? texture : 0;
+            host.fail_upload = scenario == 2 ? texture : 0;
+            CHECK(!ab_asset_textures_set_wrap(textures, image, true, true, NULL) &&
+                  ab_asset_textures_failed(textures) &&
+                  !ab_asset_textures_find(textures, image, &actual));
+            host.fail_remove = host.fail_upload = 0;
+            CHECK(ab_asset_textures_close(&textures, NULL) && !textures &&
+                  host.removals == uploads);
+            continue;
+        }
+        CHECK(ab_asset_textures_set_wrap(textures, image, true, true, NULL) &&
+              host.repeat_s[index] && host.repeat_t[index] &&
+              host.uploads == uploads + 1 && host.removals == 1 &&
+              ab_asset_textures_find(textures, image, &actual) && actual == texture &&
+              ab_asset_textures_bytes(textures) == retained &&
+              ab_asset_textures_set_wrap(textures, image, true, true, NULL) &&
+              ab_asset_textures_sync(textures, owners, NULL) &&
+              host.uploads == uploads + 1 && host.removals == 1 &&
+              host.repeat_s[index] && host.repeat_t[index]);
+        CHECK(ab_asset_textures_set_wrap(textures, image, false, true, NULL) &&
+              !host.repeat_s[index] && host.repeat_t[index] &&
+              host.uploads == uploads + 2 && host.removals == 2 &&
+              ab_asset_textures_close(&textures, NULL) && !textures &&
+              host.removals == uploads + 2);
+    }
     return true;
 }
 
@@ -293,7 +344,8 @@ static bool managed_checks(const AbZip *archive, AbSpan key) {
     CHECK(asset_texture_gpu_menu(platform, renderer, textures, owners, true, &error));
 #endif
     CHECK(ab_asset_textures_close(&textures, &error) && host.removals == 24 &&
-          failure_checks(owners) && alias_unload_checks(archive));
+          failure_checks(owners) && wrap_checks(owners) &&
+          alias_unload_checks(archive));
     host = (Host){0};
 #if defined(AB_ASSET_TEXTURES_COMMON)
     host.renderer = renderer;

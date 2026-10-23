@@ -303,6 +303,71 @@ static bool dynamic_circle_checks(AbClassicLevel *level) {
     return true;
 }
 
+static bool dynamic_box_checks(AbClassicLevel *level) {
+    AbClassicLevelView view = ab_classic_level_view(level);
+    CHECK(view.bodies->count == 2 && view.bodies->capacity == 4);
+    const AbDataTable *bird = &view.properties->objects[0].physical;
+    AbGameBoxInput input = {.name = string("generated_hat_1").string,
+                            .position = {4, -5},
+                            .size = {1.5f, 1.7f},
+                            .density = 0.001f,
+                            .friction = 1,
+                            .restitution = 0,
+                            .z_order = 10,
+                            .collision = true};
+    size_t object = 71;
+    CHECK(!ab_classic_level_create_box(NULL, input, &object, NULL) && object == 71);
+    view.world->locked = true;
+    bool locked = ab_classic_level_create_box(level, input, &object, NULL);
+    view.world->locked = false;
+    CHECK(!locked && object == 71 && view.bodies->count == 2);
+    input.size.x = -1;
+    CHECK(!ab_classic_level_create_box(level, input, &object, NULL) && object == 71 &&
+          view.bodies->count == 2 && view.world->body_count == 2);
+    input.size.x = 1.5f;
+    CHECK(ab_classic_level_create_box(level, input, &object, NULL) && object == 2);
+    view = ab_classic_level_view(level);
+    const AbLevelObject *box = view.bodies->objects + object;
+    const AbDataTable *physical = &view.properties->objects[object].physical;
+    const AbDataValue *published =
+        ab_data_get(&view.properties->world, string("generated_hat_1"));
+    CHECK(published && published->table == physical &&
+          physical->entries == view.properties->objects[object].physical_entries &&
+          view.frame->count == 3 && view.properties->count == 3 &&
+          view.properties->world.count == 3 && view.world_count == 3 &&
+          view.bird_count == 1 && view.properties->dynamic.count == 1 &&
+          !box->physics.controllable && box->physics.dimensions.radius == -1 &&
+          box->physics.dimensions.width == 1.5f &&
+          box->physics.dimensions.height == 1.7f && box->initial_mass > 0 &&
+          view.world->storage.fixtures[box->physics.fixture].user_data ==
+              (uintptr_t)box &&
+          view.frame->objects[object].history[1].position.y == -5);
+    AbLevelRaycast ray = {0};
+    CHECK(
+        ab_classic_level_raycast(level, (AbVec2){2, -5}, (AbVec2){6, -5}, &ray, NULL) &&
+        ray.hit && ray.name.kind == AB_DATA_STRING &&
+        ray.name.string.size == input.name.size &&
+        !memcmp(ray.name.string.data, input.name.data, input.name.size));
+    object = 71;
+    CHECK(!ab_classic_level_create_box(level, input, &object, NULL) && object == 71);
+    AbGameCircleInput circle = {.name = string("Bird_clone").string,
+                                .position = {8, -5},
+                                .radius = 0.4f,
+                                .density = 0.5f};
+    CHECK(ab_classic_level_create_circle(level, circle, &object, NULL) && object == 3);
+    published = ab_data_get(&view.properties->world, string("generated_hat_1"));
+    const AbDataValue *original =
+        ab_data_get(&view.properties->world, string("Bird_1"));
+    CHECK(published && published->table == physical && original &&
+          original->table == bird && view.bodies->count == 4 &&
+          view.frame->objects[2].history[0].position.x == 4);
+    input.name = string("generated_hat_2").string;
+    object = 71;
+    CHECK(!ab_classic_level_create_box(level, input, &object, NULL) && object == 71 &&
+          view.world->body_count == 4);
+    return true;
+}
+
 static bool bird_order_checks(void) {
     AbLevelObject objects[3] = {
         {.name = {(const uint8_t *)"Bird", 4}, .physics = {.controllable = true}},
@@ -831,6 +896,10 @@ static bool owner_checks(void) {
     CHECK(position.x == 1 && position.y == 5 && ground->dimensions.width == 2000 &&
           ground->dimensions.height == 10 && ground->dimensions.radius == -1);
     CHECK(dynamic_circle_checks(owner));
+    ab_classic_level_close(owner);
+    owner = NULL;
+    CHECK(ab_classic_level_open(&source, physics, limits, true, &owner, &error));
+    CHECK(dynamic_box_checks(owner));
     ab_classic_level_close(owner);
     ab_classic_level_close(NULL);
     ab_classic_forces_close(NULL);

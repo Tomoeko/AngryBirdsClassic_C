@@ -157,14 +157,48 @@ static bool background(DrawCall *call, AbError *error) {
            fullscreen(call, rgba, error);
 }
 
-static bool empty_extras(AbClassicGameDrawConfig *config, AbError *error) {
+static void extra_flag(void *context, bool present) {
+    AbClassicGameDrawState *state = context;
+    state->has_extra_z_ordered_draws =
+        (AbDataValue){.kind = AB_DATA_BOOLEAN, .bits = present};
+}
+
+static AbExtraDrawInput extra_input(const DrawCall *call) {
+    return (AbExtraDrawInput){.camera = call->theme.camera,
+                              .width = call->theme.width,
+                              .height = call->theme.height,
+                              .list = call->list,
+                              .state_context = call->config->state,
+                              .publish_has_z = extra_flag};
+}
+
+static bool prepare_extras(DrawCall *call, AbError *error) {
+    AbClassicGameDrawConfig *config = call->config;
     config->state->has_extra_z_ordered_draws = (AbDataValue){.kind = AB_DATA_BOOLEAN};
     if (!valid_table(config->extra_draw_functions))
         return ab_fail(error, "Invalid actual extra-draw registry");
     for (size_t index = 0; index < config->extra_draw_functions->count; ++index)
         if (config->extra_draw_functions->entries[index].value.kind != AB_DATA_NIL)
             return ab_fail(error, "Unimplemented reached registered extra/z draw");
+    if (config->extra_draws) {
+        bool has_z;
+        if (!ab_extra_draws_begin(config->extra_draws, extra_input(call), &has_z,
+                                  error))
+            return false;
+        config->state->has_extra_z_ordered_draws.bits = has_z;
+    }
     return true;
+}
+
+static bool extra_layer(void *context, int32_t layer, AbCoordinateCamera camera,
+                        uint32_t width, uint32_t height, AbDrawList *list,
+                        AbError *error) {
+    AbExtraDraws *draws = context;
+    return ab_extra_draws_layer(
+        draws, (float)layer,
+        (AbExtraDrawInput){
+            .camera = camera, .width = width, .height = height, .list = list},
+        error);
 }
 
 static bool sling_part(DrawCall *call, AbSlingshotDrawPart part, AbError *error) {
@@ -198,7 +232,7 @@ static bool world(DrawCall *call, AbError *error) {
     if (!refresh_camera(call, error))
         return false;
     float zoom = ab_classic_camera_view(config->camera).system.mover->current_zoom;
-    if (!empty_extras(config, error) ||
+    if (!prepare_extras(call, error) ||
         !ab_classic_sling_draw_calculate(config->sling, error) ||
         !sling_part(call, AB_SLING_DRAW_BACK, error))
         return false;
@@ -210,9 +244,11 @@ static bool world(DrawCall *call, AbError *error) {
            ab_classic_render_scene_sync(config->scene, error) &&
            ab_classic_scene_sync_visuals(ab_classic_render_scene_objects(config->scene),
                                          config->visuals, error) &&
-           ab_classic_render_scene_draw(config->scene, call->theme.camera,
-                                        call->theme.width, call->theme.height,
-                                        call->list, error) &&
+           ab_classic_render_scene_draw_layers(
+               config->scene, call->theme.camera, call->theme.width, call->theme.height,
+               (AbClassicRenderLayerHost){config->extra_draws,
+                                          config->extra_draws ? extra_layer : NULL},
+               call->list, error) &&
            ab_particles_draw_world(config->particles, particle_style(call), call->list,
                                    error) &&
            sling_part(call, AB_SLING_DRAW_HOLDER, error) &&
@@ -282,8 +318,11 @@ static bool tail(DrawCall *call, AbError *error) {
     } else {
         reset_geometry(config);
     }
-    if (truthy(state->has_extra_z_ordered_draws))
+    if (truthy(state->has_extra_z_ordered_draws) && !config->extra_draws)
         return ab_fail(error, "Unimplemented reached sorted extra draw");
+    if (config->extra_draws &&
+        !ab_extra_draws_finish(config->extra_draws, extra_input(call), error))
+        return false;
     /* Recheck the second traversal: an earlier bound draw can register work. */
     if (!valid_table(config->extra_draw_functions))
         return ab_fail(error, "Invalid actual late extra-draw registry");

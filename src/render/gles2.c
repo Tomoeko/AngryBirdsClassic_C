@@ -1,4 +1,5 @@
 #include "ab/gles2.h"
+#include "draw_vertices.h"
 
 #include "ab_sprite_shaders.h"
 
@@ -52,6 +53,7 @@ struct AbGles2 {
     int32_t color_uniform;
     int32_t opacity_uniform;
     int32_t coordinates_uniform;
+    int32_t mask_texture_uniform, mask_enabled_uniform;
     bool high_precision_uv;
 };
 
@@ -128,6 +130,7 @@ static bool build_program(AbGles2 *renderer, AbError *error) {
     api->AttachShader(renderer->program, fragment);
     api->BindAttribLocation(renderer->program, 0, "vertex_position");
     api->BindAttribLocation(renderer->program, 1, "vertex_uv");
+    api->BindAttribLocation(renderer->program, 2, "vertex_mask_uv");
     api->LinkProgram(renderer->program);
     api->DeleteShader(vertex);
     api->DeleteShader(fragment);
@@ -148,9 +151,14 @@ static bool build_program(AbGles2 *renderer, AbError *error) {
     renderer->opacity_uniform = api->GetUniformLocation(renderer->program, "opacity");
     renderer->coordinates_uniform =
         api->GetUniformLocation(renderer->program, "coordinates_are_clip");
+    renderer->mask_texture_uniform =
+        api->GetUniformLocation(renderer->program, "mask_texture");
+    renderer->mask_enabled_uniform =
+        api->GetUniformLocation(renderer->program, "mask_enabled");
     return (renderer->size_uniform >= 0 && renderer->texture_uniform >= 0 &&
             renderer->color_uniform >= 0 && renderer->opacity_uniform >= 0 &&
-            renderer->coordinates_uniform >= 0) ||
+            renderer->coordinates_uniform >= 0 && renderer->mask_texture_uniform >= 0 &&
+            renderer->mask_enabled_uniform >= 0) ||
            ab_fail(error, "GLES2 sprite program is missing required uniforms");
 }
 
@@ -196,7 +204,7 @@ bool ab_gles2_create(const AbGles2Api *api, size_t texture_capacity,
         goto release_renderer;
     }
     api->BindBuffer(GL_VERTEX_BUFFER, renderer->buffer);
-    api->BufferData(GL_VERTEX_BUFFER, (intptr_t)sizeof(AbDrawQuad), NULL,
+    api->BufferData(GL_VERTEX_BUFFER, (intptr_t)(sizeof(AbRenderVertex) * 4), NULL,
                     GL_STREAM_USAGE);
     if (!driver_ok(api, error)) {
         goto release_renderer;
@@ -282,6 +290,8 @@ static void set_blend(const AbGles2Api *api, unsigned blend) {
 static bool valid_command(const AbGles2 *renderer, const AbDrawCommand *command) {
     if (!valid_texture(renderer, command->texture) ||
         !renderer->textures[command->texture - 1] ||
+        (command->mask.texture && (!valid_texture(renderer, command->mask.texture) ||
+                                   !renderer->textures[command->mask.texture - 1])) ||
         !ab_draw_command_check(command, NULL)) {
         return false;
     }
@@ -310,14 +320,19 @@ bool ab_gles2_render(AbGles2 *renderer, const AbDrawList *list, uint32_t width,
     api->UseProgram(renderer->program);
     api->Uniform2f(renderer->size_uniform, (float)width, (float)height);
     api->Uniform1i(renderer->texture_uniform, 0);
+    api->Uniform1i(renderer->mask_texture_uniform, 1);
     api->ActiveTexture(GL_TEXTURE_UNIT_ZERO);
     api->BindBuffer(GL_VERTEX_BUFFER, renderer->buffer);
     api->EnableVertexAttribArray(0);
     api->EnableVertexAttribArray(1);
-    api->VertexAttribPointer(0, 2, GL_FLOAT_DATA, 0, (int32_t)sizeof(AbDrawVertex),
+    api->EnableVertexAttribArray(2);
+    api->VertexAttribPointer(0, 2, GL_FLOAT_DATA, 0, (int32_t)sizeof(AbRenderVertex),
                              NULL);
-    api->VertexAttribPointer(1, 2, GL_FLOAT_DATA, 0, (int32_t)sizeof(AbDrawVertex),
+    api->VertexAttribPointer(1, 2, GL_FLOAT_DATA, 0, (int32_t)sizeof(AbRenderVertex),
                              (const void *)(uintptr_t)offsetof(AbDrawVertex, u));
+    api->VertexAttribPointer(
+        2, 2, GL_FLOAT_DATA, 0, (int32_t)sizeof(AbRenderVertex),
+        (const void *)(uintptr_t)offsetof(AbRenderVertex, mask_uv));
     for (size_t index = 0; index < list->count; ++index) {
         const AbDrawCommand *command = list->commands + index;
         AbDrawScissor clip;
@@ -332,6 +347,13 @@ bool ab_gles2_render(AbGles2 *renderer, const AbDrawList *list, uint32_t width,
         } else {
             api->Disable(GL_SCISSOR_STATE);
         }
+        api->ActiveTexture(GL_TEXTURE_UNIT_ZERO + 1);
+        api->BindTexture(
+            GL_TEXTURE_2D_TARGET,
+            renderer->textures[(command->mask.texture ? command->mask.texture
+                                                      : command->texture) -
+                               1]);
+        api->ActiveTexture(GL_TEXTURE_UNIT_ZERO);
         api->BindTexture(GL_TEXTURE_2D_TARGET,
                          renderer->textures[command->texture - 1]);
         set_blend(api, (unsigned)command->blend);
@@ -339,8 +361,10 @@ bool ab_gles2_render(AbGles2 *renderer, const AbDrawList *list, uint32_t width,
         api->Uniform1f(renderer->opacity_uniform, command->opacity);
         api->Uniform1f(renderer->coordinates_uniform,
                        command->coordinates == AB_DRAW_CLIP);
-        api->BufferSubData(GL_VERTEX_BUFFER, 0, (intptr_t)sizeof(command->quad),
-                           &command->quad);
+        api->Uniform1f(renderer->mask_enabled_uniform, command->mask.texture ? 1 : 0);
+        AbRenderVertex vertices[4];
+        ab_render_vertices(command, vertices);
+        api->BufferSubData(GL_VERTEX_BUFFER, 0, (intptr_t)sizeof(vertices), vertices);
         api->DrawArrays(GL_TRIANGLE_STRIP_MODE, 0, 4);
     }
     return driver_ok(api, error);

@@ -6,7 +6,9 @@ precision mediump float;
 #endif
 
 varying AB_PRECISION vec2 sampled_uv;
+varying AB_PRECISION vec2 sampled_mask_uv;
 uniform sampler2D sprite_texture;
+uniform sampler2D sprite_mask_texture;
 uniform vec4 sprite_color;
 uniform vec4 sprite_opacity;
 #ifdef GL_ES
@@ -30,6 +32,9 @@ void main() {
         discard;
     }
     vec4 texel = texture2D(sprite_texture, sampled_uv);
+    if (sprite_opacity.z >= 0.5) {
+        texel.a *= texture2D(sprite_mask_texture, sampled_mask_uv).a;
+    }
     vec4 shaded = texel * sprite_color;
     gl_FragColor = shaded * sprite_opacity.x;
 }

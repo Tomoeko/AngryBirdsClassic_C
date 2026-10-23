@@ -92,6 +92,64 @@ static bool fresh_removal_level(void *context, AbDataValue name,
 
 #include "classic_game_runtime.h"
 
+/* Construct real boxes between world and GameUpdate setup, as the birthday
+ * factory needs. This is adapter/renderer coverage, not the complete hat hook. */
+static bool fresh_defined_boxes(AbClassicPlayfieldView playfield,
+                                AbClassicWorldRuntime *runtime, AbError *error) {
+    static const char *const names[] = {"ab_hat_1", "ab_hat_2", "ab_hat_3", "ab_hat_4",
+                                        "ab_hat_5"};
+    static const char *const definitions[] = {"PartyHat_1", "PartyHat_2", "PartyHat_5",
+                                              "PartyHat_6", "PartyHat_blue"};
+    AbClassicLevelView level = ab_classic_level_view(playfield.level);
+    size_t initial = level.bodies->count;
+    AbClassicWorldRuntimeView world = ab_classic_world_runtime_view(runtime);
+    AbClassicDynamicsView dynamics = ab_classic_dynamics_view(world.dynamics);
+    AbGameObjectCoreRegistry *registry =
+        ab_classic_object_removal_registry(dynamics.physical);
+    size_t birds = registry->bird_count;
+    for (size_t index = 0; index < 5; ++index) {
+        size_t object = SIZE_MAX;
+        if (!ab_classic_level_create_defined_box(
+                playfield.level, span(names[index]), span(definitions[index]),
+                (AbVec2){1000 + (float)index * 4, -5}, 0.001f, &object, error))
+            return false;
+        const AbDataTable *physical = &level.properties->objects[object].physical;
+        AbDataValue sprite = level.initial_sprites[object].sprite;
+        AbDataValue layer = field(physical, "z_order");
+        AbDataValue definition;
+        if (object != initial + index || sprite.kind != AB_DATA_STRING ||
+            layer.kind != AB_DATA_NUMBER ||
+            !ab_classic_render_scene_create_object(playfield.scene, playfield.visuals,
+                                                   object, sprite.string,
+                                                   from_bits(layer.bits), error) ||
+            !ab_classic_world_runtime_register_box(runtime, object, error) ||
+            !ab_object_definition_lookup(&level.properties->lookup, span(names[index]),
+                                         &definition, error) ||
+            definition.kind != AB_DATA_TABLE ||
+            !ab_classic_behaviors_create_object(playfield.behaviors, object,
+                                                field(definition.table, "behaviors"),
+                                                level.catalog_data, error) ||
+            !ab_classic_shots_register_box(playfield.shots, object, error) ||
+            !ab_classic_camera_register_object(playfield.camera, object, error) ||
+            !ab_classic_object_removal_register_box(dynamics.physical, object, error) ||
+            !ab_world_set_body_type(level.world,
+                                    level.bodies->objects[object].physics.body,
+                                    AB_BODY_STATIC, error))
+            return false;
+        AbSpriteAtlasBinding binding;
+        if (!ab_classic_visuals_binding(playfield.visuals, object, &binding) ||
+            !binding.sprite.region || registry->bird_count != birds)
+            return ab_fail(error,
+                           "Actual runtime box lost artwork or native membership");
+    }
+    world = ab_classic_world_runtime_view(runtime);
+    return (world.physical_count == initial + 5 &&
+            ab_classic_visuals_view(playfield.visuals).count == initial + 5 &&
+            ab_classic_render_scene_view(playfield.scene).object_count ==
+                initial + 5) ||
+           ab_fail(error, "Runtime box adapters have inconsistent identity counts");
+}
+
 /* Exercise fresh world and GameUpdate construction with real input and draw
  * producers. Root services, GPU submission and complete GUI remain separate. */
 static bool fresh_world_runtime(PlayfieldTest *test, AbClassicPlayfield *owner,
@@ -212,9 +270,11 @@ static bool fresh_world_runtime(PlayfieldTest *test, AbClassicPlayfield *owner,
         .score_entries = 2048,
         .script_bytes = 65536,
         .floating = {128, 64, 65536},
+        .object_capacity = ab_classic_level_view(playfield.level).bodies->count + 5,
         .storage_bytes = 8 * 1024 * 1024};
     AbClassicWorldRuntime *runtime = NULL;
     CHECK(ab_classic_world_runtime_open(config, &runtime, error));
+    CHECK(fresh_defined_boxes(playfield, runtime, error));
     AbClassicWorldRuntimeView view = ab_classic_world_runtime_view(runtime);
     AbClassicDynamicsView dynamics = ab_classic_dynamics_view(view.dynamics);
     AbClassicLevelView level = ab_classic_level_view(playfield.level);

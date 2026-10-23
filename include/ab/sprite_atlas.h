@@ -16,6 +16,7 @@ typedef struct {
     AbSpan path;
     const AbImage *image;
     AbSpriteAlpha alpha;
+    bool repeat_s, repeat_t;
 } AbSpriteAtlasImage;
 
 typedef struct {

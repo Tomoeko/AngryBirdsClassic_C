@@ -193,7 +193,8 @@ bool ab_sprite_atlas_image(const AbSpriteAtlas *atlas, size_t index,
         return false;
     }
     const AtlasImage *image = atlas->images + index;
-    *output = (AbSpriteAtlasImage){image->path, &image->image, image->alpha};
+    *output = (AbSpriteAtlasImage){
+        .path = image->path, .image = &image->image, .alpha = image->alpha};
     return true;
 }
 

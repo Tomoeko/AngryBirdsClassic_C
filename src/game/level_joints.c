@@ -54,6 +54,8 @@ bool ab_level_joint_requirements(const AbLuaData *level,
         requirements.hash_capacity = layout->hash_capacity;
         for (size_t index = 0; index < table->count; ++index) {
             const AbDataEntry *entry = table->entries + index;
+            if (entry->value.kind == AB_DATA_NIL)
+                continue;
             unsigned type;
             if (entry->key.kind != AB_DATA_STRING ||
                 (entry->key.string.size && !entry->key.string.data) ||
@@ -136,12 +138,14 @@ bool ab_level_joints_create(AbClassicJoints *joints, const AbLuaData *level,
     if (!table || !table->count) {
         return true;
     }
+    size_t live_count = 0;
     if (requirements.immediate > joints->storage.joint_capacity ||
         requirements.deferred > joints->storage.glue_capacity ||
-        !ab_data_string_order(table, requirements.hash_capacity, order, error)) {
+        !ab_data_string_order_pruned(table, requirements.hash_capacity, order,
+                                     &live_count, error)) {
         return ab_fail(error, "Initial classic joint storage/order is too small");
     }
-    for (size_t cursor = 0; cursor < table->count; ++cursor) {
+    for (size_t cursor = 0; cursor < live_count; ++cursor) {
         const AbDataEntry *entry = table->entries + order->indices[cursor];
         if (!create_joint(joints, bodies, entry->value.table, error)) {
             return false;

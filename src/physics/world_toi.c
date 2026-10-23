@@ -254,6 +254,8 @@ bool ab_world_solve_continuous(AbPhysicsWorld *world, const AbIslandStep *step,
             return true;
         }
         if (!solve_impact(world, earliest, alpha, step, error)) {
+            if (error && error->message[0])
+                return false;
             return ab_fail(error, "Continuous world island solve failed");
         }
     }

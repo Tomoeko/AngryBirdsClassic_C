@@ -1,6 +1,7 @@
 #include "ab/common_renderer.h"
 
 #include "ab_common_shaders.h"
+#include "draw_vertices.h"
 #include "console_common/platform/indexed.h"
 
 #include <math.h>
@@ -12,7 +13,7 @@ struct AbCommonRenderer {
     CcIndexedProgram *programs[AB_BLEND_MULTIPLY + 1];
     CcIndexedMesh *mesh;
     CcIndexedTexture **textures;
-    AbDrawVertex *vertices;
+    AbRenderVertex *vertices;
     size_t draw_capacity;
     size_t texture_capacity;
 };
@@ -49,15 +50,15 @@ static bool create_programs(AbCommonRenderer *renderer, AbError *error) {
         .metal_fragment_source = ab_common_metal_source,
         .metal_vertex_entry = "ab_common_vertex",
         .metal_fragment_entry = "ab_common_fragment",
-        .attributes = {{"sprite_vertex", 0}},
-        .attribute_count = 1,
-        .vertex_stride = sizeof(AbDrawVertex),
+        .attributes = {{"sprite_vertex", 0}, {"sprite_mask_uv", sizeof(AbDrawVertex)}},
+        .attribute_count = 2,
+        .vertex_stride = sizeof(AbRenderVertex),
         .vertex_uniforms = {"sprite_viewport"},
         .vertex_uniform_count = 1,
         .fragment_uniforms = {"sprite_color", "sprite_opacity", "sprite_clip"},
         .fragment_uniform_count = 3,
-        .texture_uniforms = {"sprite_texture"},
-        .texture_count = 1,
+        .texture_uniforms = {"sprite_texture", "sprite_mask_texture"},
+        .texture_count = 2,
         .metal_vertex_uniform_buffer = 1,
         .metal_fragment_uniform_buffer = 2};
     for (AbBlend blend = AB_BLEND_OPAQUE; blend <= AB_BLEND_MULTIPLY; ++blend) {
@@ -79,7 +80,7 @@ bool ab_common_create(CcPlatform *platform, size_t draw_capacity,
         return ab_fail(error, "Missing Common renderer output");
     }
     *output = NULL;
-    size_t per_draw = sizeof(AbDrawVertex) * 4 + sizeof(uint16_t) * 6;
+    size_t per_draw = sizeof(AbRenderVertex) * 4 + sizeof(uint16_t) * 6;
     if (!platform || !draw_capacity || draw_capacity > 16384 ||
         texture_capacity > UINT32_MAX || allocation_limit < sizeof(AbCommonRenderer) ||
         draw_capacity > (allocation_limit - sizeof(AbCommonRenderer)) / per_draw) {
@@ -118,7 +119,7 @@ bool ab_common_create(CcPlatform *platform, size_t draw_capacity,
     }
     CcIndexedMeshDescription mesh = {.vertices = renderer->vertices,
                                      .vertex_count = draw_capacity * 4,
-                                     .vertex_stride = sizeof(AbDrawVertex),
+                                     .vertex_stride = sizeof(AbRenderVertex),
                                      .indices = indices,
                                      .index_count = draw_capacity * 6};
     renderer->mesh = cc_indexed_mesh_create_dynamic(renderer->native, &mesh, message,
@@ -205,7 +206,10 @@ static bool render_view(AbCommonRenderer *renderer, const AbDrawList *list,
         const AbDrawCommand *command = list->commands + draw;
         if (!ab_draw_command_check(command, error) || !command->texture ||
             command->texture > renderer->texture_capacity ||
-            !renderer->textures[command->texture - 1]) {
+            !renderer->textures[command->texture - 1] ||
+            (command->mask.texture &&
+             (command->mask.texture > renderer->texture_capacity ||
+              !renderer->textures[command->mask.texture - 1]))) {
             return ab_fail(error, "Invalid Common draw at index %zu", draw);
         }
         for (size_t channel = 0; channel < 4; ++channel) {
@@ -213,12 +217,11 @@ static bool render_view(AbCommonRenderer *renderer, const AbDrawList *list,
                 return ab_fail(error, "Invalid Common draw color");
             }
         }
-        memcpy(renderer->vertices + draw * 4, command->quad.vertices,
-               sizeof(command->quad.vertices));
+        ab_render_vertices(command, renderer->vertices + draw * 4);
     }
     char message[256] = {0};
     if (!cc_indexed_mesh_update(renderer->native, renderer->mesh, renderer->vertices,
-                                renderer->draw_capacity * 4 * sizeof(AbDrawVertex),
+                                renderer->draw_capacity * 4 * sizeof(AbRenderVertex),
                                 message, sizeof(message))) {
         return diagnostic(error, message);
     }
@@ -255,7 +258,8 @@ static bool render_view(AbCommonRenderer *renderer, const AbDrawList *list,
         const float parameters[3][4] = {
             {command->color[0], command->color[1], command->color[2],
              command->color[3]},
-            {command->opacity, command->scissor.enabled ? 1 : 0, 0, 0},
+            {command->opacity, command->scissor.enabled ? 1 : 0,
+             command->mask.texture ? 1 : 0, 0},
             {-1.0f + horizontal * (float)scissor.x, 1.0f + vertical * (float)scissor.y,
              -1.0f + horizontal * (float)(scissor.x + scissor.width),
              1.0f + vertical * (float)(scissor.y + scissor.height)}};
@@ -266,8 +270,12 @@ static bool render_view(AbCommonRenderer *renderer, const AbDrawList *list,
             .vertex_uniform_count = 1,
             .fragment_uniforms = parameters,
             .fragment_uniform_count = 3,
-            .textures = {renderer->textures[command->texture - 1]},
-            .texture_count = 1,
+            .textures =
+                {renderer->textures[command->texture - 1],
+                 renderer->textures[(command->mask.texture ? command->mask.texture
+                                                           : command->texture) -
+                                    1]},
+            .texture_count = 2,
             .first_index = draw * 6,
             .index_count = 6};
         if (!cc_indexed_draw(renderer->native, &submission, message, sizeof(message))) {

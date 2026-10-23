@@ -126,7 +126,7 @@ int main(int argc, char **argv) {
     } else if (okay) {
         okay = ab_zip_open((AbSpan){bytes.data, bytes.size}, &archive, &error) &&
                level_preview_open(&archive, &level, &error) &&
-               ab_draw_list_init(PREVIEW_THEME_DRAWS + 32, 65536, &list, &error);
+               ab_draw_list_init(PREVIEW_THEME_DRAWS + 32, 128 * 1024, &list, &error);
         for (size_t index = 0; okay && index < 128; ++index) {
             okay = level_preview_draw(&level, 0x1.111112p-5f, &list, NULL, &error);
         }

@@ -6,6 +6,7 @@
 #include "ab/damage_sprite.h"
 #include "ab/game_frame.h"
 #include "ab/game_circle.h"
+#include "ab/game_box.h"
 #include "ab/object_properties.h"
 #include "ab/level_bodies.h"
 #include "ab/level_joints.h"
@@ -132,7 +133,9 @@ typedef struct {
     void *missing_context;
     void (*missing_definition)(void *context, AbSpan definition);
     /* Prepare the selected level's resource groups after its data is decoded,
-     * before any body geometry or sprite query. Borrow both inputs only for
+     * before any body geometry or sprite query. Level-script onLoad hooks may
+     * mutate this fresh level's placement values; retain its original keys and
+     * constructor layout. The shared catalog stays immutable. Borrow inputs for
      * this call. Failure discards the load; resource-host effects remain owned
      * by the caller. This boundary runs once during loading, never in a frame. */
     void *prepare_context;
@@ -166,6 +169,25 @@ typedef struct {
  * on success; late failure retains prior effects and requires session discard. */
 bool ab_classic_level_create_circle(AbClassicLevel *level, AbGameCircleInput input,
                                     size_t *output, AbError *error);
+
+/* The same stable-slot publication for a raw native box. No controllable-vector
+ * registration occurs; definition and renderer assignments remain separate. */
+bool ab_classic_level_create_box(AbClassicLevel *level, AbGameBoxInput input,
+                                 size_t *output, AbError *error);
+
+/* Ordinary ObjectFunctions box construction before component/behavior/event
+ * services. Resolve explicit positive box dimensions, density override,
+ * material fields, collider, sensor/gravity and initial sprite names from the
+ * actual catalog. Publish canonical world/dynamic membership and physical
+ * definition fields in a stable raw slot. No placement, timers, launch queue,
+ * GameObject script, renderer or constructor callbacks are synthesized.
+ * Definitions with active creation/update/animation/extra-sprite paths reject;
+ * their enclosing factory phases require separate owners. Startup or an
+ * explicitly reserved runtime slot only; all fixed adapters must subsequently
+ * register this identity before a frame. A late failure requires discard. */
+bool ab_classic_level_create_defined_box(AbClassicLevel *level, AbSpan name,
+                                         AbSpan definition, AbVec2 position,
+                                         float density, size_t *output, AbError *error);
 
 /* Recreate a removed named body in its stable logical row. This constructs a
  * fresh native circle/physical projection, not a fixture resize. The caller

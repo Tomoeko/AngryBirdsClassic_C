@@ -53,6 +53,9 @@ ab_classic_object_removal_registry(AbClassicObjectRemoval *owner);
  * Capacity must be pre-reserved; earlier effects survive a reached failure. */
 bool ab_classic_object_removal_register_circle(AbClassicObjectRemoval *owner,
                                                size_t object, AbError *error);
+/* Defined explicit box counterpart. Boxes do not register a native bird. */
+bool ab_classic_object_removal_register_box(AbClassicObjectRemoval *owner,
+                                            size_t object, AbError *error);
 bool ab_classic_object_removal_call(void *context, AbSpan name, AbError *error);
 
 #endif

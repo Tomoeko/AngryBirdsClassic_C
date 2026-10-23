@@ -7,7 +7,8 @@ typedef struct {
     const AbResourceSource *source;
     const AbImage *image;
     size_t image_index;
-    bool wanted;
+    bool wanted, uploaded;
+    bool repeat_s, repeat_t;
 } TextureSlot;
 
 struct AbAssetTextures {
@@ -151,8 +152,11 @@ static bool visit_images(AbAssetTextures *textures, const AbResourceOwners *owne
                     entry->source->release(entry->source);
                     return false;
                 }
-                textures->slots[free_slot] =
-                    (TextureSlot){entry->source, image.image, index, true};
+                textures->slots[free_slot] = (TextureSlot){.source = entry->source,
+                                                           .image = image.image,
+                                                           .image_index = index,
+                                                           .wanted = true,
+                                                           .uploaded = true};
                 ++textures->count;
             }
         }
@@ -167,8 +171,8 @@ static bool remove_slots(AbAssetTextures *textures, bool all, AbError *error) {
         if (!slot->source || (!all && slot->wanted)) {
             continue;
         }
-        if (!textures->host.remove(textures->host.context, (uint32_t)index + 1,
-                                   error)) {
+        if (slot->uploaded && !textures->host.remove(textures->host.context,
+                                                     (uint32_t)index + 1, error)) {
             okay = false;
             continue;
         }
@@ -212,6 +216,41 @@ bool ab_asset_textures_find(const AbAssetTextures *textures, const AbImage *imag
         }
     }
     return false;
+}
+
+bool ab_asset_textures_set_wrap(AbAssetTextures *textures, const AbImage *image,
+                                bool repeat_s, bool repeat_t, AbError *error) {
+    uint32_t texture;
+    if (!ab_asset_textures_find(textures, image, &texture))
+        return ab_fail(error, "Missing cached image for texture sampling change");
+    if ((repeat_s || repeat_t) &&
+        (((image->width - 1) & image->width) || ((image->height - 1) & image->height)))
+        return ab_fail(error, "Core GLES2 terrain repeat requires power-of-two pixels");
+    TextureSlot *slot = textures->slots + texture - 1;
+    if (slot->repeat_s == repeat_s && slot->repeat_t == repeat_t)
+        return true;
+    const AbSpriteResource *resource = ab_sprite_resource_from_source(slot->source);
+    AbSpriteAtlasImage view;
+    if (!ab_sprite_atlas_image(ab_sprite_resource_atlas(resource), slot->image_index,
+                               &view) ||
+        view.image != image)
+        return ab_fail(error, "Changed cached image during texture sampling change");
+    view.repeat_s = repeat_s;
+    view.repeat_t = repeat_t;
+    textures->busy = true;
+    bool okay = textures->host.remove(textures->host.context, texture, error);
+    if (okay) {
+        slot->uploaded = false;
+        okay = textures->host.upload(textures->host.context, texture, view, error);
+        slot->uploaded = okay;
+    }
+    textures->busy = false;
+    textures->failed = !okay;
+    if (okay) {
+        slot->repeat_s = repeat_s;
+        slot->repeat_t = repeat_t;
+    }
+    return okay;
 }
 
 size_t ab_asset_textures_count(const AbAssetTextures *textures) {

@@ -69,6 +69,30 @@ static bool descriptors(AbDataValue value, AbClassicParticleNames *names, size_t
     return true;
 }
 
+static bool ambient_names(const AbDataTable *definition, AbClassicParticleNames *names,
+                          size_t *work, AbError *error) {
+    AbDataValue components = field(definition, "components");
+    if (components.kind != AB_DATA_TABLE)
+        return true;
+    AbDataValue ambient = field(components.table, "ambientParticles");
+    if (ambient.kind != AB_DATA_TABLE)
+        return true;
+    if (!table(ambient.table))
+        return ab_fail(error, "Invalid ambient particle preload component");
+    for (size_t index = 0; index < ambient.table->count; ++index) {
+        if (!*work)
+            return ab_fail(error, "Ambient particle preload exceeds work bound");
+        --*work;
+        AbDataValue descriptor = ambient.table->entries[index].value;
+        if (descriptor.kind != AB_DATA_TABLE || !table(descriptor.table) ||
+            !append(names, field(descriptor.table, "particles"), error))
+            return error && error->message[0]
+                       ? false
+                       : ab_fail(error, "Invalid ambient particle preload descriptor");
+    }
+    return true;
+}
+
 bool ab_classic_particle_names(AbClassicLevel *owner, AbClassicParticleNames *names,
                                AbError *error) {
     AbClassicLevelView level = ab_classic_level_view(owner);
@@ -113,6 +137,8 @@ bool ab_classic_particle_names(AbClassicLevel *owner, AbClassicParticleNames *na
                            : ab_fail(error, "Invalid white bird projectile particles");
         }
         AbDataValue damage = field(definition.source, "damageStateChangedParticles");
+        if (!ambient_names(definition.source, names, &work, error))
+            return false;
         if (damage.kind == AB_DATA_NIL)
             continue;
         if (damage.kind != AB_DATA_TABLE || !table(damage.table) ||

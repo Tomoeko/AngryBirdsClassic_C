@@ -6,6 +6,7 @@
 #include "ab/classic_render_scene.h"
 #include "ab/particle_draw.h"
 #include "ab/theme_draw.h"
+#include "ab/extra_draw.h"
 
 typedef struct {
     AbDataValue background_overlay, level_particles_enabled, current_theme;
@@ -27,6 +28,7 @@ typedef struct {
     const AbSpriteProvider *provider;
     AbThemeDraw *theme;
     const AbDataTable *theme_definition, *local_settings, *extra_draw_functions;
+    AbExtraDraws *extra_draws;
     AbClassicGameDrawState *state;
     AbSpan basic_font;
     AbSpan *current_font;
@@ -48,9 +50,9 @@ typedef struct {
  * cached resources until the last call. Initialize has no drawing/state effects.
  * No frame allocation, clock tick, particle update or GPU submission.
  *
- * Fixed initial world identities and the explicitly resolved empty extra-draw
- * registry only. Nonempty extra/z draws reject at their reached source phase;
- * dynamic insertion, powered class construction, editor, popup and restricted
+ * The optional typed extra-draw owner preserves callbacks and source z order.
+ * Raw external extra-draw records still require their resolved producers.
+ * Dynamic insertion, powered class construction, editor, popup and restricted
  * viewport rendering require their own producers. This is not root update,
  * MenuManager/GameHud drawing or a complete native frame/session comparison.
  * Earlier commands and global effects survive failure; stop the owner.

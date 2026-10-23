@@ -24,7 +24,8 @@ extern id MTLCopyAllDevices(void);
 
 static bool upload(void *context, uint32_t texture, AbSpriteAtlasImage image,
                    AbError *error) {
-    return ab_metal_upload(context, texture, image.image, false, false, error);
+    return ab_metal_upload(context, texture, image.image, image.repeat_s,
+                           image.repeat_t, error);
 }
 
 static bool remove_texture(void *context, uint32_t texture, AbError *error) {
@@ -341,6 +342,7 @@ release:
 #include "ui_episode_navigation_apk.h"
 #include "ui_menu_birds_apk.h"
 #include "ui_menu_resolution_apk.h"
+#include "ui_theme_seams_apk.h"
 #include "ui_level_apk.h"
 #include "ui_level_scroll_apk.h"
 #include "ui_level_selection_apk.h"
@@ -355,9 +357,14 @@ release:
 #include "ui_level_golden_apk.h"
 #include "ui_level_facebook_apk.h"
 #include "ui_bird_abilities_apk.h"
+#include "ui_joint_updates_apk.h"
+#include "ui_terrain_apk.h"
+#include "ui_ambient_apk.h"
 #include "ui_powerups_apk.h"
+#include "ui_flames_apk.h"
 #include "ui_level_start_audit.h"
 #include "ui_level5_apk.h"
+#include "ui_level_egg_apk.h"
 
 int main(int argc, char **argv) {
     if (argc < 2 || argc > 17)
@@ -422,6 +429,7 @@ int main(int argc, char **argv) {
         !menu_bird_widgets(&menu, renderer, argc >= 11 ? argv[10] : NULL, &error))
         goto release;
     if (!menu_resolution_widgets(&zip, &menu, renderer, &list, &error) ||
+        !theme_seam_widgets(&menu, renderer, &error) ||
         !level_grid_widgets(&menu, renderer, argc >= 12 ? argv[11] : NULL, &error) ||
         !level_scroller_widgets(&menu, renderer, argc >= 13 ? argv[12] : NULL,
                                 &error) ||
@@ -433,6 +441,7 @@ int main(int argc, char **argv) {
         !cutscene_catalog_widgets(&menu, renderer, &error) ||
         !intro_route_widgets(&zip, &menu, renderer, &list, argc >= 17 ? argv[16] : NULL,
                              &error) ||
+        !cutscene_catalog_pan_widgets(&zip, &menu, renderer, &list, &error) ||
         !menu_audio_widgets(&zip, &menu, renderer, &list, &error) ||
         !hidden_egg_widgets(&menu, renderer, &error) ||
         !rmf_level_widgets(&menu, renderer, &error) ||
@@ -450,10 +459,16 @@ int main(int argc, char **argv) {
         !powerup_quake_widgets(&menu, renderer, &error) ||
         !powerup_scope_widgets(&menu, renderer, &error) ||
         !powerup_overlapping_widgets(&menu, renderer, &error) ||
+        !terrain_widgets(&menu, renderer, &error) ||
+        !ambient_widgets(&menu, renderer, &error) ||
+        !ambient_particle_widgets(&menu, renderer, &error) ||
+        !flame_widgets(&menu, renderer, &error) ||
         !level_start_recovery_regressions(&menu, renderer, &error) ||
         !ability_test_failure(&menu, renderer, &error))
         goto release;
-    if (!level5_reward_widgets(&zip, &menu, renderer, &list, &error)) {
+    if (!joint_impact_widgets(&zip, &menu, renderer, &list, &error) ||
+        !level_egg_reward_widgets(&zip, &menu, renderer, &list, &error) ||
+        !level5_reward_widgets(&zip, &menu, renderer, &list, &error)) {
         if (!error.message[0])
             ab_fail(&error, "Level5 reward fixture did not reopen the menu");
         goto release;

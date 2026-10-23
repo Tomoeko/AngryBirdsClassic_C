@@ -188,6 +188,49 @@ static bool capture_scene(const AbGpuSceneData *scene, const AbGles2Api *api,
     return okay || ab_fail(error, "GPU capture driver error");
 }
 
+static void mask_scene(AbGpuSceneData *scene, uint8_t pixels[8]) {
+    const uint8_t values[] = {255, 0, 0, 255, 0, 255, 0, 128};
+    memcpy(pixels, values, sizeof(values));
+    scene->width = scene->height = 64;
+    scene->texture_count = 2;
+    scene->clear[2] = scene->clear[3] = 1;
+    scene->images[0] = (AbImage){1, 1, {pixels, 4}};
+    scene->images[1] = (AbImage){1, 1, {pixels + 4, 4}};
+    AbDrawQuad quad = {
+        {{-1, 1, -2, -2}, {1, 1, 2, -2}, {-1, -1, -2, 2}, {1, -1, 2, 2}}};
+    scene->commands[0] = (AbDrawCommand){
+        .blend = AB_BLEND_STRAIGHT,
+        .texture = 1,
+        .quad = quad,
+        .color = {1, 1, 1, 1},
+        .opacity = 1,
+        .coordinates = AB_DRAW_CLIP,
+        .mask = {.texture = 2, .uv = {0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f}}};
+    scene->commands[1] = (AbDrawCommand){.blend = AB_BLEND_OPAQUE,
+                                         .texture = 2,
+                                         .quad = quad,
+                                         .color = {1, 1, 1, 1},
+                                         .opacity = 1,
+                                         .coordinates = AB_DRAW_CLIP,
+                                         .scissor = {48, 0, 64, 64, true}};
+    scene->list = (AbDrawList){scene->commands, 2, 128};
+}
+
+static bool check_mask_capture(AbSpan bytes, AbError *error) {
+    const size_t offset = sizeof("AB_GL_CAPTURE_V1\n") - 1 + 32 * 4;
+    if (bytes.size != offset + 64 * 64 * 4)
+        return ab_fail(error, "Incomplete GLES2 mask material capture");
+    for (size_t y = 0; y < 64; ++y)
+        for (size_t x = 0; x < 64; ++x) {
+            const uint8_t masked[] = {128, 0, 127, 191};
+            const uint8_t plain[] = {0, 255, 0, 128};
+            if (memcmp(bytes.data + offset + (y * 64 + x) * 4, x < 48 ? masked : plain,
+                       4))
+                return ab_fail(error, "GLES2 mask material pixel mismatch");
+        }
+    return true;
+}
+
 void theme_gpu_main(const uintptr_t *initial_stack) {
     if (initial_stack[0] < 1 || initial_stack[0] > 16) {
         _exit(2);
@@ -196,6 +239,9 @@ void theme_gpu_main(const uintptr_t *initial_stack) {
     AbError error = {0};
     AbBuffer input = {0}, output = {0};
     AbGpuSceneData scene = {0};
+    bool mask_check =
+        initial_stack[0] == 2 && !strcmp((const char *)initial_stack[2], "--mask");
+    uint8_t mask_pixels[8];
     EglApi egl = {0};
     AbGles2Api api = {0};
     CaptureApi capture = {0};
@@ -205,12 +251,15 @@ void theme_gpu_main(const uintptr_t *initial_stack) {
     void *egl_library = dlopen("/system/lib/libEGL.so", 2);
     void *gles_library = dlopen("/system/lib/libGLESv2.so", 2);
     if (!egl_library || !gles_library || !load_egl(egl_library, &egl, &error) ||
-        !load_gles(gles_library, &api, &capture, &error) ||
-        !ab_file_read("/data/local/tmp/ab520/theme-gpu-input.bin", 32 * 1024 * 1024,
-                      &input, &error) ||
-        !ab_gpu_scene_data_read((AbSpan){input.data, input.size}, &scene, &error)) {
+        !load_gles(gles_library, &api, &capture, &error)) {
         goto release_capture;
     }
+    if (mask_check)
+        mask_scene(&scene, mask_pixels);
+    else if (!ab_file_read("/data/local/tmp/ab520/theme-gpu-input.bin",
+                           32 * 1024 * 1024, &input, &error) ||
+             !ab_gpu_scene_data_read((AbSpan){input.data, input.size}, &scene, &error))
+        goto release_capture;
     display = egl.GetDisplay(NULL);
     int32_t major, minor;
     initialized = display && egl.Initialize(display, &major, &minor);
@@ -239,8 +288,8 @@ void theme_gpu_main(const uintptr_t *initial_stack) {
         goto release_capture;
     }
     for (uint32_t index = 0; index < scene.texture_count; ++index) {
-        if (!ab_gles2_upload(renderer, index + 1, scene.images + index, false, false,
-                             &error)) {
+        if (!ab_gles2_upload(renderer, index + 1, scene.images + index,
+                             mask_check && !index, mask_check && !index, &error)) {
             goto release_capture;
         }
     }
@@ -248,6 +297,8 @@ void theme_gpu_main(const uintptr_t *initial_stack) {
     capture.Clear(0x4000);
     okay = ab_gles2_render(renderer, &scene.list, scene.width, scene.height, &error) &&
            capture_scene(&scene, &api, &capture, &output, &error) &&
+           (!mask_check ||
+            check_mask_capture((AbSpan){output.data, output.size}, &error)) &&
            ab_file_write("/data/local/tmp/ab520/theme-gpu-output.bin",
                          (AbSpan){output.data, output.size}, &error);
 
@@ -269,7 +320,10 @@ release_capture:
     if (egl_library) {
         dlclose(egl_library);
     }
-    if (okay) {
+    if (okay && mask_check) {
+        static const char complete[] = "AB_MASK_GPU_COMPLETE 4096\n";
+        write_message(complete, sizeof(complete) - 1, 1);
+    } else if (okay) {
         uint8_t digest[32];
         char hexadecimal[65];
         okay = ab_sha256((AbSpan){input.data, input.size}, digest, &error);

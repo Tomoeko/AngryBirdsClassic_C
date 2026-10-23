@@ -40,6 +40,11 @@ bool ab_asset_textures_sync(AbAssetTextures *textures, const AbResourceOwners *o
  * The image pointer may be queried only while its CPU source remains loaded. */
 bool ab_asset_textures_find(const AbAssetTextures *textures, const AbImage *image,
                             uint32_t *texture);
+/* Change a cached image's sampling outside frames. Reupload only on a policy
+ * change, retain its texture ID/source identity, and perform no decoding. Core
+ * GLES2 repeat requires power-of-two dimensions. Failure stops this owner. */
+bool ab_asset_textures_set_wrap(AbAssetTextures *textures, const AbImage *image,
+                                bool repeat_s, bool repeat_t, AbError *error);
 size_t ab_asset_textures_count(const AbAssetTextures *textures);
 size_t ab_asset_textures_bytes(const AbAssetTextures *textures);
 bool ab_asset_textures_failed(const AbAssetTextures *textures);

@@ -907,52 +907,176 @@ static bool refresh_world_order(AbClassicLevel *level, AbError *error) {
     AbStringMapLayout layout;
     if (used != level->bodies.count ||
         !ab_string_map_layout(level->world_names, &layout))
-        return ab_fail(error, "Invalid dynamic circle world permutation");
+        return ab_fail(error, "Invalid dynamic object world permutation");
     level->order.hash_capacity = layout.capacity;
     return true;
 }
 
-bool ab_classic_level_create_circle(AbClassicLevel *level, AbGameCircleInput input,
-                                    size_t *output, AbError *error) {
+static bool prepare_dynamic_object(AbClassicLevel *level, AbSpan name, size_t *output,
+                                   AbError *error) {
     if (!level || !output || !level->world_names || level->world.failed ||
         level->world.locked || level->bodies.count >= level->bodies.capacity ||
         level->frame.count != level->bodies.count ||
         level->properties.count != level->bodies.count ||
         level->properties.world.entries != level->properties.world_entries ||
-        level->properties.world.count != level->bodies.count || !input.name.data ||
-        !input.name.size)
-        return ab_fail(error, "Invalid or exhausted dynamic circle level binding");
+        level->properties.world.count != level->bodies.count || !name.data ||
+        !name.size)
+        return ab_fail(error, "Invalid or exhausted dynamic object level binding");
     for (size_t index = 0; index < level->bodies.count; ++index) {
-        AbSpan name = level->bodies.objects[index].name;
-        if (name.size == input.name.size &&
-            !memcmp(name.data, input.name.data, name.size))
-            return ab_fail(error, "Dynamic circle name has already been used");
+        AbSpan existing = level->bodies.objects[index].name;
+        if (existing.size == name.size && !memcmp(existing.data, name.data, name.size))
+            return ab_fail(error, "Dynamic object name has already been used");
     }
-    if (!synchronize_world_names(level, error))
-        return false;
+    return synchronize_world_names(level, error);
+}
+
+static bool publish_dynamic_object(AbClassicLevel *level, AbLevelObject object,
+                                   const AbGameFrameObject *frame,
+                                   const AbLevelPropertyObject *properties,
+                                   size_t *output, AbError *error) {
     size_t index = level->bodies.count;
-    AbLevelObject *object = level->bodies.objects + index;
-    AbGameCircle circle;
-    if (!ab_game_circle_create(&level->world, input, (uintptr_t)object, &circle, error))
-        return false;
-    *object = (AbLevelObject){.name = input.name,
-                              .physics = circle.physics,
-                              .initial_mass = circle.initial_mass};
-    level->frame.objects[index] = circle.frame;
-    AbLevelPropertyObject *properties = level->properties.objects + index;
-    *properties = circle.properties;
-    properties->physical.entries = properties->physical_entries;
+    level->bodies.objects[index] = object;
+    level->frame.objects[index] = *frame;
+    AbLevelPropertyObject *stored = level->properties.objects + index;
+    *stored = *properties;
+    stored->physical.entries = stored->physical_entries;
     level->properties.world_entries[index] =
-        (AbDataEntry){{.kind = AB_DATA_STRING, .string = input.name},
-                      {.kind = AB_DATA_TABLE, .table = &properties->physical}};
+        (AbDataEntry){{.kind = AB_DATA_STRING, .string = object.name},
+                      {.kind = AB_DATA_TABLE, .table = &stored->physical}};
     ++level->bodies.count;
     ++level->properties.count;
     ++level->properties.world.count;
     ++level->frame.count;
-    level->character_objects[index].jump.position = input.position;
-    if (!ab_string_map_set(level->world_names, input.name, index, true, error) ||
+    level->character_objects[index].jump.position = frame->rendered.position;
+    if (!ab_string_map_set(level->world_names, object.name, index, true, error) ||
         !refresh_world_order(level, error))
         return false;
+    *output = index;
+    return true;
+}
+
+bool ab_classic_level_create_circle(AbClassicLevel *level, AbGameCircleInput input,
+                                    size_t *output, AbError *error) {
+    if (!prepare_dynamic_object(level, input.name, output, error))
+        return false;
+    AbGameCircle circle;
+    uintptr_t identity = (uintptr_t)(level->bodies.objects + level->bodies.count);
+    if (!ab_game_circle_create(&level->world, input, identity, &circle, error))
+        return false;
+    return publish_dynamic_object(level,
+                                  (AbLevelObject){.name = input.name,
+                                                  .physics = circle.physics,
+                                                  .initial_mass = circle.initial_mass},
+                                  &circle.frame, &circle.properties, output, error);
+}
+
+bool ab_classic_level_create_box(AbClassicLevel *level, AbGameBoxInput input,
+                                 size_t *output, AbError *error) {
+    if (!prepare_dynamic_object(level, input.name, output, error))
+        return false;
+    AbGameBox box;
+    uintptr_t identity = (uintptr_t)(level->bodies.objects + level->bodies.count);
+    if (!ab_game_box_create(&level->world, input, identity, &box, error))
+        return false;
+    return publish_dynamic_object(level,
+                                  (AbLevelObject){.name = input.name,
+                                                  .physics = box.physics,
+                                                  .initial_mass = box.initial_mass},
+                                  &box.frame, &box.properties, output, error);
+}
+
+bool ab_classic_level_create_defined_box(AbClassicLevel *level, AbSpan name,
+                                         AbSpan definition_name, AbVec2 position,
+                                         float density, size_t *output,
+                                         AbError *error) {
+    if (!level || !output)
+        return ab_fail(error, "Missing defined box level/output");
+    AbDataEntry entry = {property_key("density"), property_number(density)};
+    AbDataTable overrides = {&entry, 1, 1, NULL};
+    AbObjectDefinition definition;
+    AbObjectPhysics physics;
+    AbDamageSpriteNames sprites;
+    if (!ab_object_definition_open(level->catalog, definition_name, &overrides,
+                                   &definition, error) ||
+        !ab_object_physics(&definition, (AbVec2){0}, 0.05f, &physics, error) ||
+        !ab_object_initial_sprites(&definition, level->catalog_source, NULL, &sprites,
+                                   error))
+        return false;
+    AbDataValue type = ab_object_property(&definition, property_key("type").string);
+    if (type.kind != AB_DATA_STRING || !type.string.data || type.string.size != 3 ||
+        memcmp(type.string.data, "box", 3) || physics.dimensions.width <= 0 ||
+        physics.dimensions.height <= 0 || sprites.sprite.kind != AB_DATA_STRING ||
+        !sprites.sprite.string.data || !sprites.sprite.string.size)
+        return ab_fail(error, "Defined runtime box requires explicit geometry/sprite");
+    const char *const active[] = {"controllable",   "levelGoal",    "createFunction",
+                                  "updateFunction", "animation",    "extraSprites",
+                                  "components",     "isGiftBoxable"};
+    for (size_t index = 0; index < sizeof(active) / sizeof(*active); ++index) {
+        AbDataValue value =
+            ab_object_property(&definition, property_key(active[index]).string);
+        if (value.kind != AB_DATA_NIL && (value.kind != AB_DATA_BOOLEAN || value.bits))
+            return ab_fail(error, "Defined box requires its active %s factory phase",
+                           active[index]);
+    }
+    if (definition.collider.kind != AB_DATA_NUMBER ||
+        definition.z_order.kind != AB_DATA_NUMBER)
+        return ab_fail(error, "Defined box requires numeric collider/draw order");
+    float collider, z_order;
+    memcpy(&collider, &definition.collider.bits, sizeof(collider));
+    memcpy(&z_order, &definition.z_order.bits, sizeof(z_order));
+    if (!isfinite(collider) || collider < 0 || collider >= AB_GAME_COLLIDER_TYPES ||
+        collider != (float)(uint32_t)collider)
+        return ab_fail(error, "Invalid defined box collider");
+    AbDataValue collision =
+        ab_object_property(&definition, property_key("collision").string);
+    AbGameBoxInput input = {
+        .name = name,
+        .position = position,
+        .size = {physics.dimensions.width, physics.dimensions.height},
+        .density = physics.density,
+        .friction = physics.friction,
+        .restitution = physics.restitution,
+        .z_order = z_order,
+        .collision = collision.kind == AB_DATA_NIL ||
+                     collision.kind != AB_DATA_BOOLEAN || collision.bits};
+    size_t index;
+    if (!ab_classic_level_create_box(level, input, &index, error))
+        return false;
+    AbLevelObject *object = level->bodies.objects + index;
+    object->definition_name = definition_name;
+    object->physics.collider = definition.collider;
+    AbDataValue gravity =
+        ab_object_property(&definition, property_key("gravityEnabled").string);
+    object->physics.gravity_enabled =
+        gravity.kind == AB_DATA_NIL || gravity.kind != AB_DATA_BOOLEAN || gravity.bits;
+    AbDataValue sensor = ab_object_property(&definition, property_key("sensor").string);
+    bool enabled =
+        sensor.kind != AB_DATA_NIL && (sensor.kind != AB_DATA_BOOLEAN || sensor.bits);
+    if (!ab_world_set_fixture_sensor(&level->world, object->physics.fixture, enabled))
+        return ab_fail(error, "Cannot publish defined box sensor");
+    level->frame.objects[index].collider = (uint32_t)collider;
+    level->initial_sprites[index] = sprites;
+    if (!initial_property(
+            level, index, "definition",
+            (AbDataValue){.kind = AB_DATA_STRING, .string = definition_name}, error) ||
+        !initialize_definition_properties(level, index, error) ||
+        !initial_property(level, index, "damageSprite", sprites.sprite, error) ||
+        !initial_property(level, index, "blinkSprite", sprites.blink, error) ||
+        !initial_property(level, index, "smileSprite", sprites.smile, error) ||
+        !initial_property(level, index, "disableForce",
+                          (AbDataValue){.kind = AB_DATA_BOOLEAN}, error))
+        return false;
+    if (collider != AB_COLLIDER_STATIC) {
+        AbObjectPropertyAccess access = {
+            .physics_object = {.kind = AB_DATA_TABLE,
+                               .table = &level->properties.dynamic}};
+        if (!ab_object_property_set(
+                &access, name,
+                (AbDataValue){.kind = AB_DATA_TABLE,
+                              .table = &level->properties.objects[index].physical},
+                error))
+            return false;
+    }
     *output = index;
     return true;
 }

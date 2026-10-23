@@ -59,7 +59,7 @@ target_include_directories(ab_numeric PUBLIC include)
 target_link_libraries(ab_numeric PUBLIC ab_options)
 
 add_library(ab_base STATIC src/core/base.c src/core/utf8.c src/core/string_map.c
-    src/core/identity_map.c)
+    src/core/identity_map.c src/core/z_order.c)
 target_include_directories(ab_base PUBLIC include)
 target_link_libraries(ab_base PUBLIC ab_options)
 
@@ -194,11 +194,14 @@ endif()
 
 include(cmake/embed_shaders.cmake)
 add_library(ab_render STATIC src/render/draw.c src/render/gles2.c
+    src/render/extra_draw.c
+    src/render/game_sprite.c
     src/render/asset_textures.c
     src/render/font_metrics.c src/render/font_layout.c src/render/font_draw.c
     src/render/font_wrap.c src/render/ui_image_render.c src/render/screen_clip.c
     src/render/theme_layer.c
     src/render/image_points.c
+    src/render/mask_draw.c
     src/render/composite_bounds.c
     src/render/composite_draw.c
     src/render/composite_resources.c
@@ -321,6 +324,7 @@ add_library(ab_game STATIC src/game/object_definition.c src/game/object_physics.
     src/game/block_collision.c
     src/game/bird_collision_notify.c
     src/game/bird_collision_prelude.c
+    src/game/bird_hat.c
     src/game/game_behavior.c
     src/game/object_property_access.c
     src/game/object_definition_lookup.c
@@ -338,7 +342,7 @@ add_library(ab_game STATIC src/game/object_definition.c src/game/object_physics.
     src/game/object_removal_notify.c
     src/game/object_removed.c
     src/game/bird_remove.c
-    src/game/level_effect.c
+    src/game/level_effect.c src/game/level_egg.c src/game/level_clock.c
     src/game/bird_impact_prediction.c
     src/game/bird_camera_behavior.c
     src/game/bird_impact_world.c
@@ -419,6 +423,7 @@ add_library(ab_game STATIC src/game/object_definition.c src/game/object_physics.
     src/game/classic_joint_limits.c
     src/game/classic_joint_parameters.c
     src/game/classic_joint_break.c
+    src/game/classic_joint_updates.c
     src/game/classic_contact_glue.c
     src/game/level_joints.c
     src/game/object_friction.c
@@ -435,7 +440,7 @@ add_library(ab_game STATIC src/game/object_definition.c src/game/object_physics.
     src/game/block_script.c
     src/game/object_update.c
     src/game/object_visual.c
-    src/game/object_transform.c src/game/game_circle.c
+    src/game/object_transform.c src/game/game_circle.c src/game/game_box.c
     src/game/object_properties.c
     src/game/object_activity.c
     src/game/classic_post_physics.c
@@ -463,6 +468,8 @@ add_library(ab_scene STATIC src/render/classic_scene.c src/render/classic_visual
     src/game/classic_launch_host.c src/game/classic_playfield.c
     src/game/classic_level_runtime.c
     src/game/classic_block_scripts.c
+    src/game/classic_ambient.c
+    src/game/classic_flames.c
     src/game/classic_world_runtime.c
     src/game/classic_blues_child.c src/game/classic_blues_split.c
     src/game/classic_dynamics.c src/game/classic_collision_hooks.c
@@ -2020,6 +2027,66 @@ if(BUILD_TESTING)
     target_link_libraries(ab_main_menu_settings_tests PRIVATE ab_game)
     add_test(NAME main_menu_settings_edges COMMAND ab_main_menu_settings_tests)
     add_executable(ab_theme_layer_tests tests/theme_layer.c)
+    add_executable(ab_mask_draw_tests tests/mask_draw.c)
+    add_executable(ab_z_order_tests tests/z_order.c)
+    add_executable(ab_level_egg_tests tests/level_egg.c)
+    add_executable(ab_level_clock_tests tests/level_clock.c)
+    target_link_libraries(ab_level_clock_tests PRIVATE ab_game)
+    add_test(NAME level_clock_edges COMMAND ab_level_clock_tests)
+    set(AB_REFERENCE_LEVEL_CLOCK "" CACHE FILEPATH "Private pinned clock-level trace")
+    if(AB_REFERENCE_LEVEL_CLOCK)
+        file(SHA256 "${AB_REFERENCE_LEVEL_CLOCK}" level_clock_hash)
+        if(NOT level_clock_hash STREQUAL
+            "9ff3f589c6f9c3618484abbc27ab2c5772aad749dba1ee88af462a691430cf63")
+            message(FATAL_ERROR "Expected the pinned original clock-level trace")
+        endif()
+        add_test(NAME level_clock_native COMMAND ab_level_clock_tests "${AB_REFERENCE_LEVEL_CLOCK}")
+    endif()
+    target_link_libraries(ab_level_egg_tests PRIVATE ab_game)
+    add_test(NAME level_egg_edges COMMAND ab_level_egg_tests)
+    set(AB_REFERENCE_LEVEL_EGG "" CACHE FILEPATH "Private pinned level egg-hook trace")
+    if(AB_REFERENCE_LEVEL_EGG)
+        file(SHA256 "${AB_REFERENCE_LEVEL_EGG}" level_egg_hash)
+        if(NOT level_egg_hash STREQUAL
+            "978d42407af14ea84370b5a47773291fd852bfc004ebb7321b9f8827df921f90")
+            message(FATAL_ERROR "Expected the pinned original level egg-hook trace")
+        endif()
+        add_test(NAME level_egg_native COMMAND ab_level_egg_tests "${AB_REFERENCE_LEVEL_EGG}")
+    endif()
+    add_executable(ab_extra_draw_tests tests/extra_draw.c)
+    target_link_libraries(ab_extra_draw_tests PRIVATE ab_render)
+    add_test(NAME extra_draw_edges COMMAND ab_extra_draw_tests)
+    set(AB_REFERENCE_EXTRA_DRAW "" CACHE FILEPATH "Private pinned original extra-draw trace")
+    if(AB_REFERENCE_EXTRA_DRAW)
+        file(SHA256 "${AB_REFERENCE_EXTRA_DRAW}" extra_draw_hash)
+        if(NOT extra_draw_hash STREQUAL
+            "bf640813916e25070395dc90a4a7eba35cd8016af7873d8e2ec7b4775aa9d85b")
+            message(FATAL_ERROR "Expected the recorded original extra-draw trace")
+        endif()
+        add_test(NAME extra_draw_native COMMAND ab_extra_draw_tests "${AB_REFERENCE_EXTRA_DRAW}")
+    endif()
+    target_link_libraries(ab_z_order_tests PRIVATE ab_base)
+    add_test(NAME z_order_edges COMMAND ab_z_order_tests)
+    set(AB_REFERENCE_Z_ORDER "" CACHE FILEPATH "Private pinned native numeric z-order trace")
+    if(AB_REFERENCE_Z_ORDER)
+        file(SHA256 "${AB_REFERENCE_Z_ORDER}" z_order_hash)
+        if(NOT z_order_hash STREQUAL
+            "6ebc71055fa6405e4590e9ddd476e019064cb96ab9ed1b26a6a24d1ff7c7075d")
+            message(FATAL_ERROR "Expected the recorded native numeric z-order trace")
+        endif()
+        add_test(NAME z_order_native COMMAND ab_z_order_tests "${AB_REFERENCE_Z_ORDER}")
+    endif()
+    target_link_libraries(ab_mask_draw_tests PRIVATE ab_render)
+    add_test(NAME mask_draw_edges COMMAND ab_mask_draw_tests)
+    set(AB_REFERENCE_MASK_DRAW "" CACHE FILEPATH "Private pinned native masked-image trace")
+    if(AB_REFERENCE_MASK_DRAW)
+        file(SHA256 "${AB_REFERENCE_MASK_DRAW}" mask_draw_hash)
+        if(NOT mask_draw_hash STREQUAL
+            "9ea8a2ecbcd1e652d575f8e47e0f83f90001b55a085cbd21a036cbf7024204bc")
+            message(FATAL_ERROR "Expected the recorded native masked-image trace")
+        endif()
+        add_test(NAME mask_draw_native COMMAND ab_mask_draw_tests "${AB_REFERENCE_MASK_DRAW}")
+    endif()
     target_link_libraries(ab_theme_layer_tests PRIVATE ab_render)
     add_test(NAME theme_layer_edges COMMAND ab_theme_layer_tests)
     add_executable(ab_theme_background_tests tests/theme_background.c)
@@ -4268,6 +4335,23 @@ if(BUILD_TESTING)
     add_executable(ab_classic_level_tests tests/classic_level.c)
     target_link_libraries(ab_classic_level_tests PRIVATE ab_game)
     add_test(NAME classic_level_owner_edges COMMAND ab_classic_level_tests)
+    add_executable(ab_defined_box_apk_tests tests/defined_box_apk.c)
+    target_link_libraries(ab_defined_box_apk_tests PRIVATE ab_game)
+    if(AB_REFERENCE_APK)
+        add_test(NAME defined_box_apk COMMAND ab_defined_box_apk_tests "${AB_REFERENCE_APK}")
+    endif()
+    add_executable(ab_bird_hat_tests tests/bird_hat.c)
+    target_link_libraries(ab_bird_hat_tests PRIVATE ab_game)
+    add_test(NAME bird_hat_edges COMMAND ab_bird_hat_tests)
+    set(AB_REFERENCE_BIRD_HAT "" CACHE FILEPATH "Private pinned native hat lifecycle trace")
+    if(AB_REFERENCE_BIRD_HAT)
+        file(SHA256 "${AB_REFERENCE_BIRD_HAT}" bird_hat_hash)
+        if(NOT bird_hat_hash STREQUAL
+            "2d8bc9986f2a2104df1513fe38510bab571619b1346defa59680c74baa4b1638")
+            message(FATAL_ERROR "Expected the pinned native hat lifecycle trace")
+        endif()
+        add_test(NAME bird_hat_native COMMAND ab_bird_hat_tests "${AB_REFERENCE_BIRD_HAT}")
+    endif()
     add_executable(ab_object_missing_tests tests/object_missing.c)
     target_link_libraries(ab_object_missing_tests PRIVATE ab_game)
     add_test(NAME game_object_missing_edges COMMAND ab_object_missing_tests)
@@ -4306,6 +4390,18 @@ if(BUILD_TESTING)
     add_test(NAME game_object_visual_edges COMMAND ab_object_visual_tests)
     add_executable(ab_object_transform_tests tests/object_transform.c)
     add_executable(ab_game_circle_tests tests/game_circle.c)
+    add_executable(ab_game_box_tests tests/game_box.c)
+    target_link_libraries(ab_game_box_tests PRIVATE ab_game)
+    add_test(NAME game_box_edges COMMAND ab_game_box_tests)
+    set(AB_REFERENCE_CREATE_BOX "" CACHE FILEPATH "Private pinned native box-constructor trace")
+    if(AB_REFERENCE_CREATE_BOX)
+        file(SHA256 "${AB_REFERENCE_CREATE_BOX}" create_box_hash)
+        if(NOT create_box_hash STREQUAL
+            "4852bee479a33054de9c08222e97080687a4243ab3f8361284af6a2dcc326c7f")
+            message(FATAL_ERROR "Expected the pinned native box-constructor trace")
+        endif()
+        add_test(NAME game_box_native COMMAND ab_game_box_tests "${AB_REFERENCE_CREATE_BOX}")
+    endif()
     target_link_libraries(ab_game_circle_tests PRIVATE ab_game)
     add_test(NAME game_circle_edges COMMAND ab_game_circle_tests)
     set(AB_REFERENCE_CREATE_CIRCLE "" CACHE FILEPATH
@@ -4819,6 +4915,9 @@ if(BUILD_TESTING)
     add_executable(ab_common_clip_tests tests/common_clip.c)
     target_link_libraries(ab_common_clip_tests PRIVATE ab_common_renderer)
     cc_add_platform(ab_common_clip_tests "${AB_BACKEND}")
+    add_executable(ab_common_mask_tests tests/common_mask.c)
+    target_link_libraries(ab_common_mask_tests PRIVATE ab_common_renderer)
+    cc_add_platform(ab_common_mask_tests "${AB_BACKEND}")
     add_executable(ab_gles2_tests tests/gles2.c)
     target_link_libraries(ab_gles2_tests PRIVATE ab_render)
     add_test(NAME gles2_ownership_and_submission COMMAND ab_gles2_tests)
@@ -5020,6 +5119,9 @@ if(BUILD_TESTING)
     add_executable(ab_game_joint_break_tests tests/game_joint_break.c)
     target_link_libraries(ab_game_joint_break_tests PRIVATE ab_game)
     add_test(NAME game_joint_break_edges COMMAND ab_game_joint_break_tests)
+    add_executable(ab_game_joint_updates_tests tests/game_joint_updates.c)
+    target_link_libraries(ab_game_joint_updates_tests PRIVATE ab_game)
+    add_test(NAME game_joint_updates COMMAND ab_game_joint_updates_tests)
     add_executable(ab_game_joint_named_tests tests/game_joint_named.c)
     target_link_libraries(ab_game_joint_named_tests PRIVATE ab_game)
     add_test(NAME game_joint_named_edges COMMAND ab_game_joint_named_tests)

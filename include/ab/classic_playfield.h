@@ -33,6 +33,7 @@ typedef struct {
     const AbDataValue *powerups_enabled, *red_special_available, *next_bird_sound;
     uint32_t *renderer_counter;
     AbBlend object_blend;
+    const AbMaskTexture *terrain;
     /* Source resources and callbacks remain borrowed. level/storage_bytes are
      * selected by this constructor from level/limits above. */
     AbClassicCameraConfig camera;

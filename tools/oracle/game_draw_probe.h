@@ -124,6 +124,7 @@ static void gd_prepare(void *lua) {
     damage_lua.set_top(lua, 0);
 }
 
+#if !defined(AB_ORACLE_EXTRA_DRAW_ONLY)
 static void gd_value(void *lua, const char *name, uint32_t words[2]) {
     damage_lua.get_field(lua, -10002, name);
     words[0] = (uint32_t)damage_lua.type(lua, -1);
@@ -194,5 +195,6 @@ static void probe_game_draw(void) {
     damage_lua.close_state(lua);
     semihost(4, "AB drawGame reference complete\n");
 }
+#endif
 
 #endif

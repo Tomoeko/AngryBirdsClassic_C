@@ -292,6 +292,24 @@ static void print_damage_results(void *lua) {
 #if defined(AB_ORACLE_SLING_SCOPE_ONLY)
 #include "sling_scope_probe.h"
 #endif
+#if defined(AB_ORACLE_MASK_DRAW_ONLY)
+#include "mask_draw_probe.h"
+#endif
+#if defined(AB_ORACLE_Z_ORDER_ONLY)
+#include "z_order_probe.h"
+#endif
+#if defined(AB_ORACLE_EXTRA_DRAW_ONLY)
+#include "extra_draw_probe.h"
+#endif
+#if defined(AB_ORACLE_LEVEL_EGG_ONLY)
+#include "level_egg_probe.h"
+#endif
+#if defined(AB_ORACLE_LEVEL_CLOCK_ONLY)
+#include "level_clock_probe.h"
+#endif
+#if defined(AB_ORACLE_BIRD_HAT_ONLY)
+#include "bird_hat_probe.h"
+#endif
 #if defined(AB_ORACLE_SUPERSEED_RADIUS_ONLY)
 #include "superseed_radius_probe.h"
 #endif
@@ -829,6 +847,9 @@ static void print_damage_results(void *lua) {
 #if defined(AB_ORACLE_CREATE_CIRCLE_ONLY)
 #include "create_circle_probe.h"
 #endif
+#if defined(AB_ORACLE_CREATE_BOX_ONLY)
+#include "create_box_probe.h"
+#endif
 #if defined(AB_ORACLE_BLUES_CHILD_ONLY) || defined(AB_ORACLE_BLUES_SPLIT_ONLY)
 #include "blues_child_probe.h"
 #endif
@@ -854,6 +875,10 @@ static void probe_block_damage(void) {
 #endif
 #if defined(AB_ORACLE_CREATE_CIRCLE_ONLY)
     probe_create_circle();
+    return;
+#endif
+#if defined(AB_ORACLE_CREATE_BOX_ONLY)
+    probe_create_box();
     return;
 #endif
 #if defined(AB_ORACLE_RELOAD_GEOMETRY_ONLY)
@@ -1528,6 +1553,30 @@ static void probe_block_damage(void) {
 #endif
 #if defined(AB_ORACLE_SLING_SCOPE_ONLY)
     probe_sling_scope();
+    return;
+#endif
+#if defined(AB_ORACLE_MASK_DRAW_ONLY)
+    probe_mask_draw();
+    return;
+#endif
+#if defined(AB_ORACLE_Z_ORDER_ONLY)
+    probe_z_order();
+    return;
+#endif
+#if defined(AB_ORACLE_EXTRA_DRAW_ONLY)
+    probe_extra_draw();
+    return;
+#endif
+#if defined(AB_ORACLE_LEVEL_EGG_ONLY)
+    probe_level_egg();
+    return;
+#endif
+#if defined(AB_ORACLE_LEVEL_CLOCK_ONLY)
+    probe_level_clock();
+    return;
+#endif
+#if defined(AB_ORACLE_BIRD_HAT_ONLY)
+    probe_bird_hat();
     return;
 #endif
 #if defined(AB_ORACLE_SUPERSEED_RADIUS_ONLY)

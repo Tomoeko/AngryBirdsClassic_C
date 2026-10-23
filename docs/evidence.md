@@ -9281,3 +9281,411 @@ The retained corpus SHA-256 is
 identities while preserving the native 32-bit hash input. This does not establish
 native allocation addresses, garbage collection, mixed-key tables or full-frame
 random ordering, and ambient component integration remains open.
+
+### Theme scenery attachment seams
+
+The reported plant/leaf/bush cuts reproduce with the unchanged theme4 DAT/PVR
+resources at 2560x1440. Three pairs of authored integer attachment edges acquire
+a one-source-pixel gap when negative pivots pass through the legacy add-half,
+truncate-toward-zero getter. SheetLoaderDAT passes the signed integer pivots
+unchanged into Sprite construction; the getter arithmetic is confirmed by LLVM
+at ELF 0x5a4988/0x5a49a0 and Binary Ninja analysis of the pinned library. Its UV
+construction uses region edges, without a half-texel inset.
+
+Desktop ThemeDraw now requests integer pivot alignment before the shared sprite
+transform. This intentionally corrects that legacy negative-pivot artifact for
+scenery assembly. It does not alter atlas pixels, UVs, sampling, screen-coordinate
+rounding or the native getter reference path. The same placement correction
+feeds Metal and GLES2 commands. The APK regression checks all three attachment
+pairs at 1024x768, 1920x1080, 2560x1440 and 768x1024 and renders each with Metal.
+The enlarged Metal capture shows continuous stems, leaves and bushes. This is
+an explicit desktop presentation correction, not a claim that native theme4
+frames have been matched pixel for pixel.
+
+### Terrain texture masks
+
+The flat gray platforms reported in Poached Eggs 1-7 were an omitted
+MaskRenderer route. The catalog selects that branch when an object definition
+has a truthy texture field. ObjectCreation's resolved helper selects the image
+from the current theme's texture field, rather than using the historical image
+name in each block definition. The mask sprite supplies shape and alpha; its
+RGB is editor artwork and does not contribute to the final terrain color.
+
+The pinned ARMv7 MaskRenderer.draw, MaskedImage.add and MaskedImage.render are
+at analysis addresses 0x2e17cc, 0x34e570 and 0x34ef88. These analysis addresses
+include the established 0x10000 load bias. The independent C planner matches
+2,048 calls to unchanged MaskedImage.add, with 1,382 visible quads: rotated
+positions, source culling, both independent UV sets, depth and homogeneous
+coordinates. Terrain UVs stay anchored to world coordinates; mask UVs use the
+sprite's atlas region. The retained corpus SHA-256 is
+`9ea8a2ecbcd1e652d575f8e47e0f83f90001b55a085cbd21a036cbf7024204bc`;
+AB_REFERENCE_MASK_DRAW validates this exact input.
+
+The authored material samples terrain color and multiplies only its alpha by
+the mask alpha, then uses source-alpha blending. It preserves the existing
+ordered scene membership and ordinary sprite material. Common Metal's real
+640x480 framebuffer check validates every pixel of a half-alpha colored mask,
+straight blending and a subsequent ordinary draw. The Level4 catalog request
+(Poached Eggs 1-7) produces four visible terrain-mask commands with the actual
+theme texture; its Metal capture shows textured earth in the platform shapes.
+The shared terrain resource is retained and uses power-of-two repeat sampling;
+unchanged policies reuse the cached upload and decoding is not repeated.
+
+These checks establish the recovered geometry and exercised desktop material.
+They do not establish a whole original-game terrain frame comparison or a
+complete native MaskRenderer/Camera/Scene scheduling comparison. GLES2 command
+recording and shader-link checks cover the corresponding material interface.
+The first-party backend also executes the same controlled material on the
+isolated Android 5.1.1 EGL/GLES2 driver: all 4,096 framebuffer pixels match the
+expected RGBA bytes, including scissor and return to ordinary rendering. The
+16,529-byte capture SHA-256 is
+`c933d7adb10205be9c03170f4e2e1b639ebf90c8992be313525297f11499b1f2`.
+This compares our backend with explicit material equations, not with an
+original-game rendered frame. All 765 primary checks and the Windows build
+pass after the terrain and scenery fixes.
+
+### Live ambient block components
+
+AmbientAnimations and AmbientParticles now bind their recovered default class
+methods to actual level objects. Separate identity-keyed maps retain independent
+copied descriptors, timers and registration order. Each of the eight animation
+and five particle catalog components has one descriptor; its source pairs order
+is therefore unambiguous. Repeated applications append separate mutable copies.
+Disposal replaces the logical map. Every update checks the current physical name
+in objects.world, retains native nil-key erasure and uses the shared script RNG.
+The native pointer-table implementation is compared separately; original
+allocation addresses and whole-frame RNG ordering remain unverified.
+
+Animations call the actual physical/visual setSprite boundary. Particle effects
+use the current named body's angle, canonical script position, recovered x20
+coordinate transform and the existing engine emission boundary with three
+trailing zeroes and two false flags. Their exact resource names are collected
+and preloaded during level preparation. No frame-time decoding or allocation is
+introduced. The controller calls these classes in their original manager order
+and honors the actual physics-enabled pause gate.
+
+The real BlackBird_2 fixture plays an ambient frame, restores its original
+sprite, checks pause, physical-name erasure, repeated apply and disposal.
+BlackBird_7 emits its source dropBuff particles through the shared engine and
+checks loaded sprite handles, a Metal capture and paused effect timers. Both
+captures were inspected with the camera centered on the relevant actual object;
+this controlled camera setup is not a native camera replay. The animation
+checkpoint passes all 765 primary checks, both complete ASan/UBSan Metal routes
+and Windows compilation. At that checkpoint, the catalog inventory improves
+from 488 to 520 starts out of 590 requests, each followed by three ordinary
+frames. The newer particle integration has passed the complete primary Metal
+UI route, all 765 primary checks, both full ASan/UBSan Metal routes and the
+Windows build. At the particle checkpoint, the inventory reaches 531 starts
+out of 590 requests; the remaining loading failures are flame application and
+registered level hooks/scripts. None of these loading checks establishes
+all-level playthroughs or full original-game frame fidelity.
+
+Flame draw recovery also confirms that native Camera.drawGame (analysis
+0x2e43a4) calls drawZOrdered with each scene layer before drawing its members.
+drawGame141561 flushes remaining z draws at the later 1e10 boundary. The original
+numeric comparator141482 and native table.sort at ELF0x821390 / helper0x820e50
+produce 2,048 exact independently matched permutations, including equal z
+values, signed zero and arrays of zero through 128 entries. The first-party
+implementation uses explicit bounded stack ranges and finite binary32 keys.
+Its retained corpus SHA-256 is
+`6ebc71055fa6405e4590e9ddd476e019064cb96ab9ed1b26a6a24d1ff7c7075d`.
+Original comparator instructions/constants are unchanged.
+
+### Live extra draws and flames
+
+The owned extra-draw registry now captures numeric-z records in native string
+map order, sorts their references, dispatches them before each scene layer and
+flushes at the source 1e10 boundary. Non-z records retain their separate before-
+blocks and late passes. The actual hasExtraZOrderedDraws value is published
+during preparation, before subsequent callbacks can observe it. Callbacks can
+remove their own map entries without invalidating the retained z references.
+Ordinary dispatch performs no allocation.
+
+The original drawGame141561, drawZOrdered141286 and comparator141482 run through
+256 controlled registry cases over two consecutive frames. All event orders,
+per-callback hasZ values and final flags match. Native table.sort runs unchanged;
+the camera's test layer enumeration is a controlled C boundary, with native
+layer placement checked separately in Camera.drawGame. The corpus SHA-256 is
+`bf640813916e25070395dc90a4a7eba35cd8016af7873d8e2ec7b4775aa9d85b`.
+Original instructions and constants are unchanged. The extracted z dispatcher
+adds an empty debug upvalue name so the oracle can bind the original closure;
+that metadata change is not a replacement implementation.
+
+FlameEffect applies its actual physical flameEffect table, shared object-update
+function, initial zero-time update and extra-draw registration at the raw block
+definition's z_order + 1. Updates use the existing native-matched flame helpers,
+shared script RNG, current native body angle/velocity and canonical sprite.
+Rendering uses the recovered drawGameSprite12979 division by physics scale,
+integer-pivot conversion and current X scale. Both catalog flame components
+preload their authored frames; no per-frame resource lookup or allocation is
+introduced. Missing world objects remove the draw registration and prune the
+registered tail callback while retaining the object's update property.
+
+The real BlackBird_1 fixture checks visible flame animation, base/flame draw
+order, a manually inspected Metal capture, paused timers and callback pruning.
+The flame checkpoint passes all 769 primary checks, seven selected ASan/UBSan
+checks including both complete Metal UI routes, the Windows build and format
+check. Its catalog inventory reaches 548 of 590 starts, each followed by three
+ordinary frames, with no frame errors. The 42 remaining loading gates are level
+scripts and birthday-hat construction hooks. These figures do not establish
+complete level playthroughs or native whole-frame fidelity. Dynamic flame
+construction, arbitrary script-table replacement and native allocation/RNG
+interleaving beyond the independently tested boundaries remain open.
+
+### Common hidden-egg level hooks
+
+The common level-script factory3681 and helpers3189/3395/3533 now have an owned
+C implementation for their 18 registrations. The module captures the full/free
+version gate. Preparation queries the actual egg unlock state only when reached,
+then removes the named loaded placement and connected joints before native body
+construction. Decorative keep-object registrations omit preparation entirely.
+Destruction checks the current physical name and eagle flag before calling the
+existing achievement, encrypted-save, reward and event services.
+
+Post-construction nil writes retain every original key and the constructor hash
+capacity. The C ordering helper rebuilds that layout and emits surviving values;
+compacting the input would change collision chains, iteration order and later
+physical identities. World and joint constructors now consume this live order.
+This boundary supports deletion of existing keys, with no subsequent insertion,
+rehash or arbitrary metatable behavior.
+
+An isolated ARM oracle executes the entire unchanged level_scripts.lua module
+from the pinned APK (SHA-256
+`28ed02c661dc9fd522ce5c3d9501c215170b609c13d520ff5952f86c27394498`).
+External module loaders and the unused birthday level list are controlled
+boundaries. Across 1,152 cases, all 18 actual registrations match unlock-query
+counts, achievement calls and surviving world/joint iteration order, including
+full/free flags, kept decorations, matching/unrelated physical names and four
+eagle truthiness values. The retained corpus SHA-256 is
+`978d42407af14ea84370b5a47773291fd852bfc004ebb7321b9f8827df921f90`.
+This verifies the selected script paths, not complete original-game sessions.
+
+The actual LevelP2_64 integration fixture queues a real after-physics removal,
+checks eagle suppression and ordinary reward/event/save effects, captures the
+Metal notification and reopens encrypted progress. The collected egg is then
+absent before body construction; Level34 retains its decorative beach ball
+after unlock. At this checkpoint, all 771 primary checks, seven selected
+ASan/UBSan checks including both full Metal UI routes, the Windows build and
+format check pass. The catalog inventory improves to 564 of 590 starts with
+three ordinary frames each and no frame errors. The remaining 26 gates include
+15 birthday-hat construction hooks and 11 special level scripts.
+
+### Clock golden-egg level
+
+LevelGE_20 now executes its recovered onLoadLevel9849 placement adjustment
+before physics construction. The platform's existing getCurrentTime equivalent
+provides local calendar fields. The C hook retains the original binary32 steps
+around double pow/sqrt and script sine/cosine, copies the first wooden piece's
+position to the second, and uses the minute angle for the light piece as the
+source does. The separately calculated seconds angle is unused in that source.
+Missing or false clock objects skip the placement work.
+
+The unchanged 837-byte selected prototype has SHA-256
+`e8b5da8bf23ee8941ea4d5e360801483cd4419dfc7ff385ea828ed0e3dafedf8`.
+An isolated ARM oracle controls the current-time boundary and original loaded
+placements. All 4,096 cases match each position bit, covering all 3,600 normal
+minute/second pairs with varied coordinates plus 496 missing/false object cases.
+The corpus SHA-256 is
+`9ff3f589c6f9c3618484abbc27ab2c5772aad749dba1ee88af462a691430cf63`.
+Local-time acquisition is tested separately by the calendar boundary; the
+controlled trace does not establish cross-platform timezone equivalence.
+
+At this checkpoint, all 773 primary checks, the full Metal UI sanitizer route
+and both clock checks under ASan/UBSan, Windows compilation and formatting pass.
+The live catalog reaches 565 of 590 starts with three ordinary frames each and
+no frame errors. Fifteen birthday construction hooks and ten special level
+scripts remain loading gates; complete playthrough fidelity remains open.
+
+### Direct runtime box construction
+
+The birthday-hat catalog contains five box definitions, with explicit dimensions
+and the source density override 0.001. A new first-party raw box constructor
+composes the recovered fixture/body path and native physical-table projection,
+before renderer, script, definition and enclosing world registration. Native
+GameLua.createBoxLua is ELF0x320d9c (analysis0x330d9c); its collision flag is stored
+at object offset0xa2, also checked by the existing native contact-filter oracle.
+The controllable and sprite arguments are unused by this native box constructor;
+it does not append a controllable-vector entry. The later script assignments
+remain separate. Positive dimensions are the current supported domain.
+
+An isolated native constructor oracle compares 256 cases, including static and
+dynamic density, signed-zero position/material inputs, both collision flags,
+the ignored controllable/sprite gates and actual hat dimensions/density. All 19
+raw property queries and 43 numeric/flag words match, including mass/inertia,
+pose samples, box skin/centroid, four vertices/normals and vector count. The
+retained corpus SHA-256 is
+`4852bee479a33054de9c08222e97080687a4243ab3f8361284af6a2dcc326c7f`.
+This closes the tested raw creation boundary; it does not yet enable birthday
+levels or establish their attachment/release lifecycle.
+
+### Illustrated intro framing and desktop pan
+
+Constructing an intro directly at 1920x1080 exposed a separate scaling reference:
+the menu's highest-artwork 1024x768 reference made the 480x320 story canvas fit
+across the window and set no_scroll. The application now owns a distinct story
+scaling profile while retaining the menu profile for the Skip control. Both
+profiles share resolution events and release their listeners before the event
+owner closes. Highest-resolution texture selection remains independent of the
+story's logical coordinate reference.
+
+The final pack1 frame also exposed background beyond the illustration's right
+edge. STORY_1_BEGINNING has a nonzero composite pivot; its width includes a
+negative left extent, while the scroll target uses the full width. Desktop
+presentation now caps the horizontal camera at width minus pivot, with one
+logical pixel of coverage allowance for fractional/filtered component edges.
+This cap leaves the initial placement, command times and interpolated scroll
+state intact. It applies to horizontally scrolling height-fit illustrations;
+centered no-scroll framing retains its intended borders.
+
+This coverage allowance is a requested presentation correction, not a recovered
+native script operation. CutScene.draw10721 and LuaResources.drawSprite at
+analysis VA0x5b6e74 retain the default pivot anchors. In processCommand4437 the
+queried pivot is unused by the non-film scroll calculation; no native pivot
+subtraction is claimed. Full original-game cutscene pixel parity remains open.
+
+The Metal integration fixture opens a fresh highest-artwork menu at 1920x1080,
+plays all nine actual intro command lists and repeats at 2560x1440, 3840x2160
+and 1919x1079. Actual readbacks at the opening, middle and final frames must
+change when a scrolling command is reached. Pack1 additionally checks both top
+edges at all three samples and the full right column at the final frame. The
+original uncovered sky columns and 58-row gap beside the grass are absent in
+the inspected final capture. At this checkpoint all 775 primary checks, the
+Windows build and formatting pass. Private captures and logs are retained under
+the comic-pan and comic-edge jobs. Both complete Metal UI routes also pass under
+ASan/UBSan, including the final full-height edge check.
+
+### Canonical registration of runtime boxes
+
+Raw runtime boxes now publish through the same stable level-slot boundary as
+runtime circles. Each new object retains its fixture identity, physical-table
+storage, frame samples and world-name insertion order. Existing names, removed
+names, locked worlds and exhausted storage reject as before. The raw box path
+does not append a controllable-vector entry or invent definition/render fields.
+
+The level-owner fixture creates a real hat-sized box, queries it through the
+named world raycast, appends a circle and checks that existing physical-table
+aliases remain valid. Invalid geometry, duplicate names, locked creation and
+capacity exhaustion are covered. This verifies registration and mixed-shape
+ownership; birthday hat construction, joints and release remain separate work.
+All 775 primary checks pass after this registration change, as do the level
+owner and both box checks under ASan/UBSan, both full Metal UI sanitizer routes,
+Windows compilation and formatting.
+
+### Hat creation and release script lifecycle
+
+The first-party hat component implements createHat97169 and releaseHat97988.
+Creation initializes an absent/false shared counter before testing the actual
+bird's catalog offset. It retains generated object/joint names in stable caller
+storage, requests the density-0.001 object, makes it static, assigns defence
+1000000, creates the recovered zero-anchor weld and publishes the hat record.
+The counter and catalog fields are reread after callbacks at their original
+boundaries. The collision/input view remains the record's first member.
+
+Release prints before its registry lookup and preserves source truthiness for
+jointDestroyed. It queues joint destruction, sets damping0.4, switches the body
+to dynamic and reads current physical velocity/position/height for the impulse.
+Only successful impulse application marks the retained record released. A
+second release still prints but does not repeat the physics effects. Missing
+services and malformed reached data reject rather than silently skipping work.
+
+The selected unchanged original prototypes contain 831 and 527 bytes, with SHA-256
+`cc044aed8a7f05d4771fe7ae2ba92de2db1c9dbf37cb023e8ea77dfa3b2ec6ab`
+and `5b964577e5b10a6c471140aee4300890c6308f297d96b12463ef4d32748750dc`.
+An isolated ARM oracle executes those functions with controlled external object,
+joint and physics services. All 1,024 cases match 128 output words each, including
+both complete generated names, final counter/record fields, ordered host calls
+and every impulse component. Cases cover missing/false offsets, scalar truthiness,
+large/fractional/signed-zero counters, repeated releases, a registry changed by
+the print callback and state/catalog changes during creation or body transition.
+The retained corpus SHA-256 is
+`2d8bc9986f2a2104df1513fe38510bab571619b1346defa59680c74baa4b1638`.
+Both component checks pass under ASan/UBSan, and Windows compilation passes.
+The complete primary suite now passes all 777 checks, and formatting passes.
+
+This closes the tested script orchestration, not the enclosing birthday level
+integration. The actual constructor, static/dynamic transitions, weld registry,
+deferred queue, shared hat map and episode selection still require their real
+services. Sling-held, transfer, ready and character-jump hat motion also remain
+explicit integration boundaries. MuseumMode.loadLevel2711 invokes
+onAfterLevelObjectsCreated at words
+1608..1633 after its ordinary object/timer pass; the birthday hook must be placed
+there, before later game setup. The 15 birthday loading gates remain explicit.
+
+
+### Defined boxes through the live application adapters
+
+The definition-aware box factory resolves the APK catalog and density override,
+then uses the recovered raw box constructor and canonical property owner. Its
+supported domain is explicit ordinary box definitions without custom creation,
+update, animation, component or extra-sprite factories. It publishes the actual
+material, collider, gravity, sensor, strength/defence, damage sprites and dynamic
+name-map membership. It does not manufacture a native launch-queue bird.
+
+The APK fixture constructs all five birthday hat definitions at density 0.001.
+A separate live-owner fixture binds their actual artwork, force/post-physics
+metadata, block-script application, scene, camera, shot lookup, behaviors and
+physical-removal rows between world setup and GameUpdate construction. An
+ordinary real mouse launch, physics, damage and winning result still complete.
+These checks establish the adapter composition; the birthday hook, joint/hat
+motion and release integration remain separate gates.
+
+### Danger Above leaf boundary colors
+
+The reported dotted leaf boundaries are present in the pinned APK's
+`assets/data/images/themes_android/THEME_06_PARALLAX_6_2.pvr`, including the
+canopy in THEME_6_ELEMENT_1. This is a 984x992 RGBA4444 image. Its SHA-256 is
+`ae4e43360c99954f0f62266386af507cb7587b4f6def8787e55bd595c013a4d0`;
+the decoded RGBA8 SHA-256 is
+`376a31ede8f0c8c26c36c8d830036180a50813a01416433eac5826cfd5396bad`,
+matching the earlier independent texture conversion inventory. The intermediate
+canopy colors occur in fully opaque original texels; they are not introduced by
+alpha blending over another layer. The four-bit channels retain their original
+17-step values. The renderer retains the original premultiplied blend and linear
+sampling. No recoloring or smoothing is applied. This identifies the artifact
+in the original asset; it is not a claim of whole-screen native pixel parity.
+Private evidence: `analysis/input/danger-above-leaf-evidence-01.json` and the
+`leaf-theme6-before-01` atlas/render captures.
+
+### Mighty Hoax level 8 impact joint destruction
+
+A fresh highest-resource 1920x1080 application replay of LevelP2_80 reproduced
+failure after repeated Matilda launches and egg drops near the structure. The
+continuous-world wrapper hid a stored game-contact error: the Museum collision
+route had no deferred joint-destruction owner. The reached name was
+WoodBlock4_30WoodBlock4_31. The failure was a missing application binding rather
+than evidence that numerical solver constants should be changed.
+
+The joint-update owner now supplies that queue, the actual named joint registry,
+visible metadata and motor-limit checks to the existing GameUpdate joint phase.
+Initial metadata insertion follows the level's native constructor traversal and
+the measured growing string map. Destruction requests retain append order and
+duplicates. common_logic.lua prototype 24125 prints, notifies
+EID_JOINT_DESTROYED with the current joint metadata, then calls the saved native
+named removal. Repeated requests still notify with an absent joint. The C binding
+preserves this order, uses the existing recovered native removal operation and
+retains notification and metadata storage until level close. Event callbacks may
+append further queued requests; a failed callback preserves preceding effects
+and stops the session. Future joint factories must register their new metadata
+at creation. No physics solve failure is converted into success.
+
+The application also reports a stored collision-callback error before the outer
+physics diagnostic, and the continuous-world wrapper preserves an existing
+error. The exact failing replay now completes all four Matilda launches and reaches
+its natural ending. Two ability requests produce eggs before the parent has
+already collided; the other clicks do not create additional projectiles. Controlled tests additionally check event-before-removal,
+repeated names, callback-appended requests, motor-limit dispatch, retained event
+payloads and listener-failure behavior. The APK regression drives all four white
+birds in a fresh host and captures the resulting Metal frame. These are
+first-party integration checks, not original complete native gameplay traces.
+Private replay logs are `analysis/input/level8-physics-cause-01.log` and
+`level8-physics-fixed-01.log`; validation uses the `joint-updates-*` logs.
+
+Validation for this checkpoint covers all 779 primary gates: the full run
+passed 778, then the new motor fixture's missing enabled-limit flag was fixed
+and its rerun passed. Both complete Metal UI routes passed. All eight selected
+ASan/UBSan checks passed, including both complete Metal UI routes, the defined
+APK boxes, native box/hat corpora and joint updates. The fresh application-owner
+fixture with five defined boxes also passed separately under ASan/UBSan.
+Windows app, box, hat and joint-update test targets compile; source formatting
+and diff whitespace checks pass. Native complete-playthrough parity and the
+remaining catalog construction/script gates stay open.

@@ -143,6 +143,7 @@ static bool menu_cutscene_enter(PreviewMenu *menu, AbError *error) {
     menu->intro_end_fields[1] = (AbDataEntry){menu_data("data"), data};
     menu->intro_end = (AbDataTable){menu->intro_end_fields, 2, 2, NULL};
     AbUiCutsceneHost host = {.scaling = &menu->scaling,
+                             .content_scaling = &menu->cutscene_scaling,
                              .shared = &menu->cutscene_class,
                              .audio = menu->audio,
                              .mixer = menu->mixer,

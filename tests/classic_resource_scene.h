@@ -25,8 +25,8 @@ static bool resource_scene_upload(void *context, uint32_t texture,
         return ab_fail(error, "Invalid resource scene texture upload");
     }
 #if defined(AB_CLASSIC_SCENE_COMMON)
-    if (host->renderer &&
-        !ab_common_upload(host->renderer, texture, image.image, false, false, error)) {
+    if (host->renderer && !ab_common_upload(host->renderer, texture, image.image,
+                                            image.repeat_s, image.repeat_t, error)) {
         return false;
     }
 #endif

@@ -1,4 +1,5 @@
 #include "ab/gles2.h"
+#include "../src/render/draw_vertices.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -34,6 +35,7 @@ typedef struct {
     uint32_t next_name;
     uint32_t error;
     uint32_t bound_texture;
+    uint32_t active_texture, bound_mask;
     uint32_t bound_buffer;
     uint32_t bound_program;
     uint32_t source_factor;
@@ -46,6 +48,8 @@ typedef struct {
     bool blending;
     bool drew_blending[8];
     bool coordinates_are_clip, drawn_clip[8];
+    bool mask_enabled, drawn_mask_enabled[8];
+    uint32_t drawn_masks[8];
     size_t draw_count;
     unsigned deleted[5];
     unsigned source_count;
@@ -142,8 +146,8 @@ static void attach_shader(uint32_t program, uint32_t shader) {
 }
 
 static void attribute_location(uint32_t program, uint32_t location, const char *name) {
-    if (!object_exists(program, 2) || location > 1 ||
-        strcmp(name, location ? "vertex_uv" : "vertex_position") != 0) {
+    const char *names[] = {"vertex_position", "vertex_uv", "vertex_mask_uv"};
+    if (!object_exists(program, 2) || location > 2 || strcmp(name, names[location])) {
         recorder.invalid_call = true;
     }
 }
@@ -169,9 +173,10 @@ static int32_t uniform_location(uint32_t program, const char *name) {
     if (!object_exists(program, 2)) {
         recorder.invalid_call = true;
     }
-    const char *names[] = {"framebuffer_size", "sprite_texture", "channel_multiplier",
-                           "opacity", "coordinates_are_clip"};
-    for (int32_t index = 0; index < 5; ++index) {
+    const char *names[] = {
+        "framebuffer_size",     "sprite_texture", "channel_multiplier", "opacity",
+        "coordinates_are_clip", "mask_texture",   "mask_enabled"};
+    for (int32_t index = 0; index < 7; ++index) {
         if (strcmp(name, names[index]) == 0) {
             return recorder.failure == FAIL_UNIFORM ? -1 : index;
         }
@@ -185,12 +190,16 @@ static void use_program(uint32_t program) {
 }
 
 static void uniform_int(int32_t location, int32_t value) {
-    if (location != 1 || value != 0) {
+    if (!((location == 1 && value == 0) || (location == 5 && value == 1))) {
         recorder.invalid_call = true;
     }
 }
 
 static void uniform_float(int32_t location, float value) {
+    if (location == 6 && (value == 0 || value == 1)) {
+        recorder.mask_enabled = value != 0;
+        return;
+    }
     if (location == 4 && (value == 0 || value == 1)) {
         recorder.coordinates_are_clip = value != 0;
         return;
@@ -251,7 +260,7 @@ static void bind_buffer(uint32_t target, uint32_t buffer) {
 
 static void buffer_data(uint32_t target, intptr_t size, const void *data,
                         uint32_t usage) {
-    if (target != 0x8892 || size != (intptr_t)sizeof(AbDrawQuad) || data ||
+    if (target != 0x8892 || size != (intptr_t)(sizeof(AbRenderVertex) * 4) || data ||
         usage != 0x88e0) {
         recorder.invalid_call = true;
     }
@@ -259,11 +268,13 @@ static void buffer_data(uint32_t target, intptr_t size, const void *data,
 
 static void buffer_update(uint32_t target, intptr_t offset, intptr_t size,
                           const void *data) {
-    if (target != 0x8892 || offset || size != (intptr_t)sizeof(AbDrawQuad)) {
+    if (target != 0x8892 || offset || size != (intptr_t)(sizeof(AbRenderVertex) * 4)) {
         recorder.invalid_call = true;
         return;
     }
-    memcpy(&recorder.buffered_quad, data, sizeof(AbDrawQuad));
+    const AbRenderVertex *vertices = data;
+    for (size_t vertex = 0; vertex < 4; ++vertex)
+        recorder.buffered_quad.vertices[vertex] = vertices[vertex].base;
 }
 
 static void delete_buffer(int32_t count, const uint32_t *buffers) {
@@ -274,16 +285,18 @@ static void delete_buffer(int32_t count, const uint32_t *buffers) {
 }
 
 static void enable_attribute(uint32_t location) {
-    if (location > 1) {
+    if (location > 2) {
         recorder.invalid_call = true;
     }
 }
 
 static void attribute_pointer(uint32_t location, int32_t count, uint32_t type,
                               uint8_t normalized, int32_t stride, const void *offset) {
-    if (location > 1 || count != 2 || type != 0x1406 || normalized ||
-        stride != (int32_t)sizeof(AbDrawVertex) ||
-        (uintptr_t)offset != (location ? offsetof(AbDrawVertex, u) : 0)) {
+    const size_t offsets[] = {0, offsetof(AbDrawVertex, u),
+                              offsetof(AbRenderVertex, mask_uv)};
+    if (location > 2 || count != 2 || type != 0x1406 || normalized ||
+        stride != (int32_t)sizeof(AbRenderVertex) ||
+        (uintptr_t)offset != offsets[location]) {
         recorder.invalid_call = true;
     }
 }
@@ -296,16 +309,20 @@ static void generate_texture(int32_t count, uint32_t *textures) {
 }
 
 static void activate_texture(uint32_t unit) {
-    if (unit != 0x84c0) {
+    if (unit != 0x84c0 && unit != 0x84c1) {
         recorder.invalid_call = true;
     }
+    recorder.active_texture = unit == 0x84c1;
 }
 
 static void bind_texture(uint32_t target, uint32_t texture) {
     if (target != 0x0de1 || !object_exists(texture, 4)) {
         recorder.invalid_call = true;
     }
-    recorder.bound_texture = texture;
+    if (recorder.active_texture)
+        recorder.bound_mask = texture;
+    else
+        recorder.bound_texture = texture;
 }
 
 static void pixel_store(uint32_t name, int32_t value) {
@@ -409,6 +426,8 @@ static void draw_arrays(uint32_t mode, int32_t first, int32_t count) {
     }
     size_t index = recorder.draw_count++;
     recorder.drawn_textures[index] = recorder.bound_texture;
+    recorder.drawn_masks[index] = recorder.bound_mask;
+    recorder.drawn_mask_enabled[index] = recorder.mask_enabled;
     recorder.drawn_sources[index] = recorder.source_factor;
     recorder.drawn_destinations[index] = recorder.destination_factor;
     recorder.drew_blending[index] = recorder.blending;
@@ -540,8 +559,11 @@ static bool upload_order_and_errors(void) {
     CHECK(!ab_gles2_render(renderer, &list, 640, 480, &error));
     CHECK(recorder.draw_count == 0);
     list.commands[4].texture = 1;
+    list.commands[2].mask.texture = 2;
     CHECK(ab_gles2_render(renderer, &list, 640, 480, &error));
     CHECK(recorder.draw_count == 5);
+    CHECK(!recorder.drawn_mask_enabled[0] && recorder.drawn_mask_enabled[2] &&
+          !recorder.drawn_mask_enabled[3] && recorder.drawn_masks[2] == second_texture);
     CHECK(!recorder.drawn_clip[0] && recorder.drawn_clip[1] &&
           !recorder.drawn_clip[2] && recorder.drawn_clip[3] && !recorder.drawn_clip[4]);
     CHECK(recorder.drawn_textures[0] == first_texture &&
