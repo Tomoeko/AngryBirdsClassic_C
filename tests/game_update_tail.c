@@ -182,6 +182,79 @@ static bool invoke_hook(void *context, void *object, float seconds, AbError *err
     return host(context, &call, error);
 }
 
+typedef struct {
+    Host host;
+    AbGameTailHook rows[3];
+    size_t count, cursor, calls, pruned;
+    bool append, fail_next;
+} HookProducer;
+
+static bool producer_begin(void *context, AbError *error) {
+    (void)error;
+    HookProducer *producer = context;
+    producer->cursor = 0;
+    return true;
+}
+
+static bool producer_next(void *context, AbGameTailHook **output, AbError *error) {
+    HookProducer *producer = context;
+    if (producer->fail_next && producer->cursor == 1)
+        return ab_fail(error, "Controlled live-hook continuation failure");
+    *output =
+        producer->cursor < producer->count ? producer->rows + producer->cursor++ : NULL;
+    return true;
+}
+
+static bool producer_prune(void *context, AbError *error) {
+    (void)error;
+    ++((HookProducer *)context)->pruned;
+    return true;
+}
+
+static bool producer_invoke(void *context, void *object, float seconds,
+                            AbError *error) {
+    HookProducer *producer = context;
+    ++producer->calls;
+    if (producer->append)
+        producer->count = 3;
+    return invoke_hook(&producer->host, object, seconds, error);
+}
+
+static bool producer_checks(void) {
+    AbGameTailState state = {0};
+    HookProducer producer = {
+        .host = {.state = &state, .hooks = true}, .count = 1, .append = true};
+    AbGameTailObject objects[] = {{1, false}, {2, false}, {4, false}};
+    AbObjectUpdateFunction function = {&producer, producer_invoke};
+    AbObjectUpdateValue value = {AB_OBJECT_UPDATE_FUNCTION, {.function = &function}};
+    AbObjectUpdates updates[] = {{value, value}, {value, value}, {value, value}};
+    for (size_t index = 0; index < 3; ++index)
+        producer.rows[index] =
+            (AbGameTailHook){objects + index, updates + index, objects + index};
+    AbGameTailHooks hooks = {.count = 1,
+                             .context = &producer,
+                             .begin = producer_begin,
+                             .next = producer_next,
+                             .prune = producer_prune};
+    state.hooks = &hooks;
+    CHECK(ab_game_update_tail(&state, NULL, 0, 0.125f, 1, host, &producer.host, NULL) &&
+          producer.calls == 2 && producer.pruned == 1 && producer.cursor == 3 &&
+          updates[2].registered.kind == AB_OBJECT_UPDATE_NONE &&
+          updates[2].object.kind == AB_OBJECT_UPDATE_FUNCTION);
+    producer.host.count = producer.calls = producer.pruned = 0;
+    producer.count = 1;
+    producer.fail_next = true;
+    CHECK(
+        !ab_game_update_tail(&state, NULL, 0, 0.125f, 1, host, &producer.host, NULL) &&
+        producer.calls == 1 && producer.pruned == 0 &&
+        producer.host.events[producer.host.count - 1][0] == TAIL_TEST_HOOK_CALL);
+    hooks.next = NULL;
+    producer.calls = 0;
+    CHECK(!ab_game_update_tail(&state, NULL, 0, 0, 0, host, &producer.host, NULL) &&
+          producer.calls == 0);
+    return true;
+}
+
 static bool prepare_hooks(Host *fixture, const uint32_t data[22],
                           AbGameTailHook items[4], AbObjectUpdates states[4],
                           AbObjectUpdateFunction *function, AbGameTailObject *missing,
@@ -262,7 +335,7 @@ static bool edge_checks(void) {
     AbObjectUpdateValue value = {AB_OBJECT_UPDATE_FUNCTION, {.function = &function}};
     AbObjectUpdates updates = {value, value};
     AbGameTailHook hook = {&object, &updates, &object};
-    AbGameTailHooks hooks = {&hook, 1};
+    AbGameTailHooks hooks = {.items = &hook, .count = 1};
     state.hooks = &hooks;
     CHECK(!ab_game_update_tail(&state, &object, 1, 0, 0, host, &fixture, &error) &&
           fixture.count == 2 && state.old_cursor.x == 4 && state.skip_input);
@@ -483,7 +556,7 @@ int main(int argc, char **argv) {
         return 2;
     }
     if (argc == 1) {
-        return edge_checks() && joint_edge_checks() ? 0 : 1;
+        return edge_checks() && joint_edge_checks() && producer_checks() ? 0 : 1;
     }
     FILE *file = fopen(argv[hooks || joints ? 2 : 1], "rb");
     if (!file) {

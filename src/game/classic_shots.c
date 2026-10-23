@@ -217,7 +217,8 @@ static bool register_object(AbClassicShots *shots, size_t object, bool box,
                            &remaining, &entry->bird.sprite, error))
         return false;
     AbDataValue definition_name = field(&properties->physical, "definition");
-    if (source->physics.controllable && definition_name.kind != AB_DATA_NIL) {
+    AbDataValue control = field(&properties->physical, "controllable");
+    if (truthy(control) && definition_name.kind != AB_DATA_NIL) {
         AbDataValue definition = {0};
         if (definition_name.kind != AB_DATA_STRING ||
             !ab_object_definition_lookup(&shots->level.properties->lookup, source->name,
@@ -484,4 +485,8 @@ bool ab_classic_shots_bind_birds(AbClassicShots *shots, AbClassicBirds *birds,
         return ab_fail(error, "Invalid or duplicate owned shot bird registry");
     shots->birds = birds;
     return true;
+}
+
+const AbDataTable *ab_classic_shots_bird_table(AbClassicShots *shots) {
+    return shots && shots->birds ? ab_classic_birds_view(shots->birds).birds : NULL;
 }

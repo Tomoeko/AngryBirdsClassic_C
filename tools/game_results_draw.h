@@ -112,6 +112,8 @@ static bool result_highscore(PreviewResults *results, float duration, AbError *e
 static bool game_results_update(PreviewGame *game, float seconds, AbError *error) {
     PreviewResults *results = game->results;
     results->timer += seconds;
+    if (results->eagle)
+        return result_eagle_update(results, seconds, error);
     if (results->failed) {
         results->shade = fminf(results->shade + seconds, 0.5f);
         return ab_ui_widget_update(&results->root, seconds, game->menu->time, error);
@@ -187,7 +189,7 @@ static bool game_results_draw(PreviewGame *game, AbError *error) {
                            .present = 3};
     /* Both LevelComplete.draw and its LevelEnd.draw base paint the background. */
     if (!result_background(results, error) ||
-        (!results->failed && !result_background(results, error)) ||
+        (!results->failed && !results->eagle && !result_background(results, error)) ||
         !ab_ui_widget_draw(&results->root, &input, error))
         return false;
     return ab_particles_draw_menu(

@@ -48,8 +48,11 @@ static bool game_powerups_layout(PreviewGame *game, AbError *error) {
     if (!game->powerups || game->ended || !game->pause)
         return true;
     PreviewPowerups *powers = game->powerups;
-    return ab_ui_hud_powerups_layout(&powers->bar, &game->pause->button.widget,
-                                     game->pause->margin, false, error) &&
+    return ab_ui_hud_powerups_layout(
+               &powers->bar, &game->pause->button.widget, game->pause->margin,
+               game->eagle && ab_ui_pointer_value_truthy(
+                                  &game->eagle->button.widget.frame->fields.visible),
+               error) &&
            ab_ui_widget_lifecycle(&powers->root, AB_UI_FRAME_LAYOUT, error);
 }
 

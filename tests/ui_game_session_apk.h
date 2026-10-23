@@ -58,6 +58,8 @@ static bool result_test_click(PreviewMenu *menu, size_t button, AbError *error) 
     return game_test_click_widget(menu, menu->game->results->buttons + button, error);
 }
 
+#include "ui_eagle_game_apk.h"
+
 /* Reenter the second catalog level through its real button/Loader path. The
  * direct route must exit the subscribed grid before pause controls can safely
  * restart or return to it. Repeat after allocator/listener reuse. */
@@ -156,6 +158,7 @@ static bool game_session_widgets(PreviewMenu *menu, AbMetal *renderer, AbError *
     size_t pressed = SIZE_MAX, pan_start = SIZE_MAX;
     bool captured = false, panned = false, intro_moved = false;
     bool skip_shown = false, skip_clicked = false;
+    ScoreHudCheck score_check = {0};
     bool fast_forward = getenv("AB_TEST_SKIP_END") != NULL;
     AbVec2 pan_position = {0}, intro_middle = {0};
     int16_t pcm[512];
@@ -218,6 +221,8 @@ static bool game_session_widgets(PreviewMenu *menu, AbMetal *renderer, AbError *
         }
         if (!menu_preview_draw(menu, 1.0f / 60, error) ||
             !ab_audio_mixer_mix(menu->mixer, 267, pcm, 512, error))
+            return false;
+        if (!game->ended && !score_test_frame(game, renderer, &score_check, error))
             return false;
         if (!game->ended && game->skip.state == AB_UI_SKIP_ONSCREEN &&
             ab_ui_pointer_value_truthy(&game->skip.widget.frame->fields.visible)) {
@@ -284,6 +289,11 @@ static bool game_session_widgets(PreviewMenu *menu, AbMetal *renderer, AbError *
         !skip_shown || (fast_forward && !skip_clicked))
         return ab_fail(error,
                        "Application game did not reach its actual winning result");
+    if (!score_check.zero || !score_check.total || !score_check.hit ||
+        !score_check.pig || !score_check.expired)
+        return ab_fail(error, "Gameplay score checks incomplete: %d/%d/%d/%d/%d",
+                       score_check.zero, score_check.total, score_check.hit,
+                       score_check.pig, score_check.expired);
     const AbDataValue *saved =
         ab_data_get(ab_settings_statistics_root(menu->highscores), game->level_name);
     if (!saved || saved->kind != AB_DATA_TABLE ||
@@ -355,7 +365,8 @@ static bool game_session_widgets(PreviewMenu *menu, AbMetal *renderer, AbError *
     puts("Connected game: intro launch, actual mouse shot, live physics/scoring, "
          "Metal frame, two native size changes without asset reload, and winning "
          "result.");
-    return game_test_direct_pause_routes(menu, error);
+    return game_test_direct_pause_routes(menu, error) &&
+           game_test_eagle(menu, renderer, error);
 }
 
 #endif

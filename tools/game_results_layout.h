@@ -35,6 +35,8 @@ static bool game_results_layout(PreviewGame *game, AbError *error) {
     float width = game->screen.x, height = game->screen.y;
     results->center_width = fmaxf(fminf(409.6f, width * 0.4f), 1.78f * star.x);
     results->reference_width = fmaxf(fminf(1024, width), 4.45f * star.x);
+    if (results->eagle)
+        return result_eagle_layout(results, error);
     if (results->failed) {
         result_position(&results->title.widget, width * 0.5f, height * 0.25f);
         results->title.state.fields.box_size = menu_number(results->center_width);

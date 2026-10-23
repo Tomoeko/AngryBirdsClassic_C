@@ -19,6 +19,9 @@ typedef struct {
 struct PreviewResults {
     PreviewGame *game;
     AbUiWidget root, buttons[3], stars[3], powerup, badge, best_stars[3], pig;
+    AbUiWidget meter_effect, feather;
+    float feather_value;
+    bool eagle;
     AbUiTextWidget title, counter, best;
     AbUiFrameNode *frames[16];
     AbUiDrawChild draw[16];
@@ -137,6 +140,8 @@ static bool result_font(PreviewResults *results, AbSpan name, AbError *error) {
     return true;
 }
 
+#include "game_eagle_results.h"
+
 static bool game_results_graph(PreviewResults *results, AbError *error) {
     PreviewMenu *menu = results->game->menu;
     AbUiFrameFields frame = {
@@ -215,6 +220,8 @@ static bool game_results_graph(PreviewResults *results, AbError *error) {
         }
         return result_image(results, &results->pig, "pig", pig_image, NULL, error);
     }
+    if (results->eagle)
+        return result_eagle_graph(results, error);
     const char *const star_names[] = {"star1", "star2", "star3"};
     const char *const star_images[] = {"BIG_STAR_EMPTY_1", "BIG_STAR_EMPTY_2",
                                        "BIG_STAR_EMPTY_3"};
@@ -283,6 +290,7 @@ static bool game_results_open(PreviewGame *game, AbError *error) {
     game->results = results;
     results->game = game;
     results->failed = !game->result_complete;
+    results->eagle = menu_route_truthy(game->eagle_bait_launched);
     const AbDataValue *thresholds =
         ab_data_get(menu->star_limits.data.globals, game->level_name);
     if (!results->failed && (!thresholds || thresholds->kind != AB_DATA_TABLE))
@@ -301,7 +309,9 @@ static bool game_results_open(PreviewGame *game, AbError *error) {
                             : score >= results->silver ? 2
                                                        : 1;
     const char *const classes[] = {"LevelEndRoot", "LevelEnd",
-                                   results->failed ? "LevelFailed" : "LevelComplete"};
+                                   results->failed  ? "LevelFailed"
+                                   : results->eagle ? "EagleScore"
+                                                    : "LevelComplete"};
     for (size_t index = 0; index < 3; ++index) {
         const AbDataTable *groups = ab_dynamic_asset_requirements_get(
             &menu->requirements, menu_span(classes[index]));

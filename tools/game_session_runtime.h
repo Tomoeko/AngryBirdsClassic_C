@@ -47,6 +47,7 @@ static bool game_open_level(PreviewGame *game, AbError *error) {
                          .storage_bytes = 32 * 1024 * 1024},
         .resource_bytes = 16 * 1024 * 1024,
         .dynamic_objects_per_bird = 3,
+        .additional_dynamic_objects = 2,
         .prepare_context = game,
         .prepare = game_prepare,
         .playfield = {.context = game,
@@ -148,6 +149,8 @@ static bool game_open_joints(PreviewGame *game, AbError *error) {
 }
 
 static bool game_open_world(PreviewGame *game, AbError *error) {
+    if (!game_world_limits(game, error))
+        return false;
     size_t extra_nodes = 1;
     size_t object_count = ab_classic_level_view(game->playfield.level).bodies->count;
     while (extra_nodes < object_count)
@@ -161,6 +164,7 @@ static bool game_open_world(PreviewGame *game, AbError *error) {
                                             "levelCompleteStars3", "newHighScoreStars"};
     for (size_t index = 0; index < 4; ++index)
         game->particle_names[names.count++] = menu_span(result_particles[index]);
+    game->particle_names[names.count++] = menu_span("mightyEagleParticles");
     game->particle_names[names.count++] = menu_span("explosion");
     game->particle_names[names.count++] = menu_span("explosionBuff");
     const char *const powerup_particles[] = {"powerupBuff",
@@ -229,8 +233,7 @@ static bool game_open_world(PreviewGame *game, AbError *error) {
         .context = game, .level = game_removal_level, .call = game_removal_call};
     AbClassicWorldRuntimeConfig config = {
         .playfield = ab_classic_level_runtime_view(game->level).playfield,
-        .object_capacity = ab_classic_level_view(game->playfield.level).bodies->count +
-                           3 * ab_classic_level_view(game->playfield.level).bird_count,
+        .object_capacity = ab_classic_level_runtime_view(game->level).object_capacity,
         .particles = game->particles,
         .audio = menu->audio,
         .settings = menu->settings,
@@ -258,12 +261,13 @@ static bool game_open_world(PreviewGame *game, AbError *error) {
                   .print = game_collision_print,
                   .binding = game_collision_binding,
                   .specialty = game_collision_specialty,
+                  .mighty = game_eagle_collision,
                   .contact_particles = game_contact_particles,
                   .damage_particles = {game->particles, NULL,
                                        ab_classic_particles_ambient},
                   .storage_bytes = 2 * 1024 * 1024},
-        .dynamics = {.simulation = {.minimum_x = -100000,
-                                    .maximum_x = 100000,
+        .dynamics = {.simulation = {.minimum_x = (int32_t)game->world_left_edge,
+                                    .maximum_x = (int32_t)game->world_right_edge,
                                     .velocity_iterations = 10,
                                     .position_iterations = 10,
                                     .maximum_steps = 4,
@@ -300,7 +304,79 @@ static bool game_open_world(PreviewGame *game, AbError *error) {
         .script_bytes = 1024 * 1024,
         .floating = {512, 128, 256 * 1024},
         .storage_bytes = 32 * 1024 * 1024};
-    return ab_classic_world_runtime_open(config, &game->world, error);
+    if (!ab_classic_world_runtime_open(config, &game->world, error))
+        return false;
+    /* Museum level load inserts the Eagle into the authored live ignore map.
+     * Preserve all authored entries before that source assignment. */
+    AbDataValue ignored =
+        menu_route_field(ab_classic_level_view(game->playfield.level).data->globals,
+                         "doNotConsiderAsMovingObjects");
+    if (ignored.kind != AB_DATA_NIL && ignored.kind != AB_DATA_TABLE)
+        return ab_fail(error, "Invalid authored moving-object exclusions");
+    size_t count = ignored.kind == AB_DATA_TABLE ? ignored.table->count : 0;
+    if (count >= 256)
+        return ab_fail(error, "Moving-object exclusions exceed session storage");
+    if (count)
+        memcpy(game->ignored_moving_entries, ignored.table->entries,
+               count * sizeof(*game->ignored_moving_entries));
+    game->ignored_moving =
+        (AbDataTable){game->ignored_moving_entries, count, 256, NULL};
+    AbObjectPropertyAccess access = {
+        .physics_object = {.kind = AB_DATA_TABLE, .table = &game->ignored_moving}};
+    if (!ab_object_property_set(&access, menu_span("MightyEagleBird"), game->enabled,
+                                error))
+        return false;
+    AbClassicDynamicsView dynamics =
+        ab_classic_dynamics_view(ab_classic_world_runtime_view(game->world).dynamics);
+    *ab_classic_simulation_view(dynamics.simulation).post.ignored_definitions =
+        (AbDataValue){.kind = AB_DATA_TABLE, .table = &game->ignored_moving};
+    return true;
+}
+
+static bool game_score_font_open(PreviewGame *game, AbError *error) {
+    PreviewMenu *menu = game->menu;
+    const char *path = menu->highest_resources
+                           ? "assets/data/fonts/1024x768/FONT_SCORE.dat"
+                           : "assets/data/fonts/480x320/FONT_SCORE.dat";
+    if (!ab_font_asset_open(menu->archive, path, 8 * 1024 * 1024, 2 * 1024 * 1024,
+                            &game->score_font, error) ||
+        !menu->texture_host.upload(
+            menu->texture_host.context, 70,
+            (AbSpriteAtlasImage){.image = &game->score_font.image,
+                                 .alpha = game->score_font.has_alpha
+                                              ? AB_SPRITE_ALPHA_PRESENT
+                                              : AB_SPRITE_ALPHA_OPAQUE},
+            error))
+        return false;
+    game->score_font_uploaded = true;
+    return true;
+}
+
+static bool game_floating_scores_draw(PreviewGame *game, AbError *error) {
+    PreviewMenu *menu = game->menu;
+    AbFloatingScores *scores = ab_classic_world_runtime_view(game->world).floating;
+    if (!ab_floating_scores_count(scores))
+        return true;
+    AbCameraViewport viewport;
+    float scale;
+    if (!game->score_font_uploaded ||
+        !ab_camera_system_query_viewport(
+            ab_classic_camera_system(game->playfield.camera), &viewport) ||
+        !ab_ui_scaling_get(&menu->scaling, &scale, error))
+        return ab_fail(error, "Missing floating-score font/camera/scaling binding");
+    return ab_floating_scores_draw(
+        scores,
+        &(AbFloatingScoreDrawResources){.font = &game->score_font.font,
+                                        .texture = 70,
+                                        .texture_width = game->score_font.image.width,
+                                        .texture_height = game->score_font.image.height,
+                                        .strings = &menu->text_resources,
+                                        .sprites = &menu->sprites.provider,
+                                        .codes = menu->codes,
+                                        .glyphs = menu->glyphs,
+                                        .capacity = 128},
+        viewport.rendering, scale, (uint32_t)game->screen.x, (uint32_t)game->screen.y,
+        menu->context.draw_list, error);
 }
 
 static bool game_open_update(PreviewGame *game, AbError *error) {
@@ -362,7 +438,7 @@ static bool game_open_update(PreviewGame *game, AbError *error) {
                        .bird_sound = &game->bird_sound,
                        .pig_sound = &game->pig_sound,
                        .eagle_launched = &game->eagle_bait_launched,
-                       .eagle_timer = &game->absent},
+                       .eagle_timer = &game->eagle_timer.timer},
         .effects = {.shake = &game->shake, .hero = &game->hero, .burn = &game->burn},
         .prelude = {.do_not_timeout = &game->absent,
                     .cursor_world = &game->cursor_world,
@@ -427,7 +503,8 @@ static bool game_open_update(PreviewGame *game, AbError *error) {
                        .wobble_steps = 64,
                        .storage_bytes = 1024 * 1024,
                        .context = game,
-                       .service = game_service},
+                       .service = game_service,
+                       .mighty_exit = game_eagle_exit},
         .characters_bytes = 2 * 1024 * 1024,
         .touches_bytes = 256 * 1024,
         .touches = 32,
@@ -452,6 +529,16 @@ static bool game_open_update(PreviewGame *game, AbError *error) {
                                         .storage_bytes = 65536},
             &game->highscores, error))
         return false;
+    const AbDataValue *record =
+        ab_data_get(ab_settings_statistics_root(menu->highscores), game->level_name);
+    if (record && record->kind != AB_DATA_NIL) {
+        AbDataValue highscore;
+        if (!ab_classic_highscores_current(game->highscores, game->level_name.string,
+                                           game->disabled, &highscore, error) ||
+            highscore.kind != AB_DATA_NUMBER)
+            return ab_fail(error, "Missing numeric source HUD highscore");
+        game->hud_highscore = menu_real(highscore.bits);
+    }
     game->draw.current_game_mode =
         (AbDataValue){.kind = AB_DATA_OBJECT, .object = view.update};
     game->draw.editor_mode = (AbDataValue){.kind = AB_DATA_OBJECT, .object = menu};
@@ -574,11 +661,13 @@ static bool game_session_open(PreviewMenu *menu, AbError *error) {
                 ab_hero_screen_tinter_init(&game->hero) &&
                 ab_powerup_uses_open(64, 64, 16384, &game->uses, error) &&
                 game_open_level(game, error) && game_open_joints(game, error) &&
+                game_score_font_open(game, error) &&
                 game_load_phase(game, &clock, "resources/world/playfield", error) &&
                 game_open_world(game, error) &&
                 game_load_phase(game, &clock, "particles/collisions", error) &&
                 game_open_update(game, error) && game_skip_open(game, error) &&
-                game_pause_open(game, error) && game_powerups_open(game, error) &&
+                game_pause_open(game, error) && game_eagle_open(game, error) &&
+                game_powerups_open(game, error) &&
                 game_load_phase(game, &clock, "game/update/HUD", error);
     if (okay) {
         game->result_listener =

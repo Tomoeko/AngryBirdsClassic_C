@@ -185,12 +185,16 @@ bool ab_classic_level_runtime_open(AbClassicLevelRuntimeConfig config,
         playfield.level = runtime->view.level;
         size_t count = level.bodies->count;
         size_t available = level.bodies->capacity - count;
-        if (level.bird_count &&
-            config.dynamic_objects_per_bird > available / level.bird_count) {
+        if (config.additional_dynamic_objects > available ||
+            (level.bird_count &&
+             config.dynamic_objects_per_bird >
+                 (available - config.additional_dynamic_objects) / level.bird_count)) {
             ab_classic_level_runtime_close(runtime);
             return ab_fail(error, "Dynamic bird reservation exceeds level capacity");
         }
-        size_t capacity = count + config.dynamic_objects_per_bird * level.bird_count;
+        size_t capacity = count + config.dynamic_objects_per_bird * level.bird_count +
+                          config.additional_dynamic_objects;
+        runtime->view.object_capacity = capacity;
         if (playfield.limits.behavior_objects < capacity)
             playfield.limits.behavior_objects = capacity;
         if (playfield.limits.shot_objects < capacity)

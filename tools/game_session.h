@@ -2,6 +2,7 @@
 #define AB_GAME_SESSION_H
 
 #include "ab/classic_joint_updates.h"
+#include "ab/floating_score_draw.h"
 
 #include "ab/classic_balloons.h"
 #include "ab/classic_collision_achievements.h"
@@ -26,6 +27,9 @@
 typedef struct PreviewResults PreviewResults;
 typedef struct PreviewPause PreviewPause;
 typedef struct PreviewPowerups PreviewPowerups;
+typedef struct PreviewEagle PreviewEagle;
+
+#include "game_eagle_state.h"
 
 /* Application ownership, above the independently verified runtime phases.
  * Resources/settings/events remain owned by the menu application. */
@@ -47,9 +51,17 @@ struct PreviewGame {
     AbClassicExplosions explosions;
     AbClassicCollisionAchievements *achievements;
     AbClassicHighscores *highscores;
+    AbFontAsset score_font;
+    bool score_font_uploaded;
+    float hud_highscore, hud_score_width;
+    bool hud_score_width_present;
     PreviewResults *results;
     PreviewPause *pause;
     PreviewPowerups *powerups;
+    PreviewEagle *eagle;
+    AbMightyEagleTimer eagle_timer;
+    AbDataTable ignored_moving;
+    AbDataEntry ignored_moving_entries[256];
     AbUiPointerValue navigation_action;
     AbClassicCollisionHooks hooks;
     AbObjectRemovalNotifyHost removal_notifications;
@@ -103,6 +115,8 @@ struct PreviewGame {
     float scroll;
     float threshold, floating_scale, total_blocks, remove_time, remove_speed;
     float speed, game_timer, particle_timer, score, audio_fraction;
+    float world_left_edge, world_right_edge;
+    bool world_edges_initialized;
     uint32_t renderer_counter;
     AbEventListener result_listener;
     AbEventListener goals_listener;
@@ -388,8 +402,12 @@ static bool game_explosion(void *context, AbDataValue object, AbDataValue defini
     return ab_fail(error, "Unknown application explosion object");
 }
 
+static bool game_eagle_timer(PreviewGame *game, float seconds, AbError *error);
+
 static bool game_service(void *context, AbGameTailCall *call, AbError *error) {
     PreviewGame *game = context;
+    if (call->operation == AB_GAME_TAIL_MIGHTY_TIMER)
+        return game_eagle_timer(game, call->seconds, error);
     if (call->operation == AB_GAME_TAIL_CHECK_JOINT_LIMIT ||
         call->operation == AB_GAME_TAIL_DESTROY_JOINT)
         return ab_classic_joint_updates_call(game->joint_updates, call, error);
@@ -408,6 +426,8 @@ static bool game_service(void *context, AbGameTailCall *call, AbError *error) {
     game->globals.eagle_darkness = game->draw.eagle_darkness;
     return okay;
 }
+
+static bool game_eagle_result(PreviewGame *game, float score, AbError *error);
 
 static bool game_result(void *context, AbDataTable *event, AbError *error) {
     PreviewGame *game = context;
@@ -446,6 +466,8 @@ static bool game_result(void *context, AbDataTable *event, AbError *error) {
                                           game->enabled, error))
             return false;
     }
+    if (menu_route_truthy(game->eagle_bait_launched))
+        return game_eagle_result(game, menu_real(score.bits), error);
     AbDataValue used = {.kind = AB_DATA_BOOLEAN,
                         .bits = ab_powerup_uses_count(game->uses) > 0};
     if (!ab_classic_highscores_current(game->highscores, level.string, used,
@@ -462,6 +484,9 @@ static bool game_result(void *context, AbDataTable *event, AbError *error) {
 
 #include "game_skip.h"
 
+static void game_eagle_free(PreviewGame *game);
+static bool game_eagle_open(PreviewGame *game, AbError *error);
+static bool game_eagle_layout(PreviewGame *game, AbError *error);
 static void game_results_free(PreviewGame *game);
 static void game_pause_free(PreviewGame *game);
 static bool game_pause_open(PreviewGame *game, AbError *error);
@@ -484,11 +509,15 @@ static void game_session_free(PreviewMenu *menu) {
         (void)ab_event_manager_remove(menu->events, game_text("EID_LEVEL_ENDED"),
                                       &game->result_listener, &error);
     game_results_free(game);
+    game_eagle_free(game);
     game_powerups_free(game);
     game_pause_free(game);
     game_skip_free(game);
     ab_classic_game_render_close(game->render);
     ab_classic_game_runtime_close(game->game);
+    if (game->score_font_uploaded)
+        (void)menu->texture_host.remove(menu->texture_host.context, 70, &error);
+    ab_font_asset_close(&game->score_font);
     ab_classic_joint_updates_close(game->joint_updates);
     ab_classic_highscores_close(game->highscores);
     ab_classic_balloons_close(game->balloons);
@@ -505,11 +534,15 @@ static void game_session_free(PreviewMenu *menu) {
 }
 
 #include "game_level_scripts.h"
+#include "game_world_limits.h"
+#include "game_eagle_runtime.h"
 #include "game_session_runtime.h"
+#include "game_score_hud.h"
 #include "game_results.h"
 #include "game_results_navigation.h"
 #include "game_pause.h"
 #include "game_powerups.h"
+#include "game_eagle.h"
 
 static bool game_session_pointer(PreviewMenu *menu, AbSpan action, AbVec2 point,
                                  AbError *error) {
@@ -528,6 +561,10 @@ static bool game_session_pointer(PreviewMenu *menu, AbSpan action, AbVec2 point,
     }
     bool pause_consumed;
     if (!game_pause_pointer(game, action, point, &pause_consumed, error))
+        return false;
+    if (pause_consumed)
+        return true;
+    if (!game_eagle_pointer(game, action, point, &pause_consumed, error))
         return false;
     if (pause_consumed)
         return true;
@@ -561,7 +598,8 @@ static bool game_session_resize(PreviewMenu *menu, AbVec2 screen, AbError *error
     game->screen = screen;
     game->notification_context.render.viewport_width = (uint32_t)screen.x;
     game->notification_context.render.viewport_height = (uint32_t)screen.y;
-    return game_skip_layout(game, error) && game_pause_layout(game, error) &&
+    return game_world_limits(game, error) && game_skip_layout(game, error) &&
+           game_pause_layout(game, error) && game_eagle_layout(game, error) &&
            game_powerups_layout(game, error) &&
            ab_ui_widget_lifecycle(&game->notifications, AB_UI_FRAME_LAYOUT, error) &&
            (!game->results || game_results_layout(game, error));
@@ -625,7 +663,9 @@ static bool game_session_draw(PreviewMenu *menu, float seconds, AbError *error) 
     if (okay && game->results)
         okay = game_results_draw(game, error);
     else if (okay)
-        okay = game_powerups_draw(game, seconds, error) &&
+        okay = game_score_hud_draw(game, error) &&
+               game_eagle_draw(game, seconds, error) &&
+               game_powerups_draw(game, seconds, error) &&
                (game->paused || game_skip_draw(game, seconds, error)) &&
                game_pause_draw(game, seconds, error);
     if (okay)

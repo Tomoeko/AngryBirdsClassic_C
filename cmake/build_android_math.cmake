@@ -635,6 +635,9 @@ build_android_probe(ab_android_sling_rectangle arm.c oracle_main
 build_android_probe(ab_android_game_hud_draw arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
     -DAB_ORACLE_GAME_HUD_DRAW_ONLY=1)
+build_android_probe(ab_android_floating_score_draw arm.c oracle_main
+    -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
+    -DAB_ORACLE_GAME_HUD_DRAW_ONLY=1 -DAB_ORACLE_FLOATING_SCORE_DRAW_ONLY=1)
 build_android_probe(ab_android_rubberband_world arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
     -DAB_ORACLE_RUBBERBAND_WORLD_ONLY=1)
@@ -1095,6 +1098,9 @@ build_android_probe(ab_android_level_clock arm.c oracle_main
 build_android_probe(ab_android_bird_hat arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
     -DAB_ORACLE_BIRD_HAT_ONLY=1)
+build_android_probe(ab_android_mighty_eagle_timer arm.c oracle_main
+    -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
+    -DAB_ORACLE_MIGHTY_EAGLE_TIMER_ONLY=1)
 
 if(NOT android_probe_built)
     message(FATAL_ERROR "No matching Android reference probe was selected")

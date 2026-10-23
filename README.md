@@ -48,6 +48,8 @@ Blue splitting, yellow boost, white egg drops, green boomerang flight and black-
 explosions work.
 The power-up slider, counters, King Sling, Super Seeds, Sling Scope and Birdquake work
 in gameplay.
+Mighty Eagle includes sardine aiming, the flight and destruction effects, and separate
+percentage results.
 Complete startup, the full ability HUD, credits and all-level gameplay
 remain in progress.
 State stays in `Files/AngryBirdsC/userstate/`.
@@ -57,8 +59,9 @@ outside gameplay it leaves fullscreen. Close the window to quit.
 Drag to aim or move the camera; use the scroll wheel to zoom within each level's
 camera limits. The pointer stays visible.
 Options go before the APK path. `--window-size 1280x720` sets the initial window
-size. `--inf` or `--infinite` keeps power-up inventory unlimited while preserving
-activation rules. `--frames N` limits the run;
+size. `--inf` or `--infinite` gives unlimited power-up inventory and Mighty Eagle
+access without a purchase or cooldown, while preserving per-level activation rules.
+`--frames N` limits the run;
 `--capture Files/frame.ppm` saves a frame.
 
 Initialize an existing checkout with `git submodule update --init --recursive`.

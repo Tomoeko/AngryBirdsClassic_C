@@ -110,12 +110,24 @@ static bool update_hooks(AbGameTailHooks *hooks, float seconds, float time,
     if (!hooks) {
         return true;
     }
-    if ((hooks->count && !hooks->items) || hooks->count > UINT32_C(16777216)) {
+    bool producer = hooks->begin || hooks->next;
+    if ((producer && (!hooks->begin || !hooks->next)) ||
+        (!producer && hooks->count && !hooks->items) ||
+        hooks->count > UINT32_C(16777216)) {
         return ab_fail(error, "Invalid game object update hooks");
     }
+    if (producer && !hooks->begin(hooks->context, error))
+        return false;
     size_t count = hooks->count;
-    for (size_t index = 0; index < count; ++index) {
-        AbGameTailHook *hook = hooks->items + index;
+    for (size_t index = 0; producer || index < count; ++index) {
+        AbGameTailHook *hook;
+        if (producer) {
+            if (!hooks->next(hooks->context, &hook, error))
+                return false;
+            if (!hook)
+                break;
+        } else
+            hook = hooks->items + index;
         if (!hook->object || !hook->updates) {
             return ab_fail(error, "Invalid game object update hook binding");
         }
@@ -130,6 +142,8 @@ static bool update_hooks(AbGameTailHooks *hooks, float seconds, float time,
         }
         if (!present) {
             hook->updates->registered = (AbObjectUpdateValue){0};
+            if (producer && hooks->prune && !hooks->prune(hooks->context, error))
+                return false;
         } else if (!ab_object_update_call(value, hook->receiver, seconds, error)) {
             return false;
         }

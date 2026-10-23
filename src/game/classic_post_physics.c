@@ -213,6 +213,15 @@ size_t ab_classic_post_physics_bytes(const AbClassicPostPhysics *post) {
     return post ? post->bytes : 0;
 }
 
+bool ab_classic_post_physics_set_limits(AbClassicPostPhysics *post, int32_t minimum,
+                                        int32_t maximum, AbError *error) {
+    if (!post || minimum > maximum)
+        return ab_fail(error, "Invalid live post-physics X bounds");
+    post->config.minimum_x = minimum;
+    post->config.maximum_x = maximum;
+    return true;
+}
+
 AbClassicPostView ab_classic_post_physics_view(AbClassicPostPhysics *post) {
     return post ? (AbClassicPostView){post->objects,        post->count,
                                       post->source_indices, &post->ignored_definitions,

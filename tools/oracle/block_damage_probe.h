@@ -310,6 +310,9 @@ static void print_damage_results(void *lua) {
 #if defined(AB_ORACLE_BIRD_HAT_ONLY)
 #include "bird_hat_probe.h"
 #endif
+#if defined(AB_ORACLE_MIGHTY_EAGLE_TIMER_ONLY)
+#include "mighty_eagle_timer_probe.h"
+#endif
 #if defined(AB_ORACLE_SUPERSEED_RADIUS_ONLY)
 #include "superseed_radius_probe.h"
 #endif
@@ -1577,6 +1580,10 @@ static void probe_block_damage(void) {
 #endif
 #if defined(AB_ORACLE_BIRD_HAT_ONLY)
     probe_bird_hat();
+    return;
+#endif
+#if defined(AB_ORACLE_MIGHTY_EAGLE_TIMER_ONLY)
+    probe_mighty_eagle_timer();
     return;
 #endif
 #if defined(AB_ORACLE_SUPERSEED_RADIUS_ONLY)

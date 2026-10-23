@@ -1,6 +1,63 @@
 #ifndef AB_UI_FLAMES_APK_TEST_H
 #define AB_UI_FLAMES_APK_TEST_H
 
+typedef struct {
+    AbClassicObjectHooks *registry;
+    AbObjectUpdates updates[2];
+    AbObjectUpdateFunction functions[2];
+    size_t objects[2], calls[2];
+    bool added;
+} FlameSharedHooks;
+
+static bool flame_secondary_hook(void *context, void *receiver, float seconds,
+                                 AbError *error) {
+    (void)receiver;
+    (void)seconds;
+    (void)error;
+    ++((FlameSharedHooks *)context)->calls[1];
+    return true;
+}
+
+static bool flame_primary_hook(void *context, void *receiver, float seconds,
+                               AbError *error) {
+    (void)receiver;
+    (void)seconds;
+    FlameSharedHooks *hooks = context;
+    ++hooks->calls[0];
+    if (!hooks->added) {
+        hooks->added = true;
+        return ab_classic_object_hooks_register(hooks->registry, hooks->objects[1],
+                                                hooks->updates + 1, error);
+    }
+    return true;
+}
+
+static bool flame_shared_hooks(PreviewGame *game, AbClassicFlames *flames, size_t flame,
+                               FlameSharedHooks *hooks, AbError *error) {
+    AbClassicLevelView level = ab_classic_level_view(game->playfield.level);
+    hooks->registry = ab_classic_flames_updates(flames);
+    size_t count = 0;
+    for (size_t object = 0; object < level.bodies->count && count < 2; ++object)
+        if (object != flame && !level.removed_objects[object])
+            hooks->objects[count++] = object;
+    if (count != 2)
+        return ab_fail(error, "Shared hook fixture lacks two live source objects");
+    hooks->functions[0] = (AbObjectUpdateFunction){hooks, flame_primary_hook};
+    hooks->functions[1] = (AbObjectUpdateFunction){hooks, flame_secondary_hook};
+    for (size_t index = 0; index < 2; ++index) {
+        AbObjectUpdateValue value = {AB_OBJECT_UPDATE_FUNCTION,
+                                     {.function = hooks->functions + index}};
+        hooks->updates[index] = (AbObjectUpdates){value, value};
+    }
+    if (!ab_classic_object_hooks_register(hooks->registry, hooks->objects[0],
+                                          hooks->updates, error) ||
+        !powerup_test_tick(game->menu, 2, error))
+        return false;
+    size_t first = hooks->calls[0], second = hooks->calls[1];
+    return first && second && powerup_test_tick(game->menu, 1, error) &&
+           hooks->calls[0] == first + 1 && hooks->calls[1] == second + 1;
+}
+
 static size_t flame_visible_command(const AbDrawList *list,
                                     const AbLuaAssetSpriteBinding *binding) {
     for (size_t index = 0; index < list->count; ++index) {
@@ -91,6 +148,24 @@ static bool flame_widgets(PreviewMenu *menu, AbMetal *renderer, AbError *error) 
         memcmp(&frozen, flame.state, sizeof(frozen)) ||
         !game_session_escape(menu, error) || game->paused)
         return ab_fail(error, "Pause advanced the actual flame callback");
+    FlameSharedHooks shared = {0};
+    if (!flame_shared_hooks(game, scripts.flames, object, &shared, error))
+        return ab_fail(error, "Live hook insertion failed beside actual FlameEffect");
+    AbGameTailHook *retained = NULL;
+    if (!game->tail.hooks->begin || !game->tail.hooks->next ||
+        !game->tail.hooks->begin(game->tail.hooks->context, error))
+        return ab_fail(error, "Flame omitted its shared live update registry");
+    for (;;) {
+        AbGameTailHook *hook;
+        if (!game->tail.hooks->next(game->tail.hooks->context, &hook, error))
+            return false;
+        if (!hook)
+            break;
+        if (hook->object->identity == object)
+            retained = hook;
+    }
+    if (!retained)
+        return ab_fail(error, "Actual flame update was not registered");
     AbObjectPropertyAccess world = {
         .physics_object = {.kind = AB_DATA_TABLE, .table = &level.properties->world}};
     if (!ab_object_property_set(&world, level.bodies->objects[object].name,
@@ -101,14 +176,9 @@ static bool flame_widgets(PreviewMenu *menu, AbMetal *renderer, AbError *error) 
     if (!ab_extra_draws_find(game->extra_draws, flame.draw_key, &registered, error) ||
         registered)
         return ab_fail(error, "Absent flame retained its extra-draw registration");
-    for (size_t index = 0; index < game->tail.hooks->count; ++index) {
-        const AbGameTailHook *hook = game->tail.hooks->items + index;
-        if (hook->object->identity == object &&
-            (hook->updates->registered.kind != AB_OBJECT_UPDATE_NONE ||
-             hook->updates->object.kind == AB_OBJECT_UPDATE_NONE))
-            return ab_fail(error,
-                           "Flame hook pruning lost its retained object property");
-    }
+    if (retained->updates->registered.kind != AB_OBJECT_UPDATE_NONE ||
+        retained->updates->object.kind == AB_OBJECT_UPDATE_NONE)
+        return ab_fail(error, "Flame pruning lost its retained object property");
     game_session_free(menu);
     menu->level_request_ready = false;
     puts("Actual flame: source zero update, shared callback/RNG, animated cached "

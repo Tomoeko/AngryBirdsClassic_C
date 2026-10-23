@@ -16,6 +16,7 @@ typedef struct {
     /* Reserve additional stable adapter rows per authored bird. The dynamic
      * bodies still use level_limits.objects; zero retains initial-only rows. */
     size_t dynamic_objects_per_bird;
+    size_t additional_dynamic_objects;
     AbClassicPlayfieldConfig playfield;
     void *prepare_context;
     bool (*prepare)(void *context, const AbLuaData *level, const AbLuaData *catalog,
@@ -27,6 +28,7 @@ typedef struct {
     AbClassicPlayfield *playfield;
     size_t first_bird;
     float placement_scale;
+    size_t object_capacity;
 } AbClassicLevelRuntimeView;
 
 /* Fresh ordinary Museum world/playfield ownership, independent of render API.

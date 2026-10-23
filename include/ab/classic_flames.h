@@ -2,6 +2,7 @@
 #define AB_CLASSIC_FLAMES_H
 
 #include "ab/classic_render_scene.h"
+#include "ab/classic_object_hooks.h"
 #include "ab/extra_draw.h"
 #include "ab/flame_data.h"
 #include "ab/game_update_tail.h"
@@ -43,11 +44,11 @@ void ab_classic_flames_close(AbClassicFlames *flames);
 size_t ab_classic_flames_bytes(const AbClassicFlames *flames);
 bool ab_classic_flames_apply(AbClassicFlames *flames, size_t object,
                              const AbDataTable *definition, AbError *error);
-/* Bind the completed constructor's native string-map hook order to stable
- * controller identities. No subsequent hook insertion while bound. Pruning
- * clears registered callables through the source tail, retaining properties. */
+/* Bind the constructor's shared native string-map hook registry to stable
+ * controller identities. Later source registrations use the same owner. */
 bool ab_classic_flames_bind(AbClassicFlames *flames, AbClassicController *controller,
                             AbGameTailHooks **output, AbError *error);
+AbClassicObjectHooks *ab_classic_flames_updates(AbClassicFlames *flames);
 bool ab_classic_flames_view(const AbClassicFlames *flames, size_t object,
                             AbClassicFlameView *output);
 

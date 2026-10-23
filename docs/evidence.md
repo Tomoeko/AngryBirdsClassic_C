@@ -9689,3 +9689,136 @@ fixture with five defined boxes also passed separately under ASan/UBSan.
 Windows app, box, hat and joint-update test targets compile; source formatting
 and diff whitespace checks pass. Native complete-playthrough parity and the
 remaining catalog construction/script gates stay open.
+
+## Gameplay score presentation
+
+The application now executes the existing ordinary GameHud score plan, including
+the current score and a previously saved high score, before its child controls.
+The direct HUD pass resets its screen clip: an outgoing menu's retained viewport
+otherwise clips the right-hand text after a wider desktop resize. Current totals
+use the actual FONT_BASIC resource and TEXTS_BASIC labels. Floating collision and
+destruction records now render with FONT_SCORE or their actual score sprite.
+They retain the existing source growth/shrink timers and dense record order.
+Fonts upload once per session and resizing reads no new assets.
+
+The original complete GameHud.draw prototype 44365 supplies 1,024 controlled
+floating-score cases through the pinned ARMv7 library on the muted Android
+reference. World-to-screen conversion, scalar camera zoom, UI scale, fractional
+text coordinates, floored sprite coordinates, signed scales, text/sprite order
+and BOTTOM/HCENTER anchors match bit for bit. The private trace
+`analysis/input/floating-score-draw-native-01.txt` has SHA-256
+`c546a183792cc65765df5eac42b1254f12da4d54fdc1ee7f9ef3a532c892dc69`.
+The existing 4,096-case static-score HUD corpus remains enabled. These controlled
+calls establish those boundaries, rather than complete original screen parity.
+
+Both connected Metal gameplay routes check the top-right numeric glyphs before
+and after scoring and two window resizes, their alpha/clip, actual collision
+popup submission, the pig's 5,000-point sprite and record expiry. Inspected
+1920x1080 captures retain the live impact numbers and changing total; the pig
+capture also shows its green score sprite. Evidence is in the private
+`score-hit-metal-02` and `score-pig-metal-02` captures. All 781 primary tests pass;
+six selected ASan/UBSan tests pass, including both complete Metal UI routes.
+The Windows app and score-draw test compile; formatting and whitespace checks
+pass at this score checkpoint. Eagle activation and full-game parity remain
+separate recovery work.
+
+Mighty Eagle preparation now shares one live object-update registry with
+FlameEffect. It preserves the existing string-map insertion layout, resumes from
+the current retained key after callbacks add registrations, and removes missing
+world entries without clearing their retained physical updateFunction. The
+connected Metal fixture registers a second update from the first callback beside
+an actual flame and verifies continued dispatch and flame pruning. Both native
+tail/ordinary tests pass; the full 781-gate primary suite and the updated complete
+Metal UI route under ASan/UBSan pass. The Windows app/tail checker compile.
+
+The separate source Mighty Eagle timer boundary matches 1,024 original states and
+1,023 ordered summon/audio/cleanup boundaries. The reference executes the
+unchanged `assets/data/scripts/mightyEagle.lua`, prototype 6277, through the pinned
+ARMv7 library. Its empty controlled world and absent joints expose phase lookup
+order; concrete destructive loops and body construction remain outside this
+corpus. Cases include callbacks which change timer/shake/joint flags before
+subsequent source reads. The private trace `analysis/input/eagle-timer-native-01.txt`
+has SHA-256
+`e4af773867013a6a4eefc7d25804594d00ef280bc6984b88843745377043a8b4`.
+This timer is not yet the application's Eagle activation path; its button,
+infinite-use policy, bait/arrival construction and live effects remain open.
+The timer edge/native tests pass under ASan/UBSan and its Windows checker compiles.
+
+
+### Connected Mighty Eagle controls and local infinite access
+
+The application now constructs the existing recovered MightyEagleButton with
+live session/settings queries, FONT_BASIC getter, source hit padding, layout,
+event lifetime and pause/resize behavior. Both `--inf` and `--infinite` enable
+local access and bypass cooldown without persisting a purchase or replacing
+saved cooldown fields. Episode/level disability, active powerup transitions and
+the source single summon per level remain in force. Normal offline purchase
+handling reports the unavailable external store and preserves the level; it is
+not a recovered store service.
+
+The launch replaces the live queued birds with the actual BaitSardine box and
+binds its GameObject behaviors, particles, sprite, launch definition, named
+collision/exit branches and source update function to shared owners. Arrival
+constructs the raw MightyEagle circle without inventing a GameObject script.
+The shared behavior collision adapter accepts such a physical argument while
+still requiring an actual script on its method receiver. Its original flight,
+particle admission limits, source world X limits, ground/exit impulses, goal
+cleanup, audio, shake and joint calls use the actual application owners. The
+Museum loader now installs its authored moving-object exclusions and adds the
+MightyEagleBird entry required for level completion.
+
+Eagle results use the original point threshold to store a separate percentage,
+raw Eagle extrema and source highscore/feather/play events. They preserve the
+ordinary point highscore. The recovered EagleScore layout, rotating meter
+highlight, ProgressBar clip, percentage count and result navigation replace the
+ordinary star presentation for those runs. Research inputs remain private:
+`assets/data/scripts/mightyEagle.lua` SHA-256
+`564b8a7d3542d5224687b6fd61b140382f8359183d4637af54d2db055f564e42`;
+`assets/data/scripts_common/menus/level_end.lua` SHA-256
+`887e617cecee21a3d568ca783dcddc1d27e2bdab0c6af0bc38b7f5f67f5d0614`,
+EagleScore prototypes 43724/46096/46294/47537; and
+`assets/data/scripts_common/ui_components/ProgressBar.lua` SHA-256
+`087d99f1f1d33fe3e2240ab568f321aeaa5667f8a42f47a6be5f690612f0b27a`,
+prototype 977. These use the same pinned APK and ARM library identified above.
+
+The connected Metal fixture clicks the actual button, replaces the queue,
+throws the bait with pointer input, observes the live Eagle construction,
+waits for goal cleanup/result, checks the separate percentage and unchanged
+ordinary score, then repeats in a fresh level without a cooldown. It also
+exercises pause and 1920x1080 resizing. Private captures
+`eagle-button-metal-01.png` and `eagle-result-metal-01.png` were inspected; the
+latter shows a 73% clipped feather meter. All 783 main gates passed, as did five
+selected ASan/UBSan gates including both complete Metal UI routes. The Windows
+MinGW application build and format check pass.
+
+The timer's controlled native corpus above remains the comparative evidence
+for that boundary. Full native visual/flight/result comparisons, illustrated
+Eagle tutorials, active hat release, episode-specific alternate Mighty Powers,
+normal online purchase/cooldown services and the original bait collision's
+reached global-obj1 branch remain separate recovery work. The connected C test
+and screenshots do not establish whole-Eagle or whole-game 1:1 fidelity.
+
+The first fixture verified construction and completion without requiring visible
+flight or structural damage. A later gameplay report exposed that gap: the
+application included its generated 2000-unit ground in the authored horizontal
+extrema. The source Museum loader expands those extrema in its authored-object
+loop (instructions 869–923), then constructs ground separately (560–579).
+Excluding that generated body restores the intended entry point. Keep fractional
+script edges for Eagle creation; native `setLevelLimits` truncates only its own
+integer boundary storage. The retained failing trace starts the Eagle at about
+x = -1959 and reaches the result before it appears on screen.
+
+The corrected fixture additionally requires the Eagle's visible quad in the
+actual gameplay draw list, an on-screen ground-impact Metal capture, and a
+decrease in live dynamic non-goal structure blocks after construction. Both
+repeated runs destroy all seven such blocks in the selected level. Private
+`eagle-flight-metal-02.png` and `eagle-flight-metal-03.ppm` show the motion sprite,
+feathers, broken structure and live score at impact at 1920×1080. Remaining pig
+cleanup is a separate source timer action; it does not replace physical damage
+or guarantee removal of every block in every level.
+
+After the bounds correction, all 783 main tests pass, including both complete
+Metal UI routes. Both strengthened routes also pass under ASan/UBSan (335.93 s
+combined). The macOS application, Windows MinGW application and format check
+pass. These are implementation regression checks; full native visual and
+all-level Eagle comparisons remain open.

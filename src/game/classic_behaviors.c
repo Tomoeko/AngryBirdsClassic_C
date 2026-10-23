@@ -441,8 +441,8 @@ bool ab_classic_behaviors_bird_collision(AbClassicBehaviors *owner, size_t recei
                                          size_t first, size_t second,
                                          const AbBlockCollisionNotice *notice,
                                          AbError *error) {
-    if (!owner || receiver >= owner->count || first >= owner->count ||
-        second >= owner->count || !notice)
+    if (!owner || receiver >= owner->count || first >= owner->level.bodies->count ||
+        second >= owner->level.bodies->count || !notice)
         return ab_fail(error, "Invalid classic behavior collision binding");
     AbLevelPropertyObject *properties = owner->level.properties->objects;
     AbUiPointerValue arguments[8] = {

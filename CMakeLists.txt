@@ -424,6 +424,9 @@ add_library(ab_game STATIC src/game/object_definition.c src/game/object_physics.
     src/game/classic_joint_parameters.c
     src/game/classic_joint_break.c
     src/game/classic_joint_updates.c
+    src/game/floating_score_draw_plan.c
+    src/game/classic_object_hooks.c
+    src/game/mighty_eagle_timer.c
     src/game/classic_contact_glue.c
     src/game/level_joints.c
     src/game/object_friction.c
@@ -463,6 +466,7 @@ add_library(ab_asset_resources STATIC src/game/asset_resources.c
 target_link_libraries(ab_asset_resources PUBLIC ab_game ab_render)
 
 add_library(ab_scene STATIC src/render/classic_scene.c src/render/classic_visuals.c
+    src/render/floating_score_draw.c
     src/render/classic_render_scene.c src/game/classic_characters.c
     src/game/classic_shots.c src/game/classic_sling.c
     src/game/classic_launch_host.c src/game/classic_playfield.c
@@ -1788,6 +1792,30 @@ if(BUILD_TESTING)
     add_executable(ab_floating_score_tests tests/floating_scores.c)
     target_link_libraries(ab_floating_score_tests PRIVATE ab_game)
     add_test(NAME floating_scores_owned COMMAND ab_floating_score_tests)
+    add_executable(ab_floating_score_draw_tests tests/floating_score_draw.c)
+    target_link_libraries(ab_floating_score_draw_tests PRIVATE ab_scene)
+    add_test(NAME floating_score_draw_edges COMMAND ab_floating_score_draw_tests)
+    add_executable(ab_mighty_eagle_timer_tests tests/mighty_eagle_timer.c)
+    target_link_libraries(ab_mighty_eagle_timer_tests PRIVATE ab_game)
+    add_test(NAME mighty_eagle_timer_edges COMMAND ab_mighty_eagle_timer_tests)
+    set(AB_REFERENCE_MIGHTY_EAGLE_TIMER "" CACHE FILEPATH
+        "Optional original Mighty Eagle timer state and call boundaries")
+    if(AB_REFERENCE_MIGHTY_EAGLE_TIMER)
+        add_test(NAME mighty_eagle_timer_android
+            COMMAND "${CMAKE_COMMAND}"
+                "-DREFERENCE=${AB_REFERENCE_MIGHTY_EAGLE_TIMER}"
+                "-DCHECKER=$<TARGET_FILE:ab_mighty_eagle_timer_tests>"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_mighty_eagle_timer_reference.cmake")
+    endif()
+    set(AB_REFERENCE_FLOATING_SCORE_DRAW "" CACHE FILEPATH
+        "Optional original GameHud floating-score draw boundaries")
+    if(AB_REFERENCE_FLOATING_SCORE_DRAW)
+        add_test(NAME floating_score_draw_android
+            COMMAND "${CMAKE_COMMAND}"
+                "-DREFERENCE=${AB_REFERENCE_FLOATING_SCORE_DRAW}"
+                "-DCHECKER=$<TARGET_FILE:ab_floating_score_draw_tests>"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_floating_score_draw_reference.cmake")
+    endif()
     add_executable(ab_particle_tests tests/particles.c)
     target_link_libraries(ab_particle_tests PRIVATE ab_scene)
     add_test(NAME particles_owned_edges COMMAND ab_particle_tests)

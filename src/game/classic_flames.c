@@ -1,7 +1,6 @@
 #include "ab/classic_flames.h"
 #include "ab/classic_controller.h"
 #include "ab/game_sprite.h"
-#include "ab/string_map.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -30,8 +29,7 @@ struct AbClassicFlames {
     AbClassicFlameConfig config;
     AbClassicLevelView level;
     FlameObject *rows;
-    AbStringMap *registered;
-    AbGameTailHooks hooks;
+    AbClassicObjectHooks *registered;
     AbObjectUpdateFunction update;
     size_t count, bytes;
     bool bound, failed;
@@ -177,13 +175,11 @@ bool ab_classic_flames_open(AbClassicFlameConfig config, AbClassicFlames **outpu
         ab_fail(error, "Active FlameEffect requires its real services/physics scale");
         goto release;
     }
-    if (!reserve(owner, owner->count,
-                 sizeof(*owner->rows) + sizeof(*owner->hooks.items), error))
+    if (!reserve(owner, owner->count, sizeof(*owner->rows), error))
         goto release;
     if (owner->count) {
         owner->rows = calloc(owner->count, sizeof(*owner->rows));
-        owner->hooks.items = calloc(owner->count, sizeof(*owner->hooks.items));
-        if (!owner->rows || !owner->hooks.items) {
+        if (!owner->rows) {
             ab_fail(error, "Cannot allocate flame effect/hook rows");
             goto release;
         }
@@ -199,13 +195,10 @@ bool ab_classic_flames_open(AbClassicFlameConfig config, AbClassicFlames **outpu
         if (!allocate_row(owner, owner->rows + row++, source, error))
             goto release;
     }
-    size_t nodes = owner->count ? 1 : 0;
-    while (nodes < owner->count)
-        nodes *= 2;
-    if (!ab_string_map_open(0, nodes, config.storage_bytes - owner->bytes,
-                            &owner->registered, error))
+    if (!ab_classic_object_hooks_open(config.level, config.storage_bytes - owner->bytes,
+                                      &owner->registered, error))
         goto release;
-    owner->bytes += ab_string_map_bytes(owner->registered);
+    owner->bytes += ab_classic_object_hooks_bytes(owner->registered);
     *output = owner;
     return true;
 release:
@@ -223,8 +216,7 @@ void ab_classic_flames_close(AbClassicFlames *owner) {
             free(owner->rows[index].offsets);
             free(owner->rows[index].key);
         }
-    ab_string_map_close(owner->registered);
-    free(owner->hooks.items);
+    ab_classic_object_hooks_close(owner->registered);
     free(owner->rows);
     free(owner);
 }
@@ -352,9 +344,8 @@ static bool register_update(void *context, AbFlameState *state,
                       (AbDataValue){.kind = AB_DATA_OBJECT, .object = &row->updates},
                       error))
         return false;
-    return ab_string_map_set(call->owner->registered,
-                             call->owner->level.bodies->objects[row->object].name,
-                             (uintptr_t)row, true, error);
+    return ab_classic_object_hooks_register(call->owner->registered, row->object,
+                                            &row->updates, error);
 }
 
 static bool draw_object(void *context, void *parameter, AbExtraDrawInput input,
@@ -463,25 +454,14 @@ bool ab_classic_flames_bind(AbClassicFlames *owner, AbClassicController *control
                             AbGameTailHooks **output, AbError *error) {
     if (!owner || owner->failed || owner->bound || !controller || !output)
         return ab_fail(error, "Invalid flame controller binding");
-    size_t cursor = 0;
-    for (;;) {
-        AbStringMapEntry entry;
-        if (!ab_string_map_next(owner->registered, &cursor, &entry, error))
-            return false;
-        if (!entry.present)
-            break;
-        FlameObject *row = (FlameObject *)entry.value;
-        AbGameTailObject *object =
-            ab_classic_controller_object(controller, row->object);
-        if (!object || owner->hooks.count == owner->count)
-            return ab_fail(error, "Flame hook has no stable controller identity");
-        owner->hooks.items[owner->hooks.count++] =
-            (AbGameTailHook){object, &row->updates,
-                             &owner->level.properties->objects[row->object].physical};
-    }
+    if (!ab_classic_object_hooks_bind(owner->registered, controller, output, error))
+        return false;
     owner->bound = true;
-    *output = &owner->hooks;
     return true;
+}
+
+AbClassicObjectHooks *ab_classic_flames_updates(AbClassicFlames *owner) {
+    return owner ? owner->registered : NULL;
 }
 
 bool ab_classic_flames_view(const AbClassicFlames *owner, size_t object,

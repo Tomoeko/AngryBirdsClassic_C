@@ -985,10 +985,10 @@ bool ab_classic_level_create_box(AbClassicLevel *level, AbGameBoxInput input,
                                   &box.frame, &box.properties, output, error);
 }
 
-bool ab_classic_level_create_defined_box(AbClassicLevel *level, AbSpan name,
-                                         AbSpan definition_name, AbVec2 position,
-                                         float density, size_t *output,
-                                         AbError *error) {
+static bool create_defined_box(AbClassicLevel *level, AbSpan name,
+                               AbSpan definition_name, AbVec2 position,
+                               AbVec2 sprite_size, float density, bool bait,
+                               size_t *output, AbError *error) {
     if (!level || !output)
         return ab_fail(error, "Missing defined box level/output");
     AbDataEntry entry = {property_key("density"), property_number(density)};
@@ -998,7 +998,7 @@ bool ab_classic_level_create_defined_box(AbClassicLevel *level, AbSpan name,
     AbDamageSpriteNames sprites;
     if (!ab_object_definition_open(level->catalog, definition_name, &overrides,
                                    &definition, error) ||
-        !ab_object_physics(&definition, (AbVec2){0}, 0.05f, &physics, error) ||
+        !ab_object_physics(&definition, sprite_size, 0.05f, &physics, error) ||
         !ab_object_initial_sprites(&definition, level->catalog_source, NULL, &sprites,
                                    error))
         return false;
@@ -1012,6 +1012,8 @@ bool ab_classic_level_create_defined_box(AbClassicLevel *level, AbSpan name,
                                   "updateFunction", "animation",    "extraSprites",
                                   "components",     "isGiftBoxable"};
     for (size_t index = 0; index < sizeof(active) / sizeof(*active); ++index) {
+        if (bait && (index == 0 || index == 2 || index == 3))
+            continue;
         AbDataValue value =
             ab_object_property(&definition, property_key(active[index]).string);
         if (value.kind != AB_DATA_NIL && (value.kind != AB_DATA_BOOLEAN || value.bits))
@@ -1079,6 +1081,51 @@ bool ab_classic_level_create_defined_box(AbClassicLevel *level, AbSpan name,
     }
     *output = index;
     return true;
+}
+
+bool ab_classic_level_create_defined_box(AbClassicLevel *level, AbSpan name,
+                                         AbSpan definition_name, AbVec2 position,
+                                         float density, size_t *output,
+                                         AbError *error) {
+    return create_defined_box(level, name, definition_name, position, (AbVec2){0},
+                              density, false, output, error);
+}
+
+bool ab_classic_level_create_bait_box(AbClassicLevel *level, AbSpan name,
+                                      AbSpan definition_name, AbVec2 position,
+                                      AbVec2 sprite_size, size_t *output,
+                                      AbError *error) {
+    AbObjectDefinition definition;
+    if (!level || !ab_object_definition_open(level->catalog, definition_name, NULL,
+                                             &definition, error))
+        return ab_fail(error, "Missing actual sardine-bait definition");
+    const char *const fields[] = {"specialty",         "createFunction",
+                                  "updateFunction",    "timerFunction",
+                                  "collisionFunction", "exitedFunction"};
+    const char *const names[] = {
+        "SUMMON_MIGHTY_EAGLE",      "createSardineBait",
+        "updateMightyEagleBait",    "mightyEagleAndBaitTimerUpdate",
+        "mightyEagleBaitCollision", "mightyEagleBaitExited"};
+    for (size_t index = 0; index < sizeof(fields) / sizeof(*fields); ++index) {
+        AbDataValue value =
+            ab_object_property(&definition, property_key(fields[index]).string);
+        size_t length = strlen(names[index]);
+        if (value.kind != AB_DATA_STRING || value.string.size != length ||
+            !value.string.data || memcmp(value.string.data, names[index], length))
+            return ab_fail(error, "Bait definition requires its actual %s branch",
+                           fields[index]);
+    }
+    AbDataValue control =
+        ab_object_property(&definition, property_key("controllable").string);
+    AbDataValue density =
+        ab_object_property(&definition, property_key("density").string);
+    float value = 0;
+    memcpy(&value, &density.bits, sizeof(value));
+    if (control.kind != AB_DATA_BOOLEAN || !control.bits ||
+        density.kind != AB_DATA_NUMBER || !isfinite(value))
+        return ab_fail(error, "Invalid source bait control/density");
+    return create_defined_box(level, name, definition_name, position, sprite_size,
+                              value, true, output, error);
 }
 
 bool ab_classic_level_recreate_circle(AbClassicLevel *level, size_t index,

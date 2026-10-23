@@ -92,8 +92,22 @@ static bool named_bird(AbClassicSling *sling, const char *name, size_t *output,
 static bool next_bird(AbClassicSling *sling, float wanted, size_t *output,
                       AbError *error) {
     *output = SIZE_MAX;
-    for (size_t index = 0; index < sling->level.bird_count; ++index) {
-        size_t object = sling->level.bird_order[index];
+    const AbDataTable *birds = ab_classic_shots_bird_table(sling->config.shots);
+    size_t count = birds ? birds->count : sling->level.bird_count;
+    for (size_t index = 0; index < count; ++index) {
+        size_t object;
+        if (birds) {
+            AbDataValue value = birds->entries[index].value;
+            if (value.kind == AB_DATA_NIL)
+                continue;
+            if (value.kind != AB_DATA_TABLE)
+                return ab_fail(error, "Invalid live sling bird table value");
+            object = 0;
+            while (object < sling->level.bodies->count &&
+                   value.table != &sling->level.properties->objects[object].physical)
+                ++object;
+        } else
+            object = sling->level.bird_order[index];
         if (object >= sling->level.bodies->count)
             return ab_fail(error, "Invalid classic sling queue object");
         if (sling->level.removed_objects[object])
@@ -124,6 +138,25 @@ bool ab_classic_sling_next_bird(AbClassicSling *sling, float index, size_t *obje
     if (!healthy(sling, error) || !object || !isfinite(index))
         return ab_fail(error, "Invalid classic next-bird query");
     return next_bird(sling, index, object, error);
+}
+
+bool ab_classic_sling_clear_selection(AbClassicSling *sling, AbError *error) {
+    if (!healthy(sling, error) || sling->busy)
+        return ab_fail(error, "Invalid live sling selection reset");
+    sling->state.transfer_object = SIZE_MAX;
+    sling->shot->current_bird_name = NULL;
+    sling->shot->dragged = NULL;
+    return true;
+}
+
+bool ab_classic_sling_reload_after(AbClassicSling *sling, float index, float delay,
+                                   AbError *error) {
+    if (!healthy(sling, error) || sling->busy || !isfinite(index) || !isfinite(delay))
+        return ab_fail(error, "Invalid live sling queue replacement");
+    sling->state.current_bird_index = index;
+    sling->shot->next_bird_timer = delay;
+    sling->state.fill_in_next_bird = true;
+    return true;
 }
 
 bool ab_classic_sling_open(AbClassicSlingConfig config, AbClassicSling **output,
@@ -740,7 +773,9 @@ static bool complete_transfer(AbClassicSling *sling, AbError *error) {
         return ab_fail(error, "Unsupported sling reload camera geometry");
     if (!sling->config.reload_sound ||
         !sling->config.reload_sound(sling->config.context, gain, error))
-        return ab_fail(error, "Missing or failed sling reload sound");
+        return error && error->message[0]
+                   ? false
+                   : ab_fail(error, "Missing or failed sling reload sound");
     size_t body = sling->level.bodies->objects[object].physics.body;
     if (!ab_world_set_body_type(sling->level.world, body, AB_BODY_DYNAMIC, error) ||
         !ab_classic_level_set_rotation(sling->config.level, object, 0, error))

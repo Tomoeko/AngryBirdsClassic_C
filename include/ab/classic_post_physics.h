@@ -83,6 +83,10 @@ bool ab_classic_post_physics_open(AbClassicLevel *level, AbClassicPostConfig con
 void ab_classic_post_physics_close(AbClassicPostPhysics *post);
 size_t ab_classic_post_physics_bytes(const AbClassicPostPhysics *post);
 AbClassicPostView ab_classic_post_physics_view(AbClassicPostPhysics *post);
+/* Native GameLua.setLevelLimits publishes the two already truncated X bounds.
+ * Resize/source camera changes update these without rebuilding object owners. */
+bool ab_classic_post_physics_set_limits(AbClassicPostPhysics *post, int32_t minimum,
+                                        int32_t maximum, AbError *error);
 
 /* Refresh a retained named row after native circle replacement. Native rolling
  * sound returns to the direct-circle empty name; shape/collider/radius use the

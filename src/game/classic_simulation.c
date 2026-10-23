@@ -161,6 +161,14 @@ size_t ab_classic_simulation_bytes(const AbClassicSimulation *simulation) {
     return simulation ? simulation->bytes : 0;
 }
 
+bool ab_classic_simulation_set_limits(AbClassicSimulation *simulation, int32_t minimum,
+                                      int32_t maximum, AbError *error) {
+    if (!simulation)
+        return ab_fail(error, "Missing live simulation X-bound owner");
+    return ab_classic_post_physics_set_limits(simulation->post, minimum, maximum,
+                                              error);
+}
+
 AbClassicSimulationView ab_classic_simulation_view(AbClassicSimulation *simulation) {
     return simulation ? (AbClassicSimulationView){.level = simulation->level,
                                                   .forces = ab_classic_forces_view(

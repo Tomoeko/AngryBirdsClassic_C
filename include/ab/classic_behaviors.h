@@ -99,7 +99,9 @@ bool ab_classic_behaviors_launch(AbClassicBehaviors *behaviors, size_t object,
 bool ab_classic_behaviors_collision(AbClassicBehaviors *behaviors, size_t object,
                                     size_t other, const AbBlockCollisionNotice *notice,
                                     AbError *error);
-/* Preserve the method receiver independently of the two object-table arguments.
+/* Physical arguments may include raw dynamically constructed objects without
+ * GameObject scripts (the Mighty Eagle). Only the receiver requires an owned
+ * behavior group. Preserve it independently of the two object-table arguments.
  * A noncontrollable second receiver receives the original first/second pair. */
 bool ab_classic_behaviors_bird_collision(AbClassicBehaviors *behaviors, size_t receiver,
                                          size_t first, size_t second,

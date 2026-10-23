@@ -19,6 +19,13 @@ typedef struct {
 typedef struct {
     AbGameTailHook *items;
     size_t count;
+    /* Optional live string-map producer for registrations made by callbacks.
+     * Both methods are required together. The flat captured list above remains
+     * available for isolated fixed-registration callers. */
+    void *context;
+    bool (*begin)(void *context, AbError *error);
+    bool (*next)(void *context, AbGameTailHook **output, AbError *error);
+    bool (*prune)(void *context, AbError *error);
 } AbGameTailHooks;
 
 typedef struct {
@@ -121,8 +128,9 @@ bool ab_game_update_tail_world(AbGameTailState *state, AbGameTailWorld world,
  * is the pure truthiness query for that name's current world entry. A missing
  * entry drops only the registered binding, preserving the object's property.
  * Live hooks invoke the captured registered callable with receiver/seconds.
- * Hook arrays/order/lifetimes remain stable; map insertion/reinsertion and
- * traversal recovery are separate. Hooks may mutate ordinary state/callbacks.
+ * Flat hook arrays/order/lifetimes remain stable. An optional live producer
+ * owns current-key traversal recovery, dynamic registrations and pruning.
+ * Hooks may mutate ordinary state/callbacks and that live registry.
  * Optional joints borrow the current visible metadata in original table order.
  * After boomerang update, request limit checks for back_and_forth entries, then
  * visit destruction names in append order before character animation. The host

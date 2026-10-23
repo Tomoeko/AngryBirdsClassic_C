@@ -348,6 +348,7 @@ release:
 #include "ui_level_selection_apk.h"
 #include "ui_menu_level_route_apk.h"
 #include "ui_cutscene_apk.h"
+#include "ui_score_hud_apk.h"
 #include "ui_game_session_apk.h"
 #include "ui_intro_route_apk.h"
 #include "ui_menu_audio_apk.h"
@@ -358,6 +359,7 @@ release:
 #include "ui_level_facebook_apk.h"
 #include "ui_bird_abilities_apk.h"
 #include "ui_joint_updates_apk.h"
+#include "ui_tnt_apk.h"
 #include "ui_terrain_apk.h"
 #include "ui_ambient_apk.h"
 #include "ui_powerups_apk.h"
@@ -454,6 +456,7 @@ int main(int argc, char **argv) {
         !ability_test_repeated_blues(&menu, renderer, &error) ||
         !ability_test_white(&menu, renderer, &error) ||
         !ability_test_black(&menu, renderer, &error) ||
+        !tnt_explosion_widgets(&menu, renderer, &error) ||
         !powerup_king_widgets(&menu, renderer, &error) ||
         !powerup_seed_widgets(&menu, renderer, &error) ||
         !powerup_quake_widgets(&menu, renderer, &error) ||

@@ -72,6 +72,8 @@ bool ab_classic_simulation_open(AbClassicLevel *level, AbClassicSimulationConfig
 void ab_classic_simulation_close(AbClassicSimulation *simulation);
 size_t ab_classic_simulation_bytes(const AbClassicSimulation *simulation);
 AbClassicSimulationView ab_classic_simulation_view(AbClassicSimulation *simulation);
+bool ab_classic_simulation_set_limits(AbClassicSimulation *simulation, int32_t minimum,
+                                      int32_t maximum, AbError *error);
 
 /* Rebind native force/activity caches after replacing a removed named circle.
  * Call between simulation passes after collider/body-type assignment. */

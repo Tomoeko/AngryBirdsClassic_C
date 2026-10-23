@@ -236,6 +236,9 @@ static void hud_case(void *lua) {
 #if defined(AB_ORACLE_GAME_HUD_QUERIES_ONLY)
 #include "game_hud_queries_probe.h"
 #endif
+#if defined(AB_ORACLE_FLOATING_SCORE_DRAW_ONLY)
+#include "floating_score_draw_probe.h"
+#endif
 
 static void probe_game_hud_draw(void) {
     initialize_damage_lua();
@@ -254,6 +257,11 @@ static void probe_game_hud_draw(void) {
     hud_globals(lua);
     load_damage_chunk(lua, "/data/local/tmp/ab520/ui/hud-class.lua");
     load_damage_chunk(lua, "/data/local/tmp/ab520/ui/game-hud.lua");
+#if defined(AB_ORACLE_FLOATING_SCORE_DRAW_ONLY)
+    probe_floating_score_draw(lua);
+    damage_lua.close_state(lua);
+    return;
+#endif
 #if defined(AB_ORACLE_GAME_HUD_QUERIES_ONLY)
     probe_game_hud_queries(lua);
     damage_lua.close_state(lua);

@@ -189,6 +189,17 @@ bool ab_classic_level_create_defined_box(AbClassicLevel *level, AbSpan name,
                                          AbSpan definition, AbVec2 position,
                                          float density, size_t *output, AbError *error);
 
+/* Source sardine-bait ObjectFunctions box path with actual sprite geometry and
+ * all ordinary definition projections. Only the recovered Eagle callback family
+ * is accepted. The caller must construct its renderer/GameObject/behaviors and
+ * bind those creation, collision, exit and update services before the next frame.
+ * Native box controllable-vector membership stays separate from the true logical
+ * controllable property. No callback is replaced by an empty implementation. */
+bool ab_classic_level_create_bait_box(AbClassicLevel *level, AbSpan name,
+                                      AbSpan definition, AbVec2 position,
+                                      AbVec2 sprite_size, size_t *output,
+                                      AbError *error);
+
 /* Recreate a removed named body in its stable logical row. This constructs a
  * fresh native circle/physical projection, not a fixture resize. The caller
  * must first run native removal, then rebuild render, script and cached native

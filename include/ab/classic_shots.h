@@ -57,6 +57,9 @@ AbClassicLevel *ab_classic_shots_level(const AbClassicShots *shots);
 AbClassicGameGlobals *ab_classic_shots_globals(const AbClassicShots *shots);
 bool ab_classic_shots_refresh_globals(AbClassicShots *shots, AbError *error);
 AbShotBird *ab_classic_shots_bird(AbClassicShots *shots, size_t object);
+/* The canonical live Lua birds table after the owned bird registry binds it.
+ * NULL retains the initial-only queue for isolated phase callers. */
+const AbDataTable *ab_classic_shots_bird_table(AbClassicShots *shots);
 
 /* Register the next canonical direct circle after its source field/script
  * construction. Reserve object_capacity and string bytes at open; zero capacity

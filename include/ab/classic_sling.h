@@ -112,6 +112,12 @@ AbSlingshotStartPose ab_classic_sling_start_pose(const AbClassicSling *sling);
  * nil; read live controllable/startNumber and skip removed members. Pure query. */
 bool ab_classic_sling_next_bird(AbClassicSling *sling, float index, size_t *object,
                                 AbError *error);
+/* launchMightyBait88284's explicit selection clear, then its post-construction
+ * currentBirdIndex, nextBirdTimer and fillInNextBird writes. The caller performs
+ * source removals/construction/events between these two separate boundaries. */
+bool ab_classic_sling_clear_selection(AbClassicSling *sling, AbError *error);
+bool ab_classic_sling_reload_after(AbClassicSling *sling, float index, float delay,
+                                   AbError *error);
 /* Source disableSlingshotForCurrentLevel3559 ignores arguments and sets its
  * private flag true; isSlingshotDisabledForCurrentLevel3611 returns that flag.
  * Level reset/bootstrap supplies the false initial value in config. */
