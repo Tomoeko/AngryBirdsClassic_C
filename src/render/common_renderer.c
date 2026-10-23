@@ -225,8 +225,8 @@ static bool render_view(AbCommonRenderer *renderer, const AbDrawList *list,
     CcIndexedFrame frame = {.clear_color = {clear[0], clear[1], clear[2], clear[3]},
                             .clear_color_enabled = true};
     bool begun =
-        native ? cc_indexed_begin_passes(renderer->native, &frame, message,
-                                         sizeof(message))
+        native ? cc_indexed_begin_passes_wait(renderer->native, &frame, message,
+                                              sizeof(message))
                : cc_indexed_begin(renderer->native, &frame, message, sizeof(message));
     if (!begun)
         return diagnostic(error, message);

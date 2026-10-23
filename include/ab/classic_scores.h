@@ -13,6 +13,7 @@ typedef struct {
     float *birds;
     AbBirdCollisionScoreEntry *objects;
     size_t count, storage_bytes;
+    size_t object_capacity;
 } AbClassicScoreConfig;
 
 typedef struct {
@@ -41,6 +42,10 @@ bool ab_classic_scores_open(AbClassicScoreConfig config, AbClassicScores **outpu
 void ab_classic_scores_close(AbClassicScores *owner);
 size_t ab_classic_scores_bytes(const AbClassicScores *owner);
 AbClassicScoreView ab_classic_scores_view(const AbClassicScores *owner);
+/* Extend the canonical prefix into pre-reserved borrowed score rows. This does
+ * not create a scoreTable entry; its original collision boundary still does. */
+bool ab_classic_scores_register_object(AbClassicScores *owner, size_t object,
+                                       AbError *error);
 
 /* The original collision callback creates scoreTable[name]={}, then .score=0
  * before adding damage. Existing rows preserve score. Only actual initial names

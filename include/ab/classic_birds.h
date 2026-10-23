@@ -8,6 +8,7 @@
 #include "ab/bird_retirement.h"
 #include "ab/bird_remove.h"
 #include "ab/audio_bank.h"
+#include "ab/classic_explosions.h"
 
 typedef struct AbClassicBirds AbClassicBirds;
 
@@ -25,6 +26,7 @@ typedef struct {
     AbClassicObjectRemoval *physical;
     AbClassicParticles *particles;
     AbAudioBank *audio;
+    AbClassicExplosions *explosions;
     AbStringMap *hats;
     AbDataValue *flying_object, *specialty_available, *level_effect;
     const float *remove_speed_squared, *remove_time;
@@ -36,8 +38,9 @@ typedef struct {
     bool (*specialty_update)(void *context, AbClassicBirdUpdate kind, size_t object,
                              float seconds, bool *alive, AbError *error);
     size_t storage_bytes;
-    /* Zero retains the initial count/launch-table bounds. Other table entry
-     * capacity includes retained nil string keys as well as numeric names. */
+    /* Zero selects initial object capacity and initial plus two tables per
+     * queued bird (launch and optional Blues split). Other table entry capacity
+     * includes retained nil string keys as well as numeric names. */
     size_t object_capacity, other_generations, other_entries;
 } AbClassicBirdConfig;
 
@@ -111,8 +114,10 @@ bool ab_classic_birds_remove(AbClassicBirds *owner, size_t object,
 /* Ordinary Museum updateBird after its timed-specialty gates. Resolve current
  * script velocity/definition/timers, publish timer changes before the camera
  * query, then remove through the complete owned path. Return the surviving
- * object gate for the subsequent boundary/effect phases. Active bomb/pink/
- * superseed paths require their real supplied continuation when reached.
+ * object gate for the subsequent boundary/effect phases. A bound explosion owner
+ * also supplies the ordinary strict-negative bomb fuse, damage sprite stages,
+ * real detonation and removal inside this lifecycle operation. Other timed
+ * specialties require their real supplied continuation when reached.
  * This is the object controller phase; it does not schedule the root frame. */
 bool ab_classic_birds_update(AbClassicBirds *owner, size_t object, float seconds,
                              bool *alive, AbError *error);

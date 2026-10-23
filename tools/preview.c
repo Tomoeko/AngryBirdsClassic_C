@@ -22,17 +22,19 @@ typedef struct {
     bool level_one;
     bool main_menu;
     bool fixed_step;
+    bool infinite_powerups;
 } PreviewOptions;
 
 static void usage(FILE *file) {
     fputs("Usage: angrybirds-preview [--frames N] [--fullscreen] [--window-size WxH] "
-          "[--capture NEW_PPM] "
+          "[--infinite] [--capture NEW_PPM] "
           "APK\n"
           "       angrybirds-preview [OPTIONS] APK FONT_DAT_ENTRY UTF8_TEXT\n"
           "       angrybirds-preview [OPTIONS] --scene SCENE_FILE APK\n"
           "       angrybirds-preview [OPTIONS] [--fixed-step] --level-one APK\n"
           "       angrybirds-preview [OPTIONS] --main-menu APK\n"
-          "F toggles fullscreen. Escape leaves fullscreen or closes the preview.\n",
+          "F toggles fullscreen. Escape pauses/resumes gameplay or returns from "
+          "results; otherwise it leaves fullscreen. Close the window to quit.\n",
           file);
 }
 
@@ -61,6 +63,8 @@ static bool options_read(int argc, char **argv, PreviewOptions *output) {
             options.window_height = (int)height;
         } else if (strcmp(option, "--main-menu") == 0) {
             options.main_menu = true;
+        } else if (strcmp(option, "--inf") == 0 || strcmp(option, "--infinite") == 0) {
+            options.infinite_powerups = true;
         } else if (strcmp(option, "--level-one") == 0) {
             options.level_one = true;
         } else if (strcmp(option, "--fixed-step") == 0) {
@@ -89,8 +93,8 @@ static bool options_read(int argc, char **argv, PreviewOptions *output) {
         options.main_menu = true;
         modes = 1;
     }
-    if (modes > 1 || (options.fixed_step && !options.level_one) ||
-        argc - index != (modes ? 1 : 3)) {
+    if (modes > 1 || (options.infinite_powerups && !options.main_menu) ||
+        (options.fixed_step && !options.level_one) || argc - index != (modes ? 1 : 3)) {
         return false;
     }
     if (!options.window_width) {
@@ -407,6 +411,7 @@ int main(int argc, char **argv) {
             goto release_preview;
         }
         menu.highest_resources = true;
+        menu.infinite_powerups = options.infinite_powerups;
         menu.state_directory = "Files/AngryBirdsC/userstate";
         menu.screen = (AbVec2){(float)width, (float)height};
     }

@@ -350,7 +350,14 @@ release:
 #include "ui_intro_route_apk.h"
 #include "ui_menu_audio_apk.h"
 #include "ui_level_hidden_eggs_apk.h"
+#include "ui_level_rmf_apk.h"
+#include "ui_level_pigs_apk.h"
+#include "ui_level_golden_apk.h"
+#include "ui_level_facebook_apk.h"
 #include "ui_bird_abilities_apk.h"
+#include "ui_powerups_apk.h"
+#include "ui_level_start_audit.h"
+#include "ui_level5_apk.h"
 
 int main(int argc, char **argv) {
     if (argc < 2 || argc > 17)
@@ -423,12 +430,35 @@ int main(int argc, char **argv) {
         !menu_level_route_widgets(&menu, renderer, argc >= 15 ? argv[14] : NULL,
                                   &error) ||
         !cutscene_widgets(&menu, renderer, argc >= 16 ? argv[15] : NULL, &error) ||
+        !cutscene_catalog_widgets(&menu, renderer, &error) ||
         !intro_route_widgets(&zip, &menu, renderer, &list, argc >= 17 ? argv[16] : NULL,
                              &error) ||
         !menu_audio_widgets(&zip, &menu, renderer, &list, &error) ||
         !hidden_egg_widgets(&menu, renderer, &error) ||
+        !rmf_level_widgets(&menu, renderer, &error) ||
+        !facebook_level_widgets(&menu, renderer, &error) ||
+        !pigs_level_widgets(&menu, renderer, &error) ||
+        !golden_level_widgets(&menu, renderer, &error) ||
         !ability_test_yellow(&menu, renderer, &error) ||
+        !ability_test_green(&menu, renderer, &error) ||
+        !ability_test_flying_mouse(&menu, renderer, ABILITY_MOUSE_BLUES, &error) ||
+        !ability_test_repeated_blues(&menu, renderer, &error) ||
+        !ability_test_white(&menu, renderer, &error) ||
+        !ability_test_black(&menu, renderer, &error) ||
+        !powerup_king_widgets(&menu, renderer, &error) ||
+        !powerup_seed_widgets(&menu, renderer, &error) ||
+        !powerup_quake_widgets(&menu, renderer, &error) ||
+        !powerup_scope_widgets(&menu, renderer, &error) ||
+        !powerup_overlapping_widgets(&menu, renderer, &error) ||
+        !level_start_recovery_regressions(&menu, renderer, &error) ||
         !ability_test_failure(&menu, renderer, &error))
+        goto release;
+    if (!level5_reward_widgets(&zip, &menu, renderer, &list, &error)) {
+        if (!error.message[0])
+            ab_fail(&error, "Level5 reward fixture did not reopen the menu");
+        goto release;
+    }
+    if (!level_start_audit(&menu, &error))
         goto release;
     okay = true;
 

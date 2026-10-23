@@ -65,3 +65,16 @@ bool ab_settings_golden_egg_unlock(AbSettingsStatistics *highscores, AbSpan name
     return ab_settings_statistics_write(
         highscores, path, 3, (AbDataValue){.kind = AB_DATA_BOOLEAN, .bits = 1}, error);
 }
+
+bool ab_settings_golden_egg_played(AbSettingsStatistics *highscores, AbSpan name,
+                                   AbDataValue *output, AbError *error) {
+    if (!output)
+        return ab_fail(error, "Missing golden-egg played query output");
+    AbDataValue row = {0};
+    if (!ab_settings_golden_egg(highscores, name, &row, error))
+        return false;
+    if (row.kind != AB_DATA_TABLE || !row.table)
+        return ab_fail(error, "Golden-egg played query indexes a non-table record");
+    *output = get(row.table, span("opened"));
+    return true;
+}

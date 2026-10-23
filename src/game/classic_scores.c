@@ -24,8 +24,10 @@ bool ab_classic_scores_open(AbClassicScoreConfig config, AbClassicScores **outpu
         return ab_fail(error, "Missing owned score table output");
     *output = NULL;
     AbClassicLevelView level = ab_classic_level_view(config.level);
+    size_t capacity = config.object_capacity ? config.object_capacity : config.count;
     if (!level.bodies || !config.blocks || !config.birds || !config.objects ||
-        config.count != level.bodies->count || config.count > SIZE_MAX - 2 ||
+        config.count != level.bodies->count || capacity < config.count ||
+        capacity > level.bodies->capacity || capacity > SIZE_MAX - 2 ||
         config.storage_bytes < sizeof(AbClassicScores))
         return ab_fail(error, "Invalid owned score table bindings");
     for (size_t index = 0; index < config.count; ++index)
@@ -33,14 +35,15 @@ bool ab_classic_scores_open(AbClassicScoreConfig config, AbClassicScores **outpu
             return ab_fail(error,
                            "Owned score table needs fresh per-object membership");
     size_t maximum = 1;
-    while (maximum < config.count + 2 && maximum <= SIZE_MAX / 2)
+    while (maximum < capacity + 2 && maximum <= SIZE_MAX / 2)
         maximum *= 2;
-    if (maximum < config.count + 2)
+    if (maximum < capacity + 2)
         return ab_fail(error, "Owned score table capacity overflows");
     AbClassicScores *owner = calloc(1, sizeof(*owner));
     if (!owner)
         return ab_fail(error, "Cannot allocate owned score table");
     owner->config = config;
+    owner->config.object_capacity = capacity;
     owner->level = level;
     if (!ab_string_map_open(0, maximum, config.storage_bytes - sizeof(*owner),
                             &owner->map, error) ||
@@ -100,6 +103,16 @@ bool ab_classic_scores_entry(AbClassicScores *owner, AbSpan name,
         entry->score = 0;
     }
     *output = entry;
+    return true;
+}
+
+bool ab_classic_scores_register_object(AbClassicScores *owner, size_t object,
+                                       AbError *error) {
+    if (!owner || owner->updating || object != owner->config.count ||
+        object >= owner->config.object_capacity ||
+        object >= owner->level.bodies->count || owner->config.objects[object].present)
+        return ab_fail(error, "Invalid new canonical score row");
+    ++owner->config.count;
     return true;
 }
 

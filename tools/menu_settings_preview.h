@@ -7,7 +7,7 @@ static bool menu_highscores_open(PreviewMenu *menu, AbError *error) {
     if (menu->highscores)
         return true;
     AbSettingsStatisticsConfig storage = {menu_span("preview"), menu_span("preview"),
-                                          1024, 16, 4 * 1024 * 1024};
+                                          1024, 64, 16 * 1024 * 1024};
     size_t capacities[1024] = {1024}, restored = 0;
     bool okay = true;
     if (menu->state_directory) {
@@ -21,7 +21,7 @@ static bool menu_highscores_open(PreviewMenu *menu, AbError *error) {
             ab_settings_file_open(path, (AbSpan){key, sizeof(key)},
                                   (AbSettingsFileLimits){512 * 1024, 4 * 1024 * 1024},
                                   &menu->highscores_file, error) &&
-            ab_settings_file_capacities(menu->highscores_file, 16, capacities, 1024,
+            ab_settings_file_capacities(menu->highscores_file, 64, capacities, 1024,
                                         &restored, error);
         memset(key, 0, sizeof(key));
     }
@@ -32,7 +32,7 @@ static bool menu_highscores_open(PreviewMenu *menu, AbError *error) {
     if (capacities[0] < 1024)
         capacities[0] = 1024;
     for (size_t index = restored ? restored : 1; index < 1024; ++index)
-        capacities[index] = 16;
+        capacities[index] = 64;
     return ab_settings_statistics_open_capacities(storage, capacities, 1024,
                                                   &menu->highscores, error) &&
            (!menu->highscores_file ||

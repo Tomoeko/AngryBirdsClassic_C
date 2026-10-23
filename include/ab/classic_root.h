@@ -64,6 +64,12 @@ typedef struct {
     AbDataTable *delayed_url;
 } AbClassicRootState;
 
+/* Original root double-click transition, shared with the application input
+ * boundary. Touch only the three double_click fields. Resolve LBUTTON truthiness
+ * before calling, once per root frame, before game/menu updates. */
+bool ab_classic_root_double_click(AbClassicRootState *state, bool pressed,
+                                  bool released, float seconds, AbError *error);
+
 typedef struct {
     AbDataValue gamer_present, gamer_dev_mode, restricted_aspect;
     AbDataValue release_build, cheats_enabled, show_editor, block_audio_change;

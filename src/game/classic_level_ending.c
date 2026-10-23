@@ -134,6 +134,8 @@ static bool completed_update(AbClassicLevelEnding *ending, float seconds,
     AbClassicLevelEndingConfig *config = &ending->config;
     AbLevelCompleteState *finish = &config->finish->complete;
     config->state->eagle_darkness = (AbDataValue){0};
+    if (config->eagle_darkness)
+        *config->eagle_darkness = (AbDataValue){0};
     if (!subtract(&finish->bonus_timer, seconds, error))
         return false;
     if (finish->bonus_timer >= 0)

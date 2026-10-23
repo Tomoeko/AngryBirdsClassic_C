@@ -327,20 +327,14 @@ static bool managers(AbClassicRoot *root, float seconds, AbError *error) {
            ab_native_animation_update(config->native_animation, seconds, error);
 }
 
-static bool clocks_and_clicks(AbClassicRoot *root, float seconds,
-                              AbDataValue eagle_used, AbError *error) {
-    AbClassicRootState *state = root->config.state;
-    if (!ab_classic_game_globals_advance_time(root->config.globals, seconds, error) ||
-        !advance(&state->playtime, seconds, true, error))
-        return false;
-    if (state->last_video_ad_time.kind == AB_DATA_NIL)
-        state->last_video_ad_time = root->config.globals->time;
-    if (truthy(root->config.flags->has_iaps) && eagle_used.kind != AB_DATA_NIL)
-        return ab_fail(error, "Reached root eagle information needs its source owner");
+bool ab_classic_root_double_click(AbClassicRootState *state, bool pressed,
+                                  bool released, float seconds, AbError *error) {
+    if (!state || !isfinite(seconds))
+        return ab_fail(error, "Invalid shared root double-click state");
     state->double_click = (AbDataValue){.kind = AB_DATA_BOOLEAN};
     if (state->double_click_timer.kind == AB_DATA_NIL)
         state->double_click_timer = number(0);
-    if (key(root->config.pressed_keys, "LBUTTON")) {
+    if (pressed) {
         if (!numeric_equal(state->double_click_state, 2)) {
             state->double_click_state = number(1);
             state->double_click_timer = number(0.5f);
@@ -350,7 +344,7 @@ static bool clocks_and_clicks(AbClassicRoot *root, float seconds,
         float timer;
         if (!numeric(state->double_click_timer, &timer, error))
             return false;
-        if (timer > 0 && key(root->config.released_keys, "LBUTTON")) {
+        if (timer > 0 && released) {
             if (numeric_equal(state->double_click_state, 1))
                 state->double_click_state = number(2);
             else if (numeric_equal(state->double_click_state, 3))
@@ -367,6 +361,21 @@ static bool clocks_and_clicks(AbClassicRoot *root, float seconds,
         state->double_click_state = number(0);
     }
     return true;
+}
+
+static bool clocks_and_clicks(AbClassicRoot *root, float seconds,
+                              AbDataValue eagle_used, AbError *error) {
+    AbClassicRootState *state = root->config.state;
+    if (!ab_classic_game_globals_advance_time(root->config.globals, seconds, error) ||
+        !advance(&state->playtime, seconds, true, error))
+        return false;
+    if (state->last_video_ad_time.kind == AB_DATA_NIL)
+        state->last_video_ad_time = root->config.globals->time;
+    if (truthy(root->config.flags->has_iaps) && eagle_used.kind != AB_DATA_NIL)
+        return ab_fail(error, "Reached root eagle information needs its source owner");
+    return ab_classic_root_double_click(
+        state, key(root->config.pressed_keys, "LBUTTON"),
+        key(root->config.released_keys, "LBUTTON"), seconds, error);
 }
 
 static bool draw_and_tail(AbClassicRoot *root, float seconds, AbError *error) {

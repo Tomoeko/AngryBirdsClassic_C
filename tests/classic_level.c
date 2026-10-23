@@ -309,7 +309,7 @@ static bool bird_order_checks(void) {
         {.name = {(const uint8_t *)"Block", 5}},
         {.name = {(const uint8_t *)"ground", 6}},
     };
-    AbLevelBodies bodies = {objects, 3, 3};
+    AbLevelBodies bodies = {.objects = objects, .capacity = 3, .count = 3};
     AbDataEntry entries[3];
     size_t indices[3], insertion[] = {2, 0, 1};
     AbStringOrderNode nodes[4];
@@ -824,6 +824,8 @@ static bool owner_checks(void) {
     const AbObjectBody *ground = &derived.bodies->objects[1].physics;
     CHECK(circle->dimensions.width == -1 && circle->dimensions.height == -1 &&
           circle->dimensions.radius == 0.5f);
+    CHECK(derived.bodies->load_edges_present && derived.bodies->load_edges.x == 2 &&
+          derived.bodies->load_edges.y == 0);
     AbVec2 position =
         derived.world->storage.bodies[ground->body].motion.mass.transform.position;
     CHECK(position.x == 1 && position.y == 5 && ground->dimensions.width == 2000 &&

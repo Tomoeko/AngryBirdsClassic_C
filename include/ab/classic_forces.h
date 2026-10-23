@@ -55,6 +55,12 @@ size_t ab_classic_forces_bytes(const AbClassicForces *forces);
  * after registering, before the next physics pass. NULL returns an empty view. */
 AbClassicForceView ab_classic_forces_view(AbClassicForces *forces);
 
+/* Refresh one named native circle after actual body destruction/recreation.
+ * Direct construction resets native force preparation, sound and interval state;
+ * copied script definition fields do not rerun ObjectCreation. */
+bool ab_classic_forces_recreate_circle(AbClassicForces *forces, size_t object,
+                                       AbError *error);
+
 /* Register the next canonical direct circle between passes, using the native
  * circle constructor's disabled preparation gate and actual gravity flag.
  * Never resolve/apply its later copied definition's ObjectCreation force fields.

@@ -142,4 +142,79 @@ release:
     return okay;
 }
 
+static bool cutscene_catalog_widgets(PreviewMenu *menu, AbMetal *renderer,
+                                     AbError *error) {
+    if (!menu_preview_resize(menu, (AbVec2){1024, 768}, error))
+        return false;
+    for (size_t pack = 1; pack <= 9; ++pack) {
+        char name[32];
+        snprintf(name, sizeof(name), "pack%zu_intro", pack);
+        AbDataValue selected;
+        if (!menu_cutscene_selection(menu, menu_data(name), (AbDataValue){0}, &selected,
+                                     error) ||
+            !menu_cutscene_assets(menu, error) ||
+            !ab_audio_mixer_mix(menu->mixer, 0, NULL, 0, error))
+            return false;
+        const AbDataTable *commands =
+            level_test_child(menu->cutscene_data.data.globals, selected);
+        if (!commands)
+            return ab_fail(error, "Catalog intro has no actual commands");
+        const AbDataValue *end =
+            ab_data_get(commands, menu_route_number((float)commands->count));
+        AbDataValue deadline = end && end->kind == AB_DATA_TABLE
+                                   ? menu_route_field(end->table, "time")
+                                   : (AbDataValue){0};
+        if (deadline.kind != AB_DATA_NUMBER)
+            return ab_fail(error, "Catalog intro has no actual end time");
+        /* Retain the original persistent story key, not this test's name buffer. */
+        for (size_t entry = 0; entry < menu->cutscene_data.data.globals->count; ++entry)
+            if (menu_route_equal(menu->cutscene_data.data.globals->entries[entry].key,
+                                 selected))
+                selected = menu->cutscene_data.data.globals->entries[entry].key;
+        size_t saves = 0;
+        AbUiCutscene owner = {0};
+        AbUiCutsceneClass shared = {0};
+        AbUiCutsceneHost host = {.scaling = &menu->scaling,
+                                 .shared = &shared,
+                                 .audio = menu->audio,
+                                 .mixer = menu->mixer,
+                                 .settings = menu->settings,
+                                 .events = menu->events,
+                                 .commands = commands,
+                                 .name = selected.string,
+                                 .device = menu_span("android"),
+                                 .white_texture = 63,
+                                 .context = &saves,
+                                 .save_settings = cutscene_save_boundary};
+        if (!ab_ui_cutscene_init(&owner, &menu->context, host, error) ||
+            !ab_ui_widget_lifecycle(&owner.widget, AB_UI_FRAME_ENTRY, error))
+            return false;
+        bool okay = true;
+        size_t frames = (size_t)ceilf(menu_real(deadline.bits) * 30) + 2;
+        for (size_t frame = 0; okay && frame < frames; ++frame) {
+            okay =
+                ab_ui_widget_update(&owner.widget, 1.0f / 30, (float)frame / 30, error);
+            if (okay && (frame == 0 || frame + 1 == frames)) {
+                ab_draw_list_clear(menu->context.draw_list);
+                AbUiDrawInput input = {0};
+                AbImage image = {0};
+                const float clear[] = {0, 0, 0, 1};
+                okay = ab_ui_widget_draw(&owner.widget, &input, error) &&
+                       ab_metal_capture(renderer, menu->context.draw_list, 1024, 768,
+                                        clear, 16 * 1024 * 1024, &image, error);
+                ab_image_free(&image);
+            }
+        }
+        AbError cleanup = {0};
+        bool exited = ab_ui_widget_lifecycle(&owner.widget, AB_UI_FRAME_EXIT, &cleanup);
+        if (!okay || !exited || saves != 1)
+            return error && error->message[0]
+                       ? false
+                       : ab_fail(error, "Catalog pack%zu intro did not finish", pack);
+    }
+    puts("All nine source pack intros play to their actual end times and render on "
+         "Metal, including vertical fit, initial scroll and direction restrictions.");
+    return true;
+}
+
 #endif

@@ -45,7 +45,7 @@ typedef struct {
  * Level and the selected atlas/composite resources or provider remain borrowed
  * until close. Reserve stable entries for the level's full object capacity;
  * later explicit attachments append in source creation order. Removal detaches
- * the retained visual and slot reuse is unsupported.
+ * the retained visual; explicit native circle replacement can reattach that row.
  * Output starts NULL; all partial allocations are released on failure.
  */
 bool ab_classic_visuals_open(AbClassicLevel *level, AbClassicVisualResources resources,
@@ -57,8 +57,10 @@ size_t ab_classic_visuals_bytes(const AbClassicVisuals *visuals);
 /* Attach an empty ordinary asset to the next newly registered level object.
  * Stable entries reserve the level's full object capacity at open. No sprite
  * assignment or resource lookup occurs here; set_sprite follows attachment in
- * createRendererForGameObject. No gaps, reuse, ground or collider 7. A failed
- * later sprite assignment retains this attachment and requires session discard. */
+ * createRendererForGameObject. A detached existing row can be rebuilt after
+ * native circle replacement. No gaps, attached-row reuse, ground or collider 7. A
+ * failed later sprite assignment retains this attachment and requires session discard.
+ */
 bool ab_classic_visuals_attach_object(AbClassicVisuals *visuals, size_t object,
                                       AbError *error);
 

@@ -6,6 +6,7 @@
 #include "ab/theme_foreground.h"
 #include "ab/theme_layer_data.h"
 #include "ab/sprite_provider.h"
+#include "ab/theme_rect.h"
 
 typedef struct AbThemeLayers AbThemeLayers;
 
@@ -14,6 +15,7 @@ typedef enum {
     AB_THEME_SPRITE_ORDINARY,
     AB_THEME_SPRITE_COMPOSITE,
     AB_THEME_SPRITE_BORDER,
+    AB_THEME_SPRITE_RECT,
 } AbThemeSpriteKind;
 
 typedef struct {
@@ -22,12 +24,13 @@ typedef struct {
     AbSpriteBinding ordinary;
     AbResolvedComposite composite;
     float border_size, border_alpha;
+    AbThemeRect rect;
 } AbThemeLayerBinding;
 
 /* Initialize owned base-layer bindings/handles from static bgLayers/fgLayers.
  * Visit consecutive table-valued integer slots starting at1, stopping at the
- * first other value. Support default/unknown base types; recognized rect/screen/
- * menu_particles subtypes are explicitly unsupported. Screen borders retain
+ * first other value. Support default/unknown base types, rectangle layers and
+ * screen borders; screen/menu_particles subtypes remain unsupported. Borders retain
  * their named sprite, size and alpha. Resolve ordinary
  * sprites before composites; absent names retain native missing-base behavior.
  * Numeric fields follow the static constructor/color contracts. Data graph,

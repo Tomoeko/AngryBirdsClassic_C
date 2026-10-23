@@ -91,7 +91,7 @@ static bool menu_episode_open(PreviewMenu *menu, AbError *error) {
         !ab_episode_catalog_open(
             archive, key,
             (AbEpisodeCatalogConfig){.device_model = menu_span("android"),
-                                     .disable_external_links = true},
+                                     .disable_external_links = false},
             2 * 1024 * 1024, &menu->catalog, error) ||
         !ab_episode_catalog_annotate_levels(menu->catalog, error) ||
         !ab_target_data_open(archive, "assets/data/scripts/starLimits.lua", key,

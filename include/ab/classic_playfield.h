@@ -41,6 +41,7 @@ typedef struct {
     void *context;
     void (*missing_visual)(void *context, size_t object, AbSpan name);
     AbShotHost level_hook, definition_hook;
+    AbClassicShotTrails shot_trails;
 } AbClassicPlayfieldConfig;
 
 typedef struct {

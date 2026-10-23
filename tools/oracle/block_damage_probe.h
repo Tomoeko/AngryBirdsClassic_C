@@ -289,6 +289,15 @@ static void print_damage_results(void *lua) {
 #if defined(AB_ORACLE_AMBIENT_ANIMATION_ONLY)
 #include "ambient_animation_probe.h"
 #endif
+#if defined(AB_ORACLE_SLING_SCOPE_ONLY)
+#include "sling_scope_probe.h"
+#endif
+#if defined(AB_ORACLE_SUPERSEED_RADIUS_ONLY)
+#include "superseed_radius_probe.h"
+#endif
+#if defined(AB_ORACLE_OBJECT_ANIMATION_ONLY)
+#include "object_animation_probe.h"
+#endif
 #if defined(AB_ORACLE_AMBIENT_PARTICLE_ONLY)
 #include "ambient_particle_probe.h"
 #endif
@@ -559,6 +568,9 @@ static void print_damage_results(void *lua) {
 #endif
 #if defined(AB_ORACLE_GAME_RECTANGLE_ONLY)
 #include "game_rectangle_probe.h"
+#endif
+#if defined(AB_ORACLE_THEME_RECT_ONLY)
+#include "theme_rect_probe.h"
 #endif
 #if defined(AB_ORACLE_RUBBERBAND_ONLY) || defined(AB_ORACLE_RUBBERBAND_WORLD_ONLY) ||  \
     defined(AB_ORACLE_SLING_RECTANGLE_ONLY)
@@ -1048,6 +1060,10 @@ static void probe_block_damage(void) {
     probe_game_rectangle();
     return;
 #endif
+#if defined(AB_ORACLE_THEME_RECT_ONLY)
+    probe_theme_rect();
+    return;
+#endif
 #if defined(AB_ORACLE_RUBBERBAND_ONLY)
     probe_rubberband();
     return;
@@ -1508,6 +1524,18 @@ static void probe_block_damage(void) {
 #endif
 #if defined(AB_ORACLE_AMBIENT_ANIMATION_ONLY)
     probe_ambient_animation();
+    return;
+#endif
+#if defined(AB_ORACLE_SLING_SCOPE_ONLY)
+    probe_sling_scope();
+    return;
+#endif
+#if defined(AB_ORACLE_SUPERSEED_RADIUS_ONLY)
+    probe_superseed_radius();
+    return;
+#endif
+#if defined(AB_ORACLE_OBJECT_ANIMATION_ONLY)
+    probe_object_animation();
     return;
 #endif
 #if defined(AB_ORACLE_AMBIENT_PARTICLE_ONLY)

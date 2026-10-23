@@ -11,6 +11,15 @@ static void (*string_map_push_value)(void *, int);
 static int (*string_map_gc)(void *, int, int);
 static uint32_t string_map_key_id(uint32_t object);
 
+static uint32_t string_map_key_object(void *lua, int index) {
+#if defined(AB_ORACLE_IDENTITY_MAP)
+    return (uint32_t)(uintptr_t)damage_lua.to_pointer(lua, index);
+#else
+    const char *key = damage_lua.to_string(lua, index, NULL);
+    return (uint32_t)(uintptr_t)key - 16;
+#endif
+}
+
 static void string_map_collect(void *lua) {
     (void)string_map_gc(lua, 2, 0);
     (void)string_map_gc(lua, 0, 0);
@@ -25,8 +34,7 @@ static uint32_t string_map_erase_next(void *lua, uint32_t removed[64], int colle
             if (count >= 64) {
                 fail("Native string map erase iteration exceeds bounded keys\n");
             }
-            const char *key = damage_lua.to_string(lua, 3, NULL);
-            removed[count++] = string_map_key_id((uint32_t)(uintptr_t)key - 16);
+            removed[count++] = string_map_key_id(string_map_key_object(lua, 3));
             string_map_push_value(lua, 3);
             damage_lua.push_nil(lua);
             string_map_raw_set(lua, 2);
@@ -59,8 +67,13 @@ static uint32_t string_map_value(void *lua, int index) {
 }
 
 static void string_map_push_key(void *lua, uint32_t key) {
+#if defined(AB_ORACLE_IDENTITY_MAP)
+    damage_lua.push_number(lua, (float)(key + 1));
+    string_map_raw_get(lua, 1);
+#else
     string_map_push_bytes(lua, (const char *)(string_map_keys[key] + 1),
                           string_map_keys[key][0]);
+#endif
 }
 
 static void string_map_snapshot(void *lua) {
@@ -86,7 +99,9 @@ static void string_map_snapshot(void *lua) {
         const uint32_t *node = nodes + slot * 5;
         uint32_t output[5] = {0, node[1] != 0, 0, 0, node[3]};
         if (node[3]) {
-#if defined(AB_ORACLE_STRING_MAP_GC)
+#if defined(AB_ORACLE_IDENTITY_MAP)
+            if (node[3] != 5) {
+#elif defined(AB_ORACLE_STRING_MAP_GC)
             if (node[3] != 4 && node[3] != 11) {
 #else
             if (node[3] != 4) {
@@ -123,8 +138,7 @@ static void string_map_snapshot(void *lua) {
     damage_lua.push_nil(lua);
     uint32_t visited = 0;
     while (string_map_next(lua, 2)) {
-        const char *key = damage_lua.to_string(lua, 3, NULL);
-        uint32_t output[] = {string_map_key_id((uint32_t)(uintptr_t)key - 16),
+        uint32_t output[] = {string_map_key_id(string_map_key_object(lua, 3)),
                              string_map_value(lua, 4)};
         print_words(output, 2);
         ++visited;
@@ -158,14 +172,25 @@ static void probe_string_map(void) {
 #endif
     damage_lua.create_table(lua, 64, 0);
     uint32_t random = UINT32_C(0x52057a91);
+#if !defined(AB_ORACLE_IDENTITY_MAP)
     const uint32_t lengths[] = {0,  4,  5,  15,  31,  32,  33,
                                 63, 64, 65, 127, 128, 255, 256};
-#if defined(AB_ORACLE_STRING_MAP_GC)
+#endif
+#if defined(AB_ORACLE_IDENTITY_MAP)
+    semihost(4, "AB_ANDROID_IDENTITY_MAP_V1 16 256 64\n");
+#elif defined(AB_ORACLE_STRING_MAP_GC)
     semihost(4, "AB_ANDROID_STRING_MAP_GC_V1 16 256 64\n");
 #else
     semihost(4, "AB_ANDROID_STRING_MAP_V2 16 256 64\n");
 #endif
     for (uint32_t key = 0; key < 64; ++key) {
+#if defined(AB_ORACLE_IDENTITY_MAP)
+        damage_lua.create_table(lua, 0, 0);
+        string_map_key_objects[key] =
+            (uint32_t)(uintptr_t)damage_lua.to_pointer(lua, 2);
+        print_words(string_map_key_objects + key, 1);
+        raw_seti(lua, 1, (int)key + 1);
+#else
         uint32_t *input = string_map_keys[key];
         input[0] = lengths[key % 14];
         if (key && !input[0]) {
@@ -184,6 +209,7 @@ static void probe_string_map(void) {
         const char *bytes = damage_lua.to_string(lua, 2, NULL);
         string_map_key_objects[key] = (uint32_t)(uintptr_t)bytes - 16;
         raw_seti(lua, 1, (int)key + 1);
+#endif
     }
     damage_lua.create_table(lua, 0, 0);
     string_map_dummy = ((const uint32_t *)damage_lua.to_pointer(lua, 2))[4];
@@ -254,7 +280,9 @@ static void probe_string_map(void) {
         damage_lua.set_top(lua, 1);
     }
     damage_lua.close_state(lua);
-#if defined(AB_ORACLE_STRING_MAP_GC)
+#if defined(AB_ORACLE_IDENTITY_MAP)
+    semihost(4, "AB identity map reference complete\n");
+#elif defined(AB_ORACLE_STRING_MAP_GC)
     semihost(4, "AB string map GC reference complete\n");
 #else
     semihost(4, "AB string map reference complete\n");

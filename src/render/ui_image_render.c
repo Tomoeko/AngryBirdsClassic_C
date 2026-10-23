@@ -136,8 +136,7 @@ static bool composite(const AbUiSpriteRender *sprite, const AbUiImageRenderState
     const AbComposite *source = resolved->source;
     if (!source || (source->part_count && (!source->parts || !resolved->parts)) ||
         !boundaries->part || state->geometry.direct_vertices ||
-        state->geometry.angle_radians != 0 || !(state->geometry.scale_x > 0) ||
-        !(state->geometry.scale_y > 0) ||
+        state->geometry.scale_x == 0 || state->geometry.scale_y == 0 ||
         (unsigned)sprite->vertical > AB_ANCHOR_VPIVOT ||
         (unsigned)sprite->horizontal > AB_ANCHOR_HPIVOT)
         return ab_fail(error, "Unsupported UI composite transform or part provider");

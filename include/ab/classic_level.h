@@ -167,6 +167,13 @@ typedef struct {
 bool ab_classic_level_create_circle(AbClassicLevel *level, AbGameCircleInput input,
                                     size_t *output, AbError *error);
 
+/* Recreate a removed named body in its stable logical row. This constructs a
+ * fresh native circle/physical projection, not a fixture resize. The caller
+ * must first run native removal, then rebuild render, script and cached native
+ * services. No retained physical-table alias may be read during this boundary. */
+bool ab_classic_level_recreate_circle(AbClassicLevel *level, size_t object,
+                                      AbGameCircleInput input, AbError *error);
+
 /* Own the fixed world/solver/object/order/history arrays for an ordinary classic
  * level. Source data and strings remain borrowed until close; the sprite callback
  * is borrowed only during open. World settings and storage limits are explicit

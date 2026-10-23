@@ -69,7 +69,7 @@ struct AbClassicBirdCollisions {
     AbDataEntry blocks_entry;
     BirdObject *objects;
     BirdDefinition *definitions;
-    size_t count, definition_count, bytes;
+    size_t count, capacity, definition_count, bytes;
     AbBirdCollisionPreludeState prelude;
     AbBirdCollisionSpriteState sprites;
     AbDataValue published_specialty;
@@ -199,8 +199,15 @@ static bool refresh(AbClassicBirdCollisions *owner, AbError *error) {
             while (index < owner->count &&
                    &owner->objects[index].object != grenades->items[item])
                 ++index;
-            if (index == owner->count)
-                return ab_fail(error, "Unknown owned flying-grenade identity");
+            if (index == owner->count) {
+                /* Actual flyingGrenades entries are separate {name,timer}
+                 * records. Contact marks their explode field, not the physical
+                 * object's identically spelled property. */
+                AbBirdCollisionObject *record = grenades->items[item];
+                if (!record || !find(owner, record->object.name))
+                    return ab_fail(error, "Unknown owned flying-grenade name");
+                continue;
+            }
             if (!owner->objects[index].loaded &&
                 !refresh_object(owner->objects + index, error))
                 return false;
@@ -731,9 +738,12 @@ bool ab_classic_bird_collisions_open(AbClassicBirdCollisionConfig config,
         config.storage_bytes < sizeof(AbClassicBirdCollisions))
         return ab_fail(error, "Invalid owned bird collision binding or byte limit");
     size_t remaining = config.storage_bytes - sizeof(AbClassicBirdCollisions);
-    if (level.bodies->count > remaining / sizeof(BirdObject))
+    size_t capacity =
+        config.object_capacity ? config.object_capacity : level.bodies->count;
+    if (capacity < level.bodies->count || capacity > level.bodies->capacity ||
+        capacity > remaining / sizeof(BirdObject))
         return ab_fail(error, "Owned bird collision rows exceed byte limit");
-    remaining -= level.bodies->count * sizeof(BirdObject);
+    remaining -= capacity * sizeof(BirdObject);
     if (blocks.table->count > remaining / sizeof(BirdDefinition))
         return ab_fail(error, "Owned bird collision definitions exceed byte limit");
     if (config.root_scores) {
@@ -749,10 +759,11 @@ bool ab_classic_bird_collisions_open(AbClassicBirdCollisionConfig config,
     owner->level = level;
     owner->blocks = blocks.table;
     owner->count = level.bodies->count;
+    owner->capacity = capacity;
     owner->definition_count = blocks.table->count;
-    owner->bytes = sizeof(*owner) + owner->count * sizeof(BirdObject) +
+    owner->bytes = sizeof(*owner) + capacity * sizeof(BirdObject) +
                    owner->definition_count * sizeof(BirdDefinition);
-    owner->objects = calloc(owner->count, sizeof(*owner->objects));
+    owner->objects = calloc(capacity, sizeof(*owner->objects));
     owner->definitions = calloc(owner->definition_count, sizeof(*owner->definitions));
     if ((owner->count && !owner->objects) ||
         (owner->definition_count && !owner->definitions)) {
@@ -799,6 +810,29 @@ bool ab_classic_bird_collisions_open(AbClassicBirdCollisionConfig config,
                                         &owner->damage_host,     owner,
                                         effect_definition};
     *output = owner;
+    return true;
+}
+
+bool ab_classic_bird_collisions_register_object(AbClassicBirdCollisions *owner,
+                                                size_t object, AbError *error) {
+    if (!owner || owner->calling || object != owner->count ||
+        object >= owner->capacity || object >= owner->level.bodies->count)
+        return ab_fail(error, "Invalid new bird-collision row");
+    BirdObject *entry = owner->objects + object;
+    entry->owner = owner;
+    entry->index = object;
+    entry->object.object.context = entry;
+    entry->object.collision_function = (AbBirdCollisionFunction){entry, mighty};
+    entry->script = (AbBirdCollisionScript){entry, object_script};
+    entry->particle_query = (AbBirdCollisionParticleQuery){entry, particle_query};
+    AbClassicLevelView level = ab_classic_level_view(owner->config.level);
+    for (size_t bird = 0; bird < level.bird_count; ++bird)
+        if (level.bird_order[bird] == object)
+            entry->bird = true;
+    ++owner->count;
+    owner->config.bird_score_count = owner->count;
+    if (owner->config.script_objects)
+        owner->config.script_object_count = owner->count;
     return true;
 }
 

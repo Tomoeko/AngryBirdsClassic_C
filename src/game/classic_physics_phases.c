@@ -1,5 +1,7 @@
 #include "ab/classic_physics_phases.h"
 
+#include <string.h>
+
 static bool flush_birds(AbClassicPhysicsPhases *owner, AbError *error) {
     AbGameObjectCoreRegistry *registry =
         ab_classic_object_removal_registry(owner->config.physical);
@@ -14,11 +16,17 @@ static bool flush_birds(AbClassicPhysicsPhases *owner, AbError *error) {
         return ab_fail(error, "Unbound actual physics-phase contact owner");
     for (size_t bird = 0; bird < registry->bird_count; ++bird) {
         const AbGameObjectCore *object = registry->birds[bird];
-        if (!object)
+        if (!object || !object->name.data || !object->name.size)
             return ab_fail(error, "Missing shared physics-phase bird metadata");
         size_t index = 0;
+        /* Destroyed body slots are reused by split children. A body index
+         * alone can resolve to the removed parent instead of the live bird. */
         while (index < level.bodies->count &&
-               level.bodies->objects[index].physics.body != object->body)
+               (level.removed_objects[index] ||
+                level.bodies->objects[index].physics.body != object->body ||
+                level.bodies->objects[index].name.size != object->name.size ||
+                memcmp(level.bodies->objects[index].name.data, object->name.data,
+                       object->name.size)))
             ++index;
         if (index == level.bodies->count || level.removed_objects[index])
             return ab_fail(error, "Stale shared physics-phase bird membership");

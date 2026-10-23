@@ -112,6 +112,9 @@ static void probe_particle_box(void) {
 #elif defined(AB_ORACLE_PARTICLE_MENU_ONLY)
     semihost(4, "AB_ANDROID_PARTICLE_MENU_DRAW_V1 3 6\n");
     const uint32_t scenes = 3;
+#elif defined(AB_ORACLE_PARTICLE_ZERO_SCALE)
+    semihost(4, "AB_ANDROID_PARTICLE_ZERO_DRAW_V1 3 6\n");
+    const uint32_t scenes = 3;
 #elif defined(AB_ORACLE_PARTICLE_DRAW_ONLY)
     semihost(4, "AB_ANDROID_PARTICLE_DRAW_V1 3 6\n");
     const uint32_t scenes = 3;
@@ -186,6 +189,8 @@ static void probe_particle_box(void) {
     semihost(4, "AB particle level reference complete\n");
 #elif defined(AB_ORACLE_PARTICLE_MENU_ONLY)
     semihost(4, "AB particle menu draw reference complete\n");
+#elif defined(AB_ORACLE_PARTICLE_ZERO_SCALE)
+    semihost(4, "AB particle zero draw reference complete\n");
 #elif defined(AB_ORACLE_PARTICLE_DRAW_ONLY)
     semihost(4, "AB particle draw reference complete\n");
 #elif defined(AB_ORACLE_PARTICLE_COMMON_ONLY)

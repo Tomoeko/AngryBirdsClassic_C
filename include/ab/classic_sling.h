@@ -44,6 +44,7 @@ typedef struct {
     size_t transfer_object;
     bool fill_in_next_bird, allow_reset_to_bird_camera, launch_cue;
     bool disabled_for_current_level;
+    bool king, has_scope;
 } AbClassicSlingView;
 
 /* Own ordinary default-sling input/queue state and stable event/vector tables
@@ -53,7 +54,8 @@ typedef struct {
  * currentBirdName, readiness, firing and reload timers; do not keep another copy.
  * Initial queue names/start numbers and controllable properties are read from
  * the live owned level in birds-table order. No dynamic insertion/reuse, delta
- * gestures, custom reload functions, hats or scope/powered-sling modes. Reached
+ * gestures, custom reload functions or hats. KingSling selection changes power
+ * and the live sprite profile; scope trajectory/effect scheduling is external. Reached
  * unsupported work rejects, retaining preceding effects. No frame allocation.
  * Keep calls serialized and stop the session after an error. */
 bool ab_classic_sling_open(AbClassicSlingConfig config, AbClassicSling **output,
@@ -63,6 +65,19 @@ size_t ab_classic_sling_bytes(const AbClassicSling *sling);
 AbClassicSlingView ab_classic_sling_view(const AbClassicSling *sling);
 /* Borrow the actual shared shot owner; NULL for a missing sling. */
 AbClassicShots *ab_classic_sling_shots(const AbClassicSling *sling);
+/* SlingshotSystem.getSlingshotPower23570 through the selected ordinary sling. */
+bool ab_classic_sling_power(AbClassicSling *sling, float *output, AbError *error);
+/* Select the recovered KingSling class; retain system-level band/queue state.
+ * The enclosing activation supplies its source audio, particles and camera. */
+bool ab_classic_sling_set_king(AbClassicSling *sling, bool scope, AbError *error);
+bool ab_classic_sling_set_scope(AbClassicSling *sling, bool enabled, AbError *error);
+/* getLaunchVelocity24118 over the live definition, physical mass and band.
+ * A missing current bird returns zero. The caller gates a band at rest. */
+bool ab_classic_sling_launch_velocity(AbClassicSling *sling, AbVec2 *output,
+                                      AbError *error);
+/* playScopeSound6753: direct laser_sight playback once per rearmed stretch.
+ * Successful launch and resetBand rearm the original private sound flag. */
+bool ab_classic_sling_play_scope_sound(AbClassicSling *sling, AbError *error);
 
 /* Bind as the owned shots' service through a stable session context. This
  * prepares the actual BIRD_SHOT vector identities, then forwards to services.

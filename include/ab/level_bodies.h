@@ -38,6 +38,10 @@ typedef struct {
     AbLevelObject *objects;
     size_t capacity;
     size_t count;
+    /* Museum's creation-time physical X bounds, before the generated ground.
+     * Retained independently of later movement/removal and camera limits. */
+    AbVec2 load_edges;
+    bool load_edges_present;
 } AbLevelBodies;
 
 typedef struct {

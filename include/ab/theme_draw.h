@@ -33,8 +33,9 @@ typedef struct {
  * which ignore the supplied per-vertex tint. Unknown source texture alpha,
  * changed sprite identities and missing bindings reject when reached.
  *
- * This inherits ThemeLayers' base-layer/no-Spotlight domain. Specialized layers,
- * dynamic effects/shader overrides, complete drawGame ordering and GUI remain
+ * Rectangle layers use their recovered normalized screen coordinates and
+ * source fill/reset boundary. This retains the no-Spotlight domain. Other specialized
+ * layers, dynamic effects/shader overrides, complete drawGame ordering and GUI remain
  * separate. State and preceding commands survive a late failure; stop the owner.
  */
 bool ab_theme_draw_initialize(AbThemeDrawConfig config, AbThemeDraw *output,

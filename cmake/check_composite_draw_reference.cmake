@@ -1,6 +1,9 @@
+set(expected_hash "31ff6d55e43f7446c7cdce7b80a183b74a1ef7a78feb179901bf6a02428a0f29")
+if(ROTATED_PARENT)
+    set(expected_hash "3e4dfdcd3365c73ae71cb38108466a5fe59421874dbf87c474d17cbfb6c85693")
+endif()
 file(SHA256 "${REFERENCE}" reference_hash)
-if(NOT reference_hash STREQUAL
-    "31ff6d55e43f7446c7cdce7b80a183b74a1ef7a78feb179901bf6a02428a0f29")
+if(NOT reference_hash STREQUAL expected_hash)
     message(FATAL_ERROR "Expected the recorded original composite draw corpus")
 endif()
 execute_process(COMMAND "${CHECKER}" "${REFERENCE}"

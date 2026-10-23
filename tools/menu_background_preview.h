@@ -69,6 +69,21 @@ static bool menu_theme_select(PreviewMenu *menu, AbSpan name, AbError *error) {
     const AbDataTable *graphics = menu_theme_graphics(menu, name, &record);
     if (!graphics)
         return ab_fail(error, "Missing selected Android menu-theme resource recipe");
+    /* Level theme strings expire with that level. The prepared theme catalog
+     * owns the same key for the whole menu lifetime, including result/reload
+     * transitions and settings observers after the level has been released. */
+    const AbDataTable *themes = menu->theme_data.data.globals;
+    size_t key = 0;
+    for (; key < themes->count; ++key) {
+        AbDataValue candidate = themes->entries[key].key;
+        if (candidate.kind == AB_DATA_STRING && candidate.string.size == name.size &&
+            !memcmp(candidate.string.data, name.data, name.size)) {
+            name = candidate.string;
+            break;
+        }
+    }
+    if (key == themes->count)
+        return ab_fail(error, "Missing stable theme catalog key");
     const AbDataTable *old_graphics =
         menu->theme_layers ? menu_theme_graphics(menu, menu->theme_name, &old_record)
                            : NULL;

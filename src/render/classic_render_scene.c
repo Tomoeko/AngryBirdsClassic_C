@@ -201,13 +201,16 @@ bool ab_classic_render_scene_create_object(AbClassicRenderScene *scene,
     AbClassicVisualView view = ab_classic_visuals_view(visuals);
     if (!scene || view.level != scene->level ||
         view.provider != scene->config.provider || view.count != scene->object_count ||
-        object != scene->object_count || object >= scene->object_capacity ||
+        object > scene->object_count || object >= scene->object_capacity ||
+        (object < scene->object_count && scene->initial_live[object]) ||
         !isfinite(layer) || layer < -2147483648.0f || layer >= 2147483648.0f ||
         (sprite.size && !sprite.data))
         return ab_fail(error, "Invalid dynamic ordinary renderer binding");
     if (!ab_scene_id_next(scene->config.id_counter, scene->initial_ids + object,
                           error) ||
-        !ab_classic_scene_append_object(scene->objects, object, layer, error))
+        !(object == scene->object_count
+              ? ab_classic_scene_append_object(scene->objects, object, layer, error)
+              : ab_classic_scene_recreate_object(scene->objects, object, layer, error)))
         return false;
     AbClassicSceneView objects = ab_classic_scene_view(scene->objects);
     AbSceneMember member = {(void *)(objects.items + object),
@@ -217,7 +220,8 @@ bool ab_classic_render_scene_create_object(AbClassicRenderScene *scene,
     insert_route(scene, member.object,
                  (AbClassicRenderRoute){AB_CLASSIC_RENDER_OBJECT, object});
     scene->initial_live[object] = true;
-    ++scene->object_count;
+    if (object == scene->object_count)
+        ++scene->object_count;
     return ab_classic_visuals_attach_object(visuals, object, error) &&
            ab_classic_visuals_set_sprite(visuals, object, sprite, error) &&
            ab_classic_scene_sync_visuals(scene->objects, visuals, error);

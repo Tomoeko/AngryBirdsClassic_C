@@ -115,6 +115,12 @@ static bool layout(AbUiCutscene *owner, AbError *error) {
             owner->offset.x = (view.screen.x - width) * 0.5f;
             owner->no_scroll = true;
         }
+    } else if (owner->fit_width) {
+        float width = owner->reference.x * reference;
+        if (view.screen.x < width)
+            owner->scale = view.screen.x / width;
+        else
+            owner->offset.x = (view.screen.x - width) * 0.5f;
     }
     AbVec2 size = {0};
     if (!ab_ui_scaling_sprite(scaling, &owner->widget.context->images,
@@ -143,6 +149,7 @@ static bool lifecycle(void *context, AbUiWidget *widget, AbUiFrameMethod method,
         owner->command_index = 1;
         owner->sound_count = 0;
         owner->sprite_present = owner->fit_height = owner->no_scroll = false;
+        owner->fit_width = false;
         if (!ab_ui_widget_lifecycle_base(widget, method, error) ||
             !ab_audio_mixer_all_action(owner->host.mixer, AB_AUDIO_STOP, error))
             return false;
@@ -181,8 +188,9 @@ static bool create_sprite(AbUiCutscene *owner, const AbDataTable *command,
     return true;
 }
 
-static bool begin_scroll(AbUiCutscene *owner, const AbDataTable *command,
-                         AbError *error) {
+static bool scroll_points(AbUiCutscene *owner, const AbDataTable *command,
+                          AbVec2 *target_output, AbVec2 *cursor_output,
+                          AbError *error) {
     AbDataValue target = get(command, "scroll_target"),
                 cursor = get(command, "scroll_cursor");
     if (!owner->sprite_present || target.kind != AB_DATA_TABLE || !target.table ||
@@ -191,8 +199,7 @@ static bool begin_scroll(AbUiCutscene *owner, const AbDataTable *command,
         !named((AbDataValue){.kind = AB_DATA_STRING, .string = owner->sprite_name},
                "background") ||
         get(target.table, "sprite").kind != AB_DATA_STRING ||
-        !equal(get(target.table, "sprite").string, owner->sprite_name) ||
-        truthy(get(command, "restricted_scroll_direction")))
+        !equal(get(target.table, "sprite").string, owner->sprite_name))
         return ab_fail(error, "Unsupported cutscene scroll target/profile");
     AbVec2 size = {0}, view_cursor = {0}, target_point = {0};
     AbUiScalingEnvironment view = {0};
@@ -205,15 +212,45 @@ static bool begin_scroll(AbUiCutscene *owner, const AbDataTable *command,
         !real(get(cursor.table, "x"), &view_cursor.x, error) ||
         !real(get(cursor.table, "y"), &view_cursor.y, error))
         return false;
-    float cursor_x = owner->scroll.x + view_cursor.x * (view.screen.x / owner->scale -
-                                                        owner->offset.x * 2);
-    float cursor_y = owner->scroll.y + view_cursor.y * (view.screen.y / owner->scale -
-                                                        owner->offset.y * 2);
+    float cursor_x =
+        view_cursor.x * (view.screen.x / owner->scale - owner->offset.x * 2);
+    float cursor_y =
+        view_cursor.y * (view.screen.y / owner->scale - owner->offset.y * 2);
     float target_x = owner->position.x + target_point.x * size.x;
     float target_y = owner->position.y + target_point.y * size.y;
+    *target_output = (AbVec2){target_x, target_y};
+    *cursor_output = (AbVec2){cursor_x, cursor_y};
+    return true;
+}
+
+static bool begin_scroll(AbUiCutscene *owner, const AbDataTable *command,
+                         AbError *error) {
+    AbVec2 target, cursor;
+    if (!scroll_points(owner, command, &target, &cursor, error))
+        return false;
+    float cursor_x = owner->scroll.x + cursor.x;
+    float cursor_y = owner->scroll.y + cursor.y;
     owner->scroll_begin = owner->scroll;
-    owner->scroll_end = (AbVec2){owner->scroll.x + (target_x - cursor_x),
-                                 owner->scroll.y + (target_y - cursor_y)};
+    owner->scroll_end = (AbVec2){owner->scroll.x + (target.x - cursor_x),
+                                 owner->scroll.y + (target.y - cursor_y)};
+    AbDataValue restricted = get(command, "restricted_scroll_direction");
+    if (truthy(restricted)) {
+        if (restricted.kind != AB_DATA_TABLE || !restricted.table)
+            return ab_fail(error, "Cutscene scroll restriction is not a table");
+        const char *const axes[] = {"x", "y"};
+        float *ends[] = {&owner->scroll_end.x, &owner->scroll_end.y};
+        const float starts[] = {owner->scroll.x, owner->scroll.y};
+        for (size_t axis = 0; axis < 2; ++axis) {
+            AbDataValue value = get(restricted.table, axes[axis]);
+            float sign;
+            if (!truthy(value))
+                continue;
+            if (!real(value, &sign, error))
+                return false;
+            if (sign * (*ends[axis] - starts[axis]) < 0)
+                *ends[axis] = starts[axis];
+        }
+    }
     float duration = 0;
     if (!real(get(command, "time"), &owner->scroll_begin_time, error) ||
         !real(get(command, "duration"), &duration, error))
@@ -229,8 +266,16 @@ static bool begin_scroll(AbUiCutscene *owner, const AbDataTable *command,
 
 static bool process(AbUiCutscene *owner, const AbDataTable *command, AbError *error) {
     AbDataValue action = get(command, "action");
-    if (named(action, "fitheight")) {
-        owner->fit_height = true;
+    if (named(action, "set_bg_colour")) {
+        const char *const names[] = {"r", "g", "b"};
+        for (size_t color = 0; color < 3; ++color)
+            if (!real(get(command, names[color]), owner->color + color, error))
+                return false;
+        return true;
+    }
+    if (named(action, "fitheight") || named(action, "fitwidth")) {
+        owner->fit_height = named(action, "fitheight");
+        owner->fit_width = named(action, "fitwidth");
         return bounds(owner, get(command, "image"), &owner->reference, error) &&
                layout(owner, error);
     }
@@ -267,6 +312,13 @@ static bool process(AbUiCutscene *owner, const AbDataTable *command, AbError *er
         return create_sprite(owner, command, error);
     if (named(action, "scroll"))
         return begin_scroll(owner, command, error);
+    if (named(action, "set_scroll_position")) {
+        AbVec2 target, cursor;
+        if (!scroll_points(owner, command, &target, &cursor, error))
+            return false;
+        owner->scroll = (AbVec2){target.x - cursor.x, target.y - cursor.y};
+        return true;
+    }
     if (named(action, "end")) {
         if (!mark_watched(owner, error))
             return false;

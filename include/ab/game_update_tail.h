@@ -51,6 +51,9 @@ typedef struct {
     bool skip_input, skip_trigger_specialty;
     AbGameTailHooks *hooks;
     AbGameTailJoints *joints;
+    /* Live length of the actual source projectile list; NULL is an explicit
+     * empty-list domain. Read after the optional wobble phase. */
+    const size_t *grenade_count;
 } AbGameTailState;
 
 typedef enum {
@@ -77,6 +80,7 @@ typedef enum {
     AB_GAME_TAIL_HOOK_EXISTS,
     AB_GAME_TAIL_CHECK_JOINT_LIMIT = 23,
     AB_GAME_TAIL_DESTROY_JOINT,
+    AB_GAME_TAIL_GRENADES,
 } AbGameTailOperation;
 
 typedef struct {
@@ -105,7 +109,9 @@ bool ab_game_update_tail_world(AbGameTailState *state, AbGameTailWorld world,
                                void *context, AbError *error);
 
 /* Original ordinary GameUpdate tail beginning at SlingshotSystem.gameUpdate.
- * This route has no flying-bird special case or grenades.
+ * This route has no flying-bird special case. A nonempty bound grenade length
+ * reaches GRENADES after wobble and before darkness/hooks; the actual projectile
+ * owner performs the backward source explosion/removal pass there.
  * Objects borrow a stable original traversal order/lifetime
  * for both passes; membership/order mutations are outside this contract.
  * Execute actual controller/render effects through the host. It may mutate

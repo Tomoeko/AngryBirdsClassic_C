@@ -13,6 +13,9 @@ typedef struct {
     AbWorldDefinition world;
     AbClassicLevelLimits level_limits;
     size_t resource_bytes;
+    /* Reserve additional stable adapter rows per authored bird. The dynamic
+     * bodies still use level_limits.objects; zero retains initial-only rows. */
+    size_t dynamic_objects_per_bird;
     AbClassicPlayfieldConfig playfield;
     void *prepare_context;
     bool (*prepare)(void *context, const AbLuaData *level, const AbLuaData *catalog,
@@ -29,7 +32,8 @@ typedef struct {
 /* Fresh ordinary Museum world/playfield ownership, independent of render API.
  * Borrow the selected APK, preloaded actual sprite provider, shared RNG/audio,
  * settings/events, canonical globals/controller and camera log service.
- * Construct the authored world, prepare five actual camera resources and snaps,
+ * Construct the authored world, prepare the actual follow/start/end and powerup
+ * camera resources and snaps,
  * then create the playfield with the final updateValues force (-925) and
  * initGame's 0.05 physics scale. initGame calls updateValues after its earlier
  * temporary -800 assignment; that temporary value must not reach gameplay.

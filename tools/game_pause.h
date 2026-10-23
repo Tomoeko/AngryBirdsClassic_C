@@ -203,7 +203,7 @@ static bool game_pause_open(PreviewGame *game, AbError *error) {
                                      (AbUiWidgetChildren){0}, &button, false, NULL,
                                      error) ||
         !ab_ui_image_button_state_set_image(
-            &pause->button.widget.state, menu_text("BUTTON_PAUSE"),
+            &pause->button.widget.state, menu_text("INGAME_BUTTON_PAUSE"),
             (AbUiPointerValue){0}, &menu->context.images, error) ||
         !ab_ui_widget_lifecycle(&pause->page.widget, AB_UI_FRAME_ENTRY, error))
         return false;

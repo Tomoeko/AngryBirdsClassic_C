@@ -122,6 +122,9 @@ static bool boundaries(AbClassicController *owner, size_t object, float seconds,
 
 static bool boomerangs(AbClassicController *owner, AbGameTailCall *call,
                        AbError *error) {
+    if (owner->config.boomerang)
+        return ab_classic_boomerang_update(owner->config.boomerang, call->seconds,
+                                           error);
     for (size_t order = 0; order < owner->level.bird_count; ++order) {
         size_t object = owner->level.bird_order[order];
         bool present;
@@ -230,6 +233,8 @@ static bool host_operation(void *context, AbGameTailCall *call, AbError *error) 
         case AB_GAME_TAIL_WOBBLE:
             return ab_classic_sling_wobble(config->sling, call->seconds,
                                            config->wobble_steps, error);
+        case AB_GAME_TAIL_GRENADES:
+            return ab_classic_eggs_update(config->eggs, error);
         case AB_GAME_TAIL_CAMERA:
             owner->camera.specialty_available = shot->specialty_available;
             return ab_classic_camera_update(config->camera, call->seconds,
@@ -289,14 +294,47 @@ static bool host_operation(void *context, AbGameTailCall *call, AbError *error) 
     }
 }
 
+static bool read_darkness(AbClassicController *owner, AbError *error) {
+    AbClassicGameGlobals *globals = ab_classic_shots_globals(owner->config.shots);
+    if (!globals)
+        return true;
+    AbDataValue value = globals->eagle_darkness;
+    owner->config.state->darkness_present = value.kind != AB_DATA_NIL;
+    if (value.kind == AB_DATA_NIL)
+        return true;
+    float darkness;
+    memcpy(&darkness, &value.bits, sizeof(darkness));
+    if (value.kind != AB_DATA_NUMBER || !isfinite(darkness))
+        return ab_fail(error, "Unsupported canonical eagle darkness");
+    owner->config.state->eagle_darkness = darkness;
+    return true;
+}
+
+static void publish_darkness(AbClassicController *owner) {
+    AbClassicGameGlobals *globals = ab_classic_shots_globals(owner->config.shots);
+    if (!globals)
+        return;
+    AbDataValue value = {0};
+    if (owner->config.state->darkness_present) {
+        value.kind = AB_DATA_NUMBER;
+        memcpy(&value.bits, &owner->config.state->eagle_darkness, sizeof(value.bits));
+    }
+    globals->eagle_darkness = value;
+}
+
 static bool host(void *context, AbGameTailCall *call, AbError *error) {
     AbClassicController *owner = context;
     if (!ab_classic_shots_refresh_globals(owner->config.shots, error))
         return false;
+    /* The tail subtracts/clamps before its first subsequent callback. Publish
+     * at every source service boundary; callbacks can replace or clear the same
+     * canonical global before later object/draw phases. */
+    publish_darkness(owner);
     bool okay = host_operation(context, call, error);
     AbError ignored = {0};
-    bool refreshed =
-        ab_classic_shots_refresh_globals(owner->config.shots, okay ? error : &ignored);
+    bool refreshed = ab_classic_shots_refresh_globals(owner->config.shots,
+                                                      okay ? error : &ignored) &&
+                     read_darkness(owner, okay ? error : &ignored);
     return okay && refreshed;
 }
 
@@ -409,7 +447,8 @@ bool ab_classic_controller_update(AbClassicController *owner, float seconds, flo
     if (!owner || owner->updating || owner->failed || !camera || !isfinite(seconds) ||
         !isfinite(time) || owner->level.world->failed || owner->level.world->locked)
         return ab_fail(error, "Invalid, failed or reentrant classic controller");
-    if (!ab_classic_shots_refresh_globals(owner->config.shots, error))
+    if (!ab_classic_shots_refresh_globals(owner->config.shots, error) ||
+        !read_darkness(owner, error))
         return false;
     owner->updating = true;
     owner->camera = *camera;

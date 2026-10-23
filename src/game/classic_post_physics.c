@@ -220,6 +220,37 @@ AbClassicPostView ab_classic_post_physics_view(AbClassicPostPhysics *post) {
                 : (AbClassicPostView){0};
 }
 
+bool ab_classic_post_physics_recreate_circle(AbClassicPostPhysics *post, size_t object,
+                                             AbError *error) {
+    AbClassicLevelView level = ab_classic_level_view(post ? post->level : NULL);
+    if (!post || !level.bodies || object >= level.bodies->count ||
+        level.removed_objects[object] || level.world->failed || level.world->locked)
+        return ab_fail(error, "Invalid replacement circle post-physics binding");
+    const AbLevelObject *source = level.bodies->objects + object;
+    size_t rank = 0;
+    while (rank < post->count && post->entries[rank].source != object)
+        ++rank;
+    if (rank == post->count || source->physics.dimensions.radius < 0 ||
+        !ab_world_has_body(level.world, source->physics.body))
+        return ab_fail(error, "Replacement circle has no post-physics row");
+    if (!post->rolling_count || post->rolling[0].name.size) {
+        if (post->rolling_count == post->capacity)
+            return ab_fail(error, "Replacement circle rolling storage exhausted");
+        memmove(post->rolling + 1, post->rolling,
+                post->rolling_count * sizeof(*post->rolling));
+        post->rolling[0] = (RollingEntry){0};
+        ++post->rolling_count;
+        for (size_t index = 0; index < post->count; ++index)
+            ++post->entries[index].rolling;
+    }
+    post->entries[rank] = (PostEntry){.name = source->name,
+                                      .source = object,
+                                      .collider = level.frame->objects[object].collider,
+                                      .radius = source->physics.dimensions.radius};
+    post->objects[object] = (AbClassicPostObject){0};
+    return true;
+}
+
 bool ab_classic_post_physics_register_circle(AbClassicPostPhysics *post, size_t object,
                                              AbError *error) {
     AbClassicLevelView level = ab_classic_level_view(post ? post->level : NULL);

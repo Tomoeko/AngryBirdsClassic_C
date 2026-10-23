@@ -294,12 +294,14 @@ bool ab_classic_birds_open(AbClassicBirdConfig config, AbClassicBirds **output,
         capacity > level.bodies->capacity || !entries ||
         entries > UINT32_C(0x1000000) ||
         capacity > (config.storage_bytes - sizeof(AbClassicBirds)) / row_bytes ||
-        level.bird_count == SIZE_MAX)
+        (!config.other_generations && level.bird_count > (SIZE_MAX - 1) / 2))
         return ab_fail(error, "Invalid owned bird lifecycle bindings/storage");
     size_t remaining =
         config.storage_bytes - sizeof(AbClassicBirds) - capacity * row_bytes;
+    /* Every queued launch replaces otherBirds, and every original Blues may
+     * replace it again when splitting. Keep both fresh tables and old aliases. */
     size_t generations =
-        config.other_generations ? config.other_generations : level.bird_count + 1;
+        config.other_generations ? config.other_generations : 2 * level.bird_count + 1;
     if (generations > remaining / sizeof(AbDataTable))
         return ab_fail(error, "Owned other-bird table generations exceed storage");
     remaining -= generations * sizeof(AbDataTable);
@@ -545,6 +547,50 @@ static bool retirement(AbClassicBirds *owner, size_t index, float seconds, bool 
     return true;
 }
 
+static bool bomb_timer(AbClassicBirds *owner, size_t object, float seconds, bool *alive,
+                       AbError *error) {
+    const AbDataTable *physical = &owner->level.properties->objects[object].physical;
+    float timer = 0;
+    if (!numeric(field(physical, "bombTimer"), &timer, error))
+        return false;
+    timer = timer - seconds;
+    if (!write_timer(owner, object, "bombTimer", timer, error))
+        return false;
+    AbDataValue current = {0};
+    if (timer < 1 && (!ab_object_definition_lookup(
+                          &owner->level.properties->lookup,
+                          owner->level.bodies->objects[object].name, &current, error) ||
+                      current.kind != AB_DATA_TABLE))
+        return ab_fail(error, "Missing current timed-bomb definition");
+    if (timer < 0) {
+        AbDataValue sound = {0};
+        if (!ab_audio_bank_name_value(owner->config.audio,
+                                      text(span("special_explosion")), &sound, error) ||
+            !ab_classic_explosions_make(owner->config.explosions, object, current,
+                                        sound, (AbDataValue){0}, error) ||
+            !remove_bird(owner, object, (AbDataValue){0}, error))
+            return false;
+        *alive = false;
+        return true;
+    }
+    if (timer < 1) {
+        AbDataValue sprite =
+            field(current.table, timer < 0.5f ? "spriteSpecial3" : "spriteSpecial2");
+        AbObjectPropertyAccess access = {
+            .physics_object =
+                table(&owner->level.properties->objects[object].physical)};
+        if (!ab_object_property_set(&access, span("damageSprite"), sprite, error))
+            return false;
+        if (sprite.kind != AB_DATA_STRING)
+            return ab_fail(error, "Missing actual timed-bomb sprite");
+        if (!ab_classic_visuals_set_sprite(owner->config.explosions->visuals, object,
+                                           sprite.string, error))
+            return false;
+    }
+    *alive = true;
+    return true;
+}
+
 bool ab_classic_birds_update(AbClassicBirds *owner, size_t object, float seconds,
                              bool *alive, AbError *error) {
     if (!owner || !alive || owner->calling || object >= owner->count)
@@ -571,7 +617,9 @@ bool ab_classic_birds_update(AbClassicBirds *owner, size_t object, float seconds
     else
         special = false;
     bool okay;
-    if (special)
+    if (special && kind == AB_CLASSIC_BIRD_BOMB_TIMER && owner->config.explosions)
+        okay = bomb_timer(owner, object, seconds, alive, error);
+    else if (special)
         okay = owner->config.specialty_update
                    ? owner->config.specialty_update(owner->config.context, kind, object,
                                                     seconds, alive, error)

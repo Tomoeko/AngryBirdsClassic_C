@@ -55,6 +55,11 @@ size_t ab_classic_scene_bytes(const AbClassicScene *scene);
 bool ab_classic_scene_append_object(AbClassicScene *scene, size_t object, float layer,
                                     AbError *error);
 
+/* Reinitialize a retained row after its enclosing renderer was detached. The
+ * caller owns scene membership and must remove the old identity first. */
+bool ab_classic_scene_recreate_object(AbClassicScene *scene, size_t object, float layer,
+                                      AbError *error);
+
 /* These actions change only ordinary renderer bindings. Sprite lookup preserves
  * the previous binding on failure. Scales must be finite and nonzero. Hidden
  * objects and empty assets are skipped by pose sync; hide a removed body before the

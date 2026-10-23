@@ -31,6 +31,9 @@ typedef struct {
     AbClassicCharacterServices *conditions;
     AbClassicLevelFinishState *finish;
     AbClassicLevelEndingState *state;
+    /* Optional canonical production global; the standalone state remains its
+     * projection for component callers. Completed updates clear both. */
+    AbDataValue *eagle_darkness;
     AbClassicBirdBonusScores *bonus;
     const AbDataValue *eagle_launched, *bird_sound;
     const AbDataTable *stars;

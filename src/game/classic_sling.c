@@ -200,6 +200,28 @@ AbClassicShots *ab_classic_sling_shots(const AbClassicSling *sling) {
     return sling ? sling->config.shots : NULL;
 }
 
+bool ab_classic_sling_power(AbClassicSling *sling, float *output, AbError *error) {
+    if (!output || !healthy(sling, error))
+        return ab_fail(error, "Invalid ordinary slingshot power query");
+    *output = sling->state.king ? 1.0f + 0.3f : 1;
+    return true;
+}
+
+bool ab_classic_sling_set_king(AbClassicSling *sling, bool scope, AbError *error) {
+    if (!healthy(sling, error) || sling->busy)
+        return ab_fail(error, "Invalid or busy KingSling selection");
+    sling->state.king = true;
+    sling->state.has_scope = scope;
+    return true;
+}
+
+bool ab_classic_sling_set_scope(AbClassicSling *sling, bool enabled, AbError *error) {
+    if (!healthy(sling, error) || sling->busy)
+        return ab_fail(error, "Invalid or busy sling scope selection");
+    sling->state.has_scope = enabled;
+    return true;
+}
+
 bool ab_classic_sling_disable_for_level(AbClassicSling *sling, AbError *error) {
     if (!healthy(sling, error) || sling->busy)
         return ab_fail(error, "Invalid or busy sling disable binding");
@@ -262,8 +284,23 @@ bool ab_classic_sling_shot(AbClassicSling *sling, AbShotCall *call, AbError *err
 }
 
 void ab_classic_sling_set_launch_cue(AbClassicSling *sling) {
-    if (sling)
+    if (sling) {
         sling->state.launch_cue = true;
+        sling->state.band.scope_sound_eligible = true;
+    }
+}
+
+bool ab_classic_sling_play_scope_sound(AbClassicSling *sling, AbError *error) {
+    if (!healthy(sling, error) || sling->busy)
+        return ab_fail(error, "Invalid or busy scope sound binding");
+    if (!sling->state.band.scope_sound_eligible)
+        return true;
+    uint32_t handle;
+    if (!ab_audio_bank_play_resource(sling->config.audio, span("laser_sight"), 1, false,
+                                     0, &handle, error))
+        return false;
+    sling->state.band.scope_sound_eligible = false;
+    return true;
 }
 
 static bool play_sound(AbClassicSling *sling, const char *name, bool resolve,
@@ -406,14 +443,55 @@ static bool query(void *context, AbSlingLaunchCall *call, AbError *error) {
             call->number = call->number < 0 ? 0 : call->number > 1 ? 1 : call->number;
             return true;
         case AB_SLING_LAUNCH_POWER:
-            call->number = 1;
-            return true;
+            return ab_classic_sling_power(sling, &call->number, error);
         case AB_SLING_LAUNCH_POSITION:
             call->position = &band->rubber_band;
             return true;
         default:
             return ab_shot_services_sling(sling->config.services, call, error);
     }
+}
+
+bool ab_classic_sling_launch_velocity(AbClassicSling *sling, AbVec2 *output,
+                                      AbError *error) {
+    if (!output || !healthy(sling, error) || sling->busy)
+        return ab_fail(error, "Invalid or busy live sling velocity query");
+    if (!sling->shot->current_bird_name) {
+        *output = (AbVec2){0};
+        return true;
+    }
+    size_t object;
+    AbDataValue definition;
+    if (!named_bird(sling, sling->shot->current_bird_name, &object, error) ||
+        !ab_object_definition_lookup(&sling->level.properties->lookup,
+                                     sling->level.bodies->objects[object].name,
+                                     &definition, error))
+        return false;
+    if (definition.kind != AB_DATA_TABLE)
+        return ab_fail(error, "Sling velocity requires its actual bird definition");
+    const AbDataValue *raw_force =
+        ab_data_get(definition.table, text("slingshotLaunchForce"));
+    const AbDataValue *raw_mass =
+        ab_data_get(&sling->level.properties->objects[object].physical, text("mass"));
+    AbSlingLaunchInput input = {.rest = sling->state.band.rest,
+                                .rubber_band = sling->state.band.rubber_band,
+                                .launch_force = sling->config.default_force,
+                                .physics_scale = sling->config.physics_scale,
+                                .bird_present = true};
+    if (!raw_mass || raw_mass->kind != AB_DATA_NUMBER ||
+        (raw_force && truthy(*raw_force) && raw_force->kind != AB_DATA_NUMBER))
+        return ab_fail(error, "Sling velocity requires numeric force and mass");
+    memcpy(&input.bird_mass, &raw_mass->bits, sizeof(input.bird_mass));
+    if (raw_force && truthy(*raw_force))
+        memcpy(&input.launch_force, &raw_force->bits, sizeof(input.launch_force));
+    AbSlingLaunchCall call = {.operation = AB_SLING_LAUNCH_STRETCH};
+    if (!query(sling, &call, error))
+        return false;
+    input.stretch = call.number;
+    if (!ab_classic_sling_power(sling, &input.slingshot_power, error))
+        return false;
+    return ab_slingshot_launch_velocity(&input, output) ||
+           ab_fail(error, "Unsupported live sling launch velocity");
 }
 
 static bool release(AbClassicSling *sling, AbError *error) {

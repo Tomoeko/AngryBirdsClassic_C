@@ -22,6 +22,7 @@ struct AbClassicBlockScripts {
     AbTrackedBlockScriptObject *tracked;
     AbBlockScriptUpdate update;
     AbPhysicsScriptStep physics;
+    size_t count, capacity;
     bool failed;
 };
 
@@ -119,13 +120,15 @@ bool ab_classic_block_scripts_open(AbClassicBlockScriptConfig config,
         return ab_fail(error, "Missing default block-script output");
     *output = NULL;
     AbClassicLevelView level = ab_classic_level_view(config.level);
+    size_t capacity = config.object_capacity ? config.object_capacity
+                                             : (level.bodies ? level.bodies->count : 0);
     const size_t stride = sizeof(AbBlockEventObject) +
                           SCRIPT_CLASSES * sizeof(AbBlockEventScript *) +
                           sizeof(AbTrackedBlockScriptObject);
     if (!level.bodies || !level.properties || !config.physics_enabled ||
         config.storage_bytes < sizeof(AbClassicBlockScripts) ||
-        level.bodies->count >
-            (config.storage_bytes - sizeof(AbClassicBlockScripts)) / stride)
+        capacity < level.bodies->count || capacity > level.bodies->capacity ||
+        capacity > (config.storage_bytes - sizeof(AbClassicBlockScripts)) / stride)
         return ab_fail(error, "Invalid default block-script owners or storage bound");
     AbClassicBlockScripts *owner = calloc(1, sizeof(*owner));
     if (!owner)
@@ -133,9 +136,11 @@ bool ab_classic_block_scripts_open(AbClassicBlockScriptConfig config,
     owner->config = config;
     owner->level = level;
     size_t count = level.bodies->count;
-    owner->objects = calloc(count, sizeof(*owner->objects));
-    owner->attachments = calloc(count, SCRIPT_CLASSES * sizeof(*owner->attachments));
-    owner->tracked = calloc(count, sizeof(*owner->tracked));
+    owner->count = count;
+    owner->capacity = capacity;
+    owner->objects = calloc(capacity, sizeof(*owner->objects));
+    owner->attachments = calloc(capacity, SCRIPT_CLASSES * sizeof(*owner->attachments));
+    owner->tracked = calloc(capacity, sizeof(*owner->tracked));
     if (count && (!owner->objects || !owner->attachments || !owner->tracked)) {
         ab_classic_block_scripts_close(owner);
         return ab_fail(error, "Cannot allocate actual block-script attachment rows");
@@ -144,7 +149,7 @@ bool ab_classic_block_scripts_open(AbClassicBlockScriptConfig config,
         (AbBlockScriptManager){.registered = {owner->registered, 0, SCRIPT_CLASSES},
                                .initialized = {owner->initialized, 0, SCRIPT_CLASSES},
                                .tracked = owner->tracked,
-                               .capacity = count};
+                               .capacity = capacity};
     AbBlockEventHost host = {owner, definition, world_truthy};
     owner->update = (AbBlockScriptUpdate){.host = host, .event = span("onUpdateBlock")};
     owner->physics = (AbPhysicsScriptStep){.host = host,
@@ -199,9 +204,24 @@ void ab_classic_block_scripts_close(AbClassicBlockScripts *scripts) {
 AbClassicBlockScriptView ab_classic_block_scripts_view(AbClassicBlockScripts *scripts) {
     return scripts ? (AbClassicBlockScriptView){.manager = &scripts->manager,
                                                 .objects = scripts->objects,
-                                                .count = scripts->level.bodies->count,
+                                                .count = scripts->count,
                                                 .update = &scripts->update,
                                                 .physics = &scripts->physics,
                                                 .host = scripts->update.host}
                    : (AbClassicBlockScriptView){0};
+}
+
+bool ab_classic_block_scripts_register_circle(AbClassicBlockScripts *scripts,
+                                              size_t object, AbError *error) {
+    if (!scripts || scripts->failed || object != scripts->count ||
+        object >= scripts->capacity || object >= scripts->level.bodies->count)
+        return ab_fail(error, "Invalid direct-circle block-script row");
+    const AbLevelObject *source = scripts->level.bodies->objects + object;
+    scripts->objects[object] =
+        (AbBlockEventObject){.name = source->name,
+                             .definition = source->definition_name,
+                             .scripts = scripts->attachments + object * SCRIPT_CLASSES,
+                             .capacity = SCRIPT_CLASSES};
+    ++scripts->count;
+    return true;
 }

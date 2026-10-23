@@ -70,13 +70,14 @@ bool ab_classic_render_scene_create_lua(AbClassicRenderScene *scene, AbSpan name
                                         AbError *error);
 
 /* Actual ordinary createRendererForGameObject sequence for the next new stable
- * level slot: consume renderer ID, create/register renderer, attach asset, then
- * publish/resolve sprite. Layers truncate toward zero. Both this scene and the
- * visual owner reserve the level's full capacity at open. Resource errors retain
- * earlier ID/membership/attachment/property effects and require session discard.
- * No script, behavior, audio or dynamic physics-adapter registration occurs.
- * Missing sprites retain an empty asset through the existing visual policy.
- * Composites and collider 7 remain unsupported. No frame allocation/GPU calls. */
+ * level slot or a detached row after native body replacement: consume renderer ID,
+ * create/register renderer, attach asset, then publish/resolve sprite. Layers truncate
+ * toward zero. Both this scene and the visual owner reserve the level's full capacity
+ * at open. Resource errors retain earlier ID/membership/attachment/property effects and
+ * require session discard. No script, behavior, audio or dynamic physics-adapter
+ * registration occurs. Missing sprites retain an empty asset through the existing
+ * visual policy. Composites and collider 7 remain unsupported. No frame allocation/GPU
+ * calls. */
 bool ab_classic_render_scene_create_object(AbClassicRenderScene *scene,
                                            AbClassicVisuals *visuals, size_t object,
                                            AbSpan sprite, float layer, AbError *error);

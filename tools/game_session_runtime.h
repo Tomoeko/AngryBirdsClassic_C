@@ -3,6 +3,8 @@
 
 #include "console_common/support/host.h"
 
+enum { GAME_TRAJECTORY_POINTS = 1024 };
+
 typedef struct {
     struct timespec previous;
     bool enabled;
@@ -44,9 +46,12 @@ static bool game_open_level(PreviewGame *game, AbError *error) {
                          .contacts = 8192,
                          .storage_bytes = 32 * 1024 * 1024},
         .resource_bytes = 16 * 1024 * 1024,
+        .dynamic_objects_per_bird = 3,
         .prepare_context = game,
         .prepare = game_prepare,
-        .playfield = {.sprites = &menu->sprites.provider,
+        .playfield = {.context = game,
+                      .shot_trails = game_powerup_trails,
+                      .sprites = &menu->sprites.provider,
                       .audio = menu->audio,
                       .statistics = menu->settings,
                       .events = menu->events,
@@ -77,9 +82,10 @@ static bool game_open_level(PreviewGame *game, AbError *error) {
                                  .sling = 65536,
                                  .storage_bytes = 8 * 1024 * 1024,
                                  .name_capacity = 256,
-                                 .extra_renderers = 256,
+                                 /* Each retained trajectory point owns a renderer. */
+                                 .extra_renderers = GAME_TRAJECTORY_POINTS,
                                  .tracks = 128,
-                                 .points = 1024,
+                                 .points = GAME_TRAJECTORY_POINTS,
                                  .notifications = 64}}};
     if (!ab_classic_level_runtime_open(config, &game->level, error))
         return false;
@@ -114,6 +120,27 @@ static bool game_open_world(PreviewGame *game, AbError *error) {
                                             "levelCompleteStars3", "newHighScoreStars"};
     for (size_t index = 0; index < 4; ++index)
         game->particle_names[names.count++] = menu_span(result_particles[index]);
+    game->particle_names[names.count++] = menu_span("explosion");
+    game->particle_names[names.count++] = menu_span("explosionBuff");
+    const char *const powerup_particles[] = {"powerupBuff",
+                                             "powerupBurst",
+                                             "powerupSmokeBuff",
+                                             "superSlingActivation",
+                                             "superSlingBurst",
+                                             "superSlingTrail",
+                                             "superSeedActivation",
+                                             "powerPotionExplosion",
+                                             "powerPotionBubbles",
+                                             "powerPotionTrail",
+                                             "smokeBuffBirdsPurple",
+                                             "quake",
+                                             "quake_smoke",
+                                             "woodenBuff",
+                                             "rockBuff",
+                                             "lightBuff"};
+    for (size_t index = 0;
+         index < sizeof(powerup_particles) / sizeof(*powerup_particles); ++index)
+        game->particle_names[names.count++] = menu_span(powerup_particles[index]);
     if (menu_route_truthy(game->level_particles_enabled)) {
         AbDataValue name = menu_route_field(game->level_particles.table, "particles");
         if (name.kind != AB_DATA_STRING)
@@ -131,7 +158,7 @@ static bool game_open_world(PreviewGame *game, AbError *error) {
                                       .storage_bytes = 2 * 1024 * 1024,
                                       .capacity = 1024,
                                       .level_capacity = 1024,
-                                      .engine_random = &game->engine_random,
+                                      .engine_random = &menu->engine_random,
                                       .script_random = &menu->random,
                                       .admission = {75, 150, 0.5f},
                                       .workspace = &game->workspace,
@@ -161,6 +188,8 @@ static bool game_open_world(PreviewGame *game, AbError *error) {
         (AbObjectRemovalNotifyHost){.context = game, .level = game_removal_level};
     AbClassicWorldRuntimeConfig config = {
         .playfield = ab_classic_level_runtime_view(game->level).playfield,
+        .object_capacity = ab_classic_level_view(game->playfield.level).bodies->count +
+                           3 * ab_classic_level_view(game->playfield.level).bird_count,
         .particles = game->particles,
         .audio = menu->audio,
         .settings = menu->settings,
@@ -195,6 +224,7 @@ static bool game_open_world(PreviewGame *game, AbError *error) {
                                     .position_iterations = 10,
                                     .maximum_steps = 4,
                                     .limits = {.storage_bytes = 1024 * 1024,
+                                               .queued_forces = 1024,
                                                .glue_pairs = 512}},
                      .physical = {.storage_bytes = 1024 * 1024},
                      .goals = {.disable_check = &game->disabled,
@@ -209,6 +239,8 @@ static bool game_open_world(PreviewGame *game, AbError *error) {
                                     .event_fields = 8,
                                     .storage_bytes = 1024 * 1024},
                      .removals = {.level_name = &game->level_name,
+                                  .context = game,
+                                  .explosion = game_explosion,
                                   .notifications = &game->removal_notifications,
                                   .block_increment = 500,
                                   .goal_increment = 5000,
@@ -230,6 +262,18 @@ static bool game_open_world(PreviewGame *game, AbError *error) {
 static bool game_open_update(PreviewGame *game, AbError *error) {
     PreviewMenu *menu = game->menu;
     AbClassicWorldRuntimeView world = ab_classic_world_runtime_view(game->world);
+    game->explosions = (AbClassicExplosions){.level = game->playfield.level,
+                                             .visuals = game->playfield.visuals,
+                                             .particles = game->particles,
+                                             .audio = menu->audio,
+                                             .globals = &game->globals,
+                                             .shake = &game->shake,
+                                             .dead_blocks = world.dead_blocks,
+                                             .physical_values = world.physical_values,
+                                             .physical_count = world.physical_count,
+                                             .workspace = &game->workspace,
+                                             .physics_scale = 0.05f,
+                                             .base_effect = true};
     if (!ab_classic_game_updates_open(64, 256 * 1024, &game->updates, error) ||
         !ab_classic_game_updates_clear(game->updates, error) ||
         !ab_classic_balloons_open(
@@ -242,13 +286,18 @@ static bool game_open_update(PreviewGame *game, AbError *error) {
         return false;
     /* Actual inherited NotificationsFrame constructor before UI consumers add
      * children. The complete notification class/GUI remains a separate owner. */
+    game->notification_context = menu->context;
     game->notification_context.maximum_depth = 64;
     game->notification_fields.name = menu_text("notifications");
-    if (!ab_ui_widget_init(&game->notifications, &game->notification_context,
-                           AB_UI_WIDGET_FRAME, (AbUiWidgetChildren){0},
-                           &game->notification_fields, NULL, NULL, error))
+    if (!ab_ui_widget_init(
+            &game->notifications, &game->notification_context, AB_UI_WIDGET_FRAME,
+            (AbUiWidgetChildren){game->notification_frames, game->notification_draw,
+                                 game->notification_pointer, AB_CLASSIC_POWERUPS},
+            &game->notification_fields, NULL, NULL, error) ||
+        !ab_ui_widget_lifecycle(&game->notifications, AB_UI_FRAME_ENTRY, error))
         return false;
     AbClassicGameRuntimeConfig config = {
+        .blues_names = {game->blues_names, sizeof(game->blues_names)},
         .playfield = ab_classic_level_runtime_view(game->level).playfield,
         .world = game->world,
         .particles = game->particles,
@@ -257,13 +306,15 @@ static bool game_open_update(PreviewGame *game, AbError *error) {
         .events = menu->events,
         .random = &menu->random,
         .flying = &game->flying,
-        .birds = {.level_effect = &game->level_effect,
+        .birds = {.context = game,
+                  .specialty_update = game_powerup_bird_update,
+                  .level_effect = &game->level_effect,
                   .remove_speed_squared = &game->remove_speed,
                   .remove_time = &game->remove_time,
                   .removed_hook = game_bird_removed,
                   .removal_volume = game_bird_volume,
                   .storage_bytes = 1024 * 1024},
-        .conditions = {.prevent_ending = &game->disabled,
+        .conditions = {.prevent_ending = &game->prevent_ending,
                        .bird_sound = &game->bird_sound,
                        .pig_sound = &game->pig_sound,
                        .eagle_launched = &game->disabled,
@@ -279,13 +330,19 @@ static bool game_open_update(PreviewGame *game, AbError *error) {
                   .level_start_sound = &game->start_sound,
                   .main_menu_song = &game->song,
                   .current_music = &game->music,
-                  .physics_enabled = &game->physics},
+                  .physics_enabled = &game->physics,
+                  .context = game,
+                  .level_update =
+                      menu_route_equal(game->level_name, game_text("Level5"))
+                          ? game_level5_update
+                          : NULL},
         .finish = {.state = &game->finish,
                    .clear_sound = &game->clear_sound,
                    .failed_sound = &game->failed_sound,
                    .notifications = 64,
                    .storage_bytes = 256 * 1024},
         .ending = {.state = &game->ending,
+                   .eagle_darkness = &game->globals.eagle_darkness,
                    .bonus = &game->bonus,
                    .stars = menu->star_limits.data.globals,
                    .notifications = 64,
@@ -314,6 +371,11 @@ static bool game_open_update(PreviewGame *game, AbError *error) {
                       .boost = {.force = -925, .physics_scale = 0.05f},
                       .notifications_capacity = 64,
                       .storage_bytes = 256 * 1024},
+        .boomerang = {.physics_scale = 0.05f},
+        .eggs = {.sprites = &menu->sprites.provider,
+                 .default_force = -925,
+                 .storage_bytes = 256 * 1024},
+        .explosions = &game->explosions,
         .controller = {.level_effects = &game->effects,
                        .effect_kind = AB_CLASSIC_CONTROLLER_EFFECT_BASE,
                        .state = &game->tail,
@@ -383,6 +445,10 @@ static bool game_session_open(PreviewMenu *menu, AbError *error) {
             return false;
         menu->entered = false;
     }
+    /* MuseumMode.loadLevel2711 instructions50..52, after releasing the story
+     * view and before constructing this level: res.stopAllAudio(). */
+    if (!ab_audio_mixer_all_action(menu->mixer, AB_AUDIO_STOP, error))
+        return false;
     menu->level_active = menu->cutscene_active = menu->episode_active = false;
     PreviewGame *game = calloc(1, sizeof(*game));
     if (!game)
@@ -394,6 +460,7 @@ static bool game_session_open(PreviewMenu *menu, AbError *error) {
      * the application script clock across the menu-to-level transition. */
     game->enabled = (AbDataValue){.kind = AB_DATA_BOOLEAN, .bits = 1};
     game->disabled = (AbDataValue){.kind = AB_DATA_BOOLEAN};
+    game->prevent_ending = game->disabled;
     game->level_name = menu->level_request.name;
     game->next_sound = game_text("bird_next_military");
     game->bird_sound = game_text("bird_misc");
@@ -458,7 +525,7 @@ static bool game_session_open(PreviewMenu *menu, AbError *error) {
                 game_open_world(game, error) &&
                 game_load_phase(game, &clock, "particles/collisions", error) &&
                 game_open_update(game, error) && game_skip_open(game, error) &&
-                game_pause_open(game, error) &&
+                game_pause_open(game, error) && game_powerups_open(game, error) &&
                 game_load_phase(game, &clock, "game/update/HUD", error);
     if (okay) {
         game->result_listener =

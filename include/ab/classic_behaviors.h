@@ -70,6 +70,12 @@ bool ab_classic_behaviors_create_object(AbClassicBehaviors *behaviors, size_t ob
                                         const AbLuaData *descriptor_data,
                                         AbError *error);
 
+/* Recreate the source GameObject after native circle/renderer replacement.
+ * Discard the old behavior groups and initialize fresh instances; raw physical
+ * fields copied by Super Seeds remain available to the new script. */
+bool ab_classic_behaviors_recreate_object(AbClassicBehaviors *behaviors, size_t object,
+                                          AbDataValue descriptor, AbError *error);
+
 /* Actual later GameObject.addBehavior on a registered canonical script. Retain
  * existing groups/instances and publish a missing empty group before a reached
  * factory failure. Two distinct classes with one instance each fit the reserved

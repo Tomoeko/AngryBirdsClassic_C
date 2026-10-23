@@ -22,10 +22,11 @@ typedef struct {
  * preloaded sprite/texture bindings. Open prepares only cached base images;
  * subsequent calls allocate nothing. Close before borrowed resources are released.
  *
- * This is AbClassicSling's ordinary unpowered/default class: no scope, extra
- * trajectory or custom sprite/shader/color overrides. Original initializer26738
- * sets hasExtraTrajectoryDraw=false, so drawExtras27991 reaches no work. Other
- * class activation remains unsupported by the borrowed sling. Used numbers must
+ * Select the source default/KingSling back/front and optional scope front from
+ * the live sling. Bind each reached powered image once from preloaded resources,
+ * including the actual basic/King scope-front composites and cached parts.
+ * Scope accessories/trajectory remain a separate effect draw; the ordinary
+ * initializer disables extra trajectory. Used numbers must
  * fit the existing pose/draw helpers. Errors retain prior pose/command effects
  * and stop subsequent calls. No GPU work or complete frame scheduling supplied.
  */

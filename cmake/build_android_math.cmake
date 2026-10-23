@@ -551,6 +551,9 @@ build_android_probe(ab_android_string_map arm.c oracle_main
 build_android_probe(ab_android_string_map_gc arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
     -DAB_ORACLE_STRING_MAP_ONLY=1 -DAB_ORACLE_STRING_MAP_GC=1)
+build_android_probe(ab_android_identity_map arm.c oracle_main
+    -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
+    -DAB_ORACLE_STRING_MAP_ONLY=1 -DAB_ORACLE_IDENTITY_MAP=1)
 build_android_probe(ab_android_ui_menu_manager arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1 -DAB_ORACLE_UI_MENU_MANAGER_ONLY=1)
 build_android_probe(ab_android_ui_menu_links arm.c oracle_main
@@ -604,15 +607,23 @@ build_android_probe(ab_android_theme_layer_gpu arm.c oracle_main
 build_android_probe(ab_android_composite_bounds arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
     -DAB_ORACLE_COMPOSITE_BOUNDS_ONLY=1)
+set(composite_draw_options)
+if(AB_ANDROID_COMPOSITE_ROTATED_PARENT)
+    list(APPEND composite_draw_options -DAB_ORACLE_COMPOSITE_ROTATED_PARENT=1)
+endif()
 build_android_probe(ab_android_composite_draw arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
-    -DAB_ORACLE_COMPOSITE_BOUNDS_ONLY=1 -DAB_ORACLE_COMPOSITE_DRAW_ONLY=1)
+    -DAB_ORACLE_COMPOSITE_BOUNDS_ONLY=1 -DAB_ORACLE_COMPOSITE_DRAW_ONLY=1
+    ${composite_draw_options})
 build_android_probe(ab_android_theme_background arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
     -DAB_ORACLE_THEME_BACKGROUND_ONLY=1)
 build_android_probe(ab_android_game_rectangle arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
     -DAB_ORACLE_GAME_RECTANGLE_ONLY=1)
+build_android_probe(ab_android_theme_rect arm.c oracle_main
+    -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
+    -DAB_ORACLE_THEME_RECT_ONLY=1)
 build_android_probe(ab_android_rubberband arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
     -DAB_ORACLE_RUBBERBAND_ONLY=1)
@@ -661,6 +672,10 @@ build_android_probe(ab_android_particle_common arm.c oracle_main
 build_android_probe(ab_android_particle_draw arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
     -DAB_ORACLE_PARTICLE_BOX_ONLY=1 -DAB_ORACLE_PARTICLE_DRAW_ONLY=1)
+build_android_probe(ab_android_particle_zero_draw arm.c oracle_main
+    -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
+    -DAB_ORACLE_PARTICLE_BOX_ONLY=1 -DAB_ORACLE_PARTICLE_DRAW_ONLY=1
+    -DAB_ORACLE_PARTICLE_ZERO_SCALE=1)
 build_android_probe(ab_android_particle_level arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
     -DAB_ORACLE_PARTICLE_BOX_ONLY=1 -DAB_ORACLE_PARTICLE_LEVEL_ONLY=1)
@@ -938,6 +953,9 @@ build_android_probe(ab_android_flame_apply arm.c oracle_main
 build_android_probe(ab_android_ambient_animation arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
     -DAB_ORACLE_AMBIENT_ANIMATION_ONLY=1)
+build_android_probe(ab_android_object_animation arm.c oracle_main
+    -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
+    -DAB_ORACLE_OBJECT_ANIMATION_ONLY=1)
 build_android_probe(ab_android_ambient_particle arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
     -DAB_ORACLE_AMBIENT_PARTICLE_ONLY=1)
@@ -1049,6 +1067,14 @@ if(DEFINED AB_ANDROID_PROBE AND AB_ANDROID_PROBE STREQUAL "ab_android_theme_gpu"
         "${gpu_directory}/start.o" ${gpu_objects} "${android_libc}" "${android_libdl}")
     set(android_probe_built TRUE)
 endif()
+build_android_probe(ab_android_superseed_radius arm.c oracle_main
+    -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
+    -DAB_ORACLE_SUPERSEED_RADIUS_ONLY=1)
+
+build_android_probe(ab_android_sling_scope arm.c oracle_main
+    -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
+    -DAB_ORACLE_SLING_SCOPE_ONLY=1)
+
 if(NOT android_probe_built)
     message(FATAL_ERROR "No matching Android reference probe was selected")
 endif()

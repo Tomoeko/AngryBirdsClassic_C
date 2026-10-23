@@ -99,7 +99,7 @@ static bool prepare(PropertyFixture *fixture, uint32_t index) {
     memcpy(&source.physics.dimensions.width, fixture->input + 9, 4);
     memcpy(&source.physics.dimensions.height, fixture->input + 10, 4);
     memcpy(&source.physics.dimensions.radius, fixture->input + 8, 4);
-    AbLevelBodies bodies = {&source, 1, 1};
+    AbLevelBodies bodies = {.objects = &source, .capacity = 1, .count = 1};
     fixture->properties = (AbLevelProperties){.objects = &fixture->object,
                                               .world_entries = &fixture->world_entry,
                                               .capacity = 1};

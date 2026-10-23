@@ -44,7 +44,12 @@ static bool default_tweens(const AbDataTable *properties, bool axes, AbError *er
     const char *names[] = {"tweenFunction", "movementTweenFunction",
                            "zoomTweenFunction"};
     for (size_t index = 0; index < (axes ? 3u : 1u); ++index) {
-        if (truthy(field(properties, names[index]))) {
+        AbDataValue selected = field(properties, names[index]);
+        /* BirdquakeCameraSequence names the same recovered curve as the
+         * default. Other named functions still need their actual resolution. */
+        bool cubic = selected.kind == AB_DATA_STRING &&
+                     named(selected.string, "tweenEaseCubicInOut");
+        if (truthy(selected) && !cubic) {
             return ab_fail(error, "Camera action tween selection requires recovery");
         }
     }

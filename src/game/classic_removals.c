@@ -22,7 +22,8 @@ struct AbClassicRemovals {
     AbBlockRemovalState state;
     AbBlockRemovalCleanupState cleanup;
     AbObjectRemovalNotifyHost *notifying;
-    size_t count, bytes;
+    size_t count, capacity, bytes;
+    size_t fields_used, fields_capacity;
     bool calling;
 };
 
@@ -140,12 +141,27 @@ static bool normalize(AbClassicRemovals *owner, const AbObjectDefinition *defini
         if (!entry && !owner->definitions[index].source)
             entry = owner->definitions + index;
     }
-    if (!entry || definition->source->count > entry->table.capacity)
-        return ab_fail(error, "Classic removal definition storage exhausted");
-    entry->table.count = definition->source->count;
-    memcpy(entry->table.entries, definition->source->entries,
-           entry->table.count * sizeof(*entry->table.entries));
+    size_t required = definition->source->count;
     const AbDataTable *material = definition->material;
+    for (size_t index = 0; material && index < material->count; ++index) {
+        AbDataValue key = material->entries[index].key;
+        if (key.kind != AB_DATA_STRING || ab_data_get(definition->source, key) ||
+            ab_object_property(definition, key.string).kind == AB_DATA_NIL)
+            continue;
+        if (required == SIZE_MAX)
+            return ab_fail(error, "Classic removal definition size overflows");
+        ++required;
+    }
+    if (!entry || required > owner->config.definition_fields ||
+        required > owner->fields_capacity - owner->fields_used)
+        return ab_fail(error, "Classic removal definition storage exhausted");
+    entry->table = (AbDataTable){.entries = owner->fields + owner->fields_used,
+                                 .count = definition->source->count,
+                                 .capacity = required};
+    owner->fields_used += required;
+    if (entry->table.count)
+        memcpy(entry->table.entries, definition->source->entries,
+               entry->table.count * sizeof(*entry->table.entries));
     for (size_t index = 0; material && index < material->count; ++index) {
         AbDataValue key = material->entries[index].key;
         const AbDataValue *prior = ab_data_get(&entry->table, key);
@@ -429,16 +445,21 @@ bool ab_classic_removals_open(AbClassicRemovalConfig config, AbClassicRemovals *
     *output = NULL;
     AbClassicLevelView level = ab_classic_level_view(config.level);
     size_t count = level.bodies ? level.bodies->count : 0;
+    size_t capacity = config.object_capacity ? config.object_capacity : count;
     if (!count || !level.properties || !level.catalog || !config.level_name ||
         !config.dead_blocks || !config.level_goals || !config.scores ||
         !config.destruction_scores || !config.definition_fields ||
-        config.storage_bytes < sizeof(AbClassicRemovals))
+        config.storage_bytes < sizeof(AbClassicRemovals) || capacity < count ||
+        capacity > level.bodies->capacity)
         return ab_fail(error, "Invalid classic removal source or limits");
     size_t remaining = config.storage_bytes - sizeof(AbClassicRemovals);
-    if (count > remaining / sizeof(RemovalDefinition))
+    if (capacity > remaining / sizeof(RemovalDefinition))
         return ab_fail(error, "Classic removal definition rows exceed byte bound");
-    remaining -= count * sizeof(RemovalDefinition);
-    if (config.definition_fields > remaining / sizeof(AbDataEntry) / count)
+    remaining -= capacity * sizeof(RemovalDefinition);
+    size_t fields = remaining / sizeof(AbDataEntry);
+    if (config.definition_fields <= fields / capacity)
+        fields = capacity * config.definition_fields;
+    if (!fields)
         return ab_fail(error, "Classic removal definition fields exceed byte bound");
     AbClassicRemovals *owner = calloc(1, sizeof(*owner));
     if (!owner)
@@ -446,24 +467,31 @@ bool ab_classic_removals_open(AbClassicRemovalConfig config, AbClassicRemovals *
     owner->config = config;
     owner->level = level;
     owner->count = count;
-    owner->bytes = sizeof(*owner) + count * sizeof(RemovalDefinition) +
-                   count * config.definition_fields * sizeof(AbDataEntry);
-    owner->definitions = calloc(count, sizeof(*owner->definitions));
-    owner->fields = calloc(count * config.definition_fields, sizeof(*owner->fields));
+    owner->capacity = capacity;
+    owner->fields_capacity = fields;
+    owner->bytes = sizeof(*owner) + capacity * sizeof(RemovalDefinition) +
+                   fields * sizeof(AbDataEntry);
+    owner->definitions = calloc(capacity, sizeof(*owner->definitions));
+    owner->fields = calloc(fields, sizeof(*owner->fields));
     if (!owner->definitions || !owner->fields) {
         ab_classic_removals_close(owner);
         return ab_fail(error, "Cannot allocate classic removal definitions");
     }
-    for (size_t index = 0; index < count; ++index)
-        owner->definitions[index].table =
-            (AbDataTable){owner->fields + index * config.definition_fields, 0,
-                          config.definition_fields, NULL};
     owner->block_entry =
         (AbDataEntry){text(span("blocks")), field(level.catalog, "blocks")};
     owner->block_table = (AbDataTable){&owner->block_entry, 1, 1, NULL};
     owner->state =
         (AbBlockRemovalState){table(&level.properties->registry), config.dead_blocks};
     *output = owner;
+    return true;
+}
+
+bool ab_classic_removals_register_object(AbClassicRemovals *owner, size_t object,
+                                         AbError *error) {
+    if (!owner || owner->calling || object != owner->count ||
+        object >= owner->capacity || object >= owner->level.bodies->count)
+        return ab_fail(error, "Invalid new removal adapter row");
+    ++owner->count;
     return true;
 }
 

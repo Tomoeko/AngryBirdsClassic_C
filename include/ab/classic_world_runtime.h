@@ -29,6 +29,7 @@ typedef struct {
     bool (*level_physics)(void *context, float seconds, AbError *error);
     size_t map_nodes, map_bytes, score_entries, script_bytes, storage_bytes;
     AbFloatingScoreLimits floating;
+    size_t object_capacity;
 } AbClassicWorldRuntimeConfig;
 
 typedef struct {
@@ -45,12 +46,17 @@ typedef struct {
     float *bird_bonus;
     const bool *physics_enabled;
     AbDataValue *flying;
+    /* Stable physical-table values used by the shared dead-block map. */
+    const AbDataValue *physical_values;
+    size_t physical_count;
+    size_t object_capacity;
 } AbClassicWorldRuntimeView;
 
 /* Fresh ordinary Museum world services. Construct the actual fresh death/hat/
  * teleporter registries, grenade list and score records, apply the registered
  * default block classes, and bind both collision routes to the same dynamics,
- * removal, goal and score owners. Initial stable identities only. Borrow the
+ * removal, goal and score owners. Reserve later direct-circle identities with
+ * object_capacity and publish them through register_circle. Borrow the
  * prepared playfield, particles, shared state and resolved service callbacks.
  * This is construction, not a frame tick or an input/GUI substitute.
  *
@@ -66,5 +72,9 @@ bool ab_classic_world_runtime_open(AbClassicWorldRuntimeConfig config,
                                    AbClassicWorldRuntime **output, AbError *error);
 bool ab_classic_world_runtime_close(AbClassicWorldRuntime **runtime, AbError *error);
 AbClassicWorldRuntimeView ab_classic_world_runtime_view(AbClassicWorldRuntime *runtime);
+/* Publish the next source direct circle after its real playfield/native-vector
+ * construction. Reserve object_capacity at open. No gameplay effects or RNG. */
+bool ab_classic_world_runtime_register_circle(AbClassicWorldRuntime *runtime,
+                                              size_t object, AbError *error);
 
 #endif

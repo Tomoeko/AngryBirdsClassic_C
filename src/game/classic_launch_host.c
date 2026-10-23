@@ -54,9 +54,10 @@ static bool remaining(AbClassicLaunchHost *host, AbShotCall *call, AbError *erro
         case AB_SHOT_ATTACH_PARTICLES: {
             size_t object;
             return bird_index(host, call, &object, error) &&
-                   ab_classic_shot_attach_particles(
+                   ab_classic_shot_attach_particles_host(
                        config->level, object, config->powerups,
-                       truthy(*config->powerups_enabled), error);
+                       truthy(*config->powerups_enabled), config->context,
+                       config->shot_trails, error);
         }
         case AB_SHOT_RESOLVE_AUDIO:
             return ab_audio_bank_name(config->audio, call->text, &call->text, error);
@@ -75,11 +76,28 @@ static bool remaining(AbClassicLaunchHost *host, AbShotCall *call, AbError *erro
         }
         case AB_SHOT_PLAY_SLING_SOUND: {
             uint32_t handle;
-            if (!ab_audio_bank_default_sling_launch(config->audio, &handle, error))
-                return false;
             AbClassicSling *sling = *config->sling;
             if (!sling || ab_classic_sling_shots(sling) != *config->shots)
                 return ab_fail(error, "Missing reached actual sling launch-cue owner");
+            if (ab_classic_sling_view(sling).king) {
+                AbDataValue selected;
+                const char name[] = "super_shot";
+                if (!ab_audio_bank_name_value(
+                        config->audio,
+                        (AbDataValue){
+                            .kind = AB_DATA_STRING,
+                            .string = {(const uint8_t *)name, sizeof(name) - 1}},
+                        &selected, error) ||
+                    !ab_audio_bank_play(
+                        config->audio,
+                        (AbAudioPlay){.name = selected,
+                                      .volume = {.kind = AB_DATA_NUMBER,
+                                                 .bits = UINT32_C(0x3f800000)}},
+                        &handle, error))
+                    return false;
+            } else if (!ab_audio_bank_default_sling_launch(config->audio, &handle,
+                                                           error))
+                return false;
             ab_classic_sling_set_launch_cue(sling);
             return true;
         }

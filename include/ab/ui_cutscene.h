@@ -39,7 +39,8 @@ typedef struct {
     float scale, elapsed, scroll_begin_time, scroll_end_time;
     float color[3];
     size_t command_index, sound_count;
-    bool sprite_present, fit_height, no_scroll, scrolling, scroll_cubic, ldown;
+    bool sprite_present, fit_height, fit_width, no_scroll, scrolling, scroll_cubic,
+        ldown;
     bool trigger_skip, skip_allowed;
 } AbUiCutscene;
 

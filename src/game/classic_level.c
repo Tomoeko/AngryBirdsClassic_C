@@ -240,7 +240,8 @@ static bool allocate_arrays(AbClassicLevel *level, AbClassicLevelLimits limits,
         arrays[JOINT_CONSTRUCTOR_INDICES],
         joint_requirements.immediate + joint_requirements.deferred,
         arrays[JOINT_CONSTRUCTOR_NODES], joint_requirements.hash_capacity};
-    level->bodies = (AbLevelBodies){arrays[OBJECTS], bodies, 0};
+    level->bodies =
+        (AbLevelBodies){.objects = arrays[OBJECTS], .capacity = bodies, .count = 0};
     level->properties =
         (AbLevelProperties){.objects = arrays[PROPERTY_OBJECTS],
                             .world_entries = arrays[PROPERTY_WORLD_ENTRIES],
@@ -465,6 +466,7 @@ static bool initialize_definition_properties(AbClassicLevel *level, size_t index
         "passThroughSound",
         "passThroughParticles",
         "isGiftBox",
+        "extraSprites",
     };
     for (size_t field = 0; field < sizeof(fields) / sizeof(*fields); ++field) {
         AbDataValue value =
@@ -953,6 +955,36 @@ bool ab_classic_level_create_circle(AbClassicLevel *level, AbGameCircleInput inp
         return false;
     *output = index;
     return true;
+}
+
+bool ab_classic_level_recreate_circle(AbClassicLevel *level, size_t index,
+                                      AbGameCircleInput input, AbError *error) {
+    if (!level || index >= level->bodies.count || !level->removed_objects[index] ||
+        level->world.failed || level->world.locked ||
+        input.name.size != level->bodies.objects[index].name.size || !input.name.data ||
+        memcmp(input.name.data, level->bodies.objects[index].name.data,
+               input.name.size))
+        return ab_fail(error, "Invalid removed circle replacement");
+    AbLevelObject *object = level->bodies.objects + index;
+    if (ab_world_has_body(&level->world, object->physics.body))
+        return ab_fail(error, "Circle replacement retained its old native body");
+    AbGameCircle circle;
+    if (!ab_game_circle_create(&level->world, input, (uintptr_t)object, &circle, error))
+        return false;
+    *object = (AbLevelObject){.name = input.name,
+                              .physics = circle.physics,
+                              .initial_mass = circle.initial_mass};
+    level->frame.objects[index] = circle.frame;
+    AbLevelPropertyObject *properties = level->properties.objects + index;
+    *properties = circle.properties;
+    properties->physical.entries = properties->physical_entries;
+    level->properties.world_entries[index].value =
+        (AbDataValue){.kind = AB_DATA_TABLE, .table = &properties->physical};
+    level->removed_objects[index] = false;
+    level->motion_properties[index] = (AbClassicMotionProperties){0};
+    level->character_objects[index].jump.position = input.position;
+    return ab_string_map_set(level->world_names, input.name, index, true, error) &&
+           refresh_world_order(level, error);
 }
 
 bool ab_classic_level_raycast(const AbClassicLevel *level, AbVec2 first, AbVec2 second,

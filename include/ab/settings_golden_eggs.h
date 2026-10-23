@@ -12,6 +12,9 @@ bool ab_settings_golden_egg(AbSettingsStatistics *highscores, AbSpan name,
                             AbDataValue *output, AbError *error);
 bool ab_settings_golden_egg_unlocked(AbSettingsStatistics *highscores, AbSpan name,
                                      AbDataValue *output, AbError *error);
+/* isGoldenEggPlayed20882 returns the same owned row's raw opened field. */
+bool ab_settings_golden_egg_played(AbSettingsStatistics *highscores, AbSpan name,
+                                   AbDataValue *output, AbError *error);
 bool ab_settings_golden_egg_unlock(AbSettingsStatistics *highscores, AbSpan name,
                                    AbError *error);
 

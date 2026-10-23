@@ -152,6 +152,10 @@ bool ab_game_update_tail_world(AbGameTailState *state, AbGameTailWorld world,
                                         seconds, time, NULL, error)) {
         return false;
     }
+    if (state->grenade_count && *state->grenade_count &&
+        !call_host(host, context, AB_GAME_TAIL_GRENADES, NULL, seconds, time, NULL,
+                   error))
+        return false;
     if (state->darkness_present) {
         float darkness = state->eagle_darkness - seconds * 0.4f;
         if (!isfinite(darkness)) {

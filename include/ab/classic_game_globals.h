@@ -14,6 +14,7 @@ typedef struct {
     AbDataValue bird_specialty;
     AbDataValue has_awake_objects, has_moving_objects,
         has_moving_objects_above_tolerance;
+    AbDataValue eagle_darkness;
 } AbClassicGameGlobals;
 
 /* gamelogic.lua root update prototype 57000 instructions 289..297. Advance the

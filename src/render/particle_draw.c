@@ -96,6 +96,14 @@ static bool append(const AbParticle *particle, AbParticleDrawStyle style,
         !binding.sprite.region || !binding.image ||
         !style.provider->texture(style.provider->context, binding.image, &texture))
         return ab_fail(error, "Missing retained world particle sprite binding");
+    /* Native Particles::drawParticles divides position/translation by zero
+     * scale and submits nonfinite rectangles with zero context scale. They
+     * produce no rasterizable geometry. Keep the live particle and its update
+     * order, while omitting that draw before the finite quad boundary. */
+    if (particle->scale == 0 ||
+        (kind == PARTICLE_MENU && isfinite(menu_scale) && isfinite(particle->scale) &&
+         menu_scale * particle->scale == 0))
+        return true;
     AbImageRectangle rectangle;
     AbSpriteRenderState state;
     bool transformed =

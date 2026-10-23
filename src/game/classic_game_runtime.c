@@ -18,6 +18,8 @@ struct AbClassicGameRuntime {
     AbClassicGameLevelParticles level_particles;
     AbClassicGameInput input;
     AbClassicGameUpdate update;
+    AbClassicBoomerang boomerang;
+    AbClassicBluesSplit blues;
 };
 
 static bool budget(AbClassicGameRuntimeConfig *config, AbError *error) {
@@ -33,6 +35,8 @@ static bool budget(AbClassicGameRuntimeConfig *config, AbError *error) {
             return ab_fail(error, "Invalid or exhausted GameUpdate runtime budget");
         remaining -= parts[index];
     }
+    if (config->eggs.storage_bytes > remaining)
+        return ab_fail(error, "White bird egg owner exceeds GameUpdate runtime budget");
     return true;
 }
 
@@ -47,6 +51,8 @@ static bool open_birds(AbClassicGameRuntime *runtime, AbError *error) {
     birds.physical = runtime->dynamics.physical;
     birds.particles = config->particles;
     birds.audio = config->audio;
+    birds.explosions = config->explosions;
+    birds.object_capacity = runtime->world.object_capacity;
     birds.hats = runtime->world.hats;
     birds.flying_object = config->flying;
     birds.specialty_available = &runtime->globals->specialty_available;
@@ -73,10 +79,11 @@ static bool open_characters(AbClassicGameRuntime *runtime, AbError *error) {
     conditions.do_not_timeout = config->prelude.do_not_timeout;
     return ab_classic_character_services_initialize(conditions, &runtime->conditions,
                                                     error) &&
-           ab_classic_characters_open(
+           ab_classic_characters_open_capacity(
                playfield.level, playfield.visuals, config->random,
                ab_classic_character_services_host(&runtime->conditions),
-               config->characters_bytes, &runtime->view.characters, error);
+               runtime->world.object_capacity, config->characters_bytes,
+               &runtime->view.characters, error);
 }
 
 static bool open_progress(AbClassicGameRuntime *runtime, AbError *error) {
@@ -113,6 +120,36 @@ static bool open_progress(AbClassicGameRuntime *runtime, AbError *error) {
     return ab_classic_game_progress_open(progress, &runtime->view.progress, error);
 }
 
+static bool blues_created(void *context, const AbClassicBluesSplitResult *result,
+                          AbError *error) {
+    AbClassicGameRuntime *runtime = context;
+    for (size_t child = 0; child < 3; ++child)
+        if (!ab_classic_world_runtime_register_circle(runtime->config.world,
+                                                      result->objects[child], error) ||
+            !ab_classic_controller_register_object(runtime->view.controller,
+                                                   result->objects[child], error))
+            return false;
+    if (!ab_classic_characters_register_objects(runtime->view.characters, error))
+        return false;
+    runtime->world = ab_classic_world_runtime_view(runtime->config.world);
+    if (runtime->config.explosions)
+        runtime->config.explosions->physical_count = runtime->world.physical_count;
+    return true;
+}
+
+static bool egg_created(void *context, size_t object, AbError *error) {
+    AbClassicGameRuntime *runtime = context;
+    if (!ab_classic_world_runtime_register_circle(runtime->config.world, object,
+                                                  error) ||
+        !ab_classic_controller_register_object(runtime->view.controller, object,
+                                               error) ||
+        !ab_classic_characters_register_objects(runtime->view.characters, error))
+        return false;
+    runtime->world = ab_classic_world_runtime_view(runtime->config.world);
+    runtime->config.explosions->physical_count = runtime->world.physical_count;
+    return true;
+}
+
 static bool open_input(AbClassicGameRuntime *runtime, AbError *error) {
     AbClassicGameRuntimeConfig *config = &runtime->config;
     AbClassicPlayfieldView playfield = runtime->playfield;
@@ -129,6 +166,59 @@ static bool open_input(AbClassicGameRuntime *runtime, AbError *error) {
     specialty.boost.particles = config->particles;
     specialty.boost.audio = config->audio;
     specialty.boost.settings = config->settings;
+    runtime->boomerang = config->boomerang;
+    runtime->boomerang.level = playfield.level;
+    runtime->boomerang.birds = runtime->view.birds;
+    runtime->boomerang.sling = playfield.sling;
+    runtime->boomerang.visuals = playfield.visuals;
+    runtime->boomerang.trajectories = playfield.trajectories;
+    runtime->boomerang.audio = config->audio;
+    runtime->boomerang.settings = config->settings;
+    runtime->boomerang.forces =
+        ab_classic_simulation_view(runtime->dynamics.simulation).queue;
+    runtime->boomerang.flying = config->flying;
+    runtime->boomerang.specialty_available = &runtime->globals->specialty_available;
+    runtime->view.boomerang = &runtime->boomerang;
+    specialty.boomerang = &runtime->boomerang;
+    specialty.explosions = config->explosions;
+    specialty.birds = runtime->view.birds;
+    if (config->eggs.storage_bytes) {
+        AbClassicEggConfig eggs = config->eggs;
+        eggs.playfield = playfield;
+        eggs.birds = runtime->view.birds;
+        eggs.physical = runtime->dynamics.physical;
+        eggs.particles = config->particles;
+        eggs.explosions = config->explosions;
+        eggs.audio = config->audio;
+        eggs.settings = config->settings;
+        eggs.grenades = runtime->world.grenades;
+        eggs.context = runtime;
+        eggs.created = egg_created;
+        if (!ab_classic_eggs_open(eggs, &runtime->view.eggs, error))
+            return false;
+        specialty.eggs = runtime->view.eggs;
+    }
+    if (config->blues_names.size) {
+        if (specialty.blues || !config->blues_names.data ||
+            !ab_classic_blues_split_initialize(
+                (AbClassicBluesSplitConfig){.playfield = playfield,
+                                            .birds = runtime->view.birds,
+                                            .physical = runtime->dynamics.physical,
+                                            .settings = config->settings,
+                                            .audio = config->audio,
+                                            .hats = runtime->world.hats,
+                                            .teleporters = runtime->world.teleporters,
+                                            .flying = config->flying,
+                                            .names = config->blues_names},
+                &runtime->blues, error))
+            return error && error->message[0]
+                       ? false
+                       : ab_fail(error, "Conflicting actual Blues owners");
+        runtime->view.blues = &runtime->blues;
+        specialty.blues = &runtime->blues;
+        specialty.blues_context = runtime;
+        specialty.blues_created = blues_created;
+    }
     if (!ab_classic_bird_specialty_open(specialty, &runtime->view.specialty, error) ||
         !ab_classic_touches_open(
             (AbClassicTouchesConfig){.level = playfield.level,
@@ -200,6 +290,9 @@ static bool open_controller(AbClassicGameRuntime *runtime, AbError *error) {
         ab_classic_block_scripts_view(runtime->world.scripts);
     AbClassicControllerConfig controller = config->controller;
     controller.level = playfield.level;
+    controller.eggs = runtime->view.eggs;
+    if (controller.state)
+        controller.state->grenade_count = &runtime->world.grenades->count;
     controller.shots = playfield.shots;
     controller.sling = playfield.sling;
     controller.birds = runtime->view.birds;
@@ -215,6 +308,8 @@ static bool open_controller(AbClassicGameRuntime *runtime, AbError *error) {
     controller.physics_enabled = config->start.physics_enabled;
     controller.level_completed = &config->finish.state->complete.completed;
     controller.input = &runtime->input;
+    controller.boomerang = &runtime->boomerang;
+    controller.object_capacity = runtime->world.object_capacity;
     return ab_classic_controller_open(controller, &runtime->view.controller, error) &&
            ab_classic_game_update_initialize(
                (AbClassicGameUpdateConfig){.prelude = &runtime->prelude,
@@ -246,6 +341,17 @@ bool ab_classic_game_runtime_open(AbClassicGameRuntimeConfig config,
         return error && error->message[0]
                    ? false
                    : ab_fail(error, "Invalid GameUpdate runtime source owners/state");
+    const AbClassicExplosions *explosions = config.explosions;
+    if (explosions &&
+        (explosions->level != playfield.level ||
+         explosions->visuals != playfield.visuals ||
+         explosions->particles != config.particles ||
+         explosions->audio != config.audio ||
+         explosions->globals != ab_classic_shots_globals(playfield.shots) ||
+         explosions->dead_blocks != world.dead_blocks ||
+         explosions->physical_values != world.physical_values ||
+         explosions->physical_count != world.physical_count))
+        return ab_fail(error, "Explosion services do not share the actual game owners");
     AbClassicGameRuntime *runtime = calloc(1, sizeof(*runtime));
     if (!runtime)
         return ab_fail(error, "Cannot allocate GameUpdate runtime");
@@ -274,6 +380,7 @@ void ab_classic_game_runtime_close(AbClassicGameRuntime *runtime) {
         return;
     ab_classic_controller_close(runtime->view.controller);
     ab_classic_bird_specialty_close(runtime->view.specialty);
+    ab_classic_eggs_close(runtime->view.eggs);
     ab_classic_touches_close(runtime->touches);
     ab_classic_game_progress_close(runtime->view.progress);
     ab_classic_level_ending_close(runtime->view.ending);

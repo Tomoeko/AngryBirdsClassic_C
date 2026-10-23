@@ -254,6 +254,33 @@ static ForceEntry *find_entry(AbClassicForces *forces, AbSpan name) {
                : NULL;
 }
 
+bool ab_classic_forces_recreate_circle(AbClassicForces *forces, size_t object,
+                                       AbError *error) {
+    AbClassicLevelView level = ab_classic_level_view(forces ? forces->level : NULL);
+    if (!forces || !level.bodies || object >= level.bodies->count ||
+        level.removed_objects[object] || level.world->failed || level.world->locked)
+        return ab_fail(error, "Invalid replacement circle force binding");
+    const AbLevelObject *source = level.bodies->objects + object;
+    ForceEntry *entry = find_entry(forces, source->name);
+    if (!entry || entry->source != object || source->placement ||
+        source->physics.dimensions.radius < 0 ||
+        !ab_world_has_body(level.world, source->physics.body))
+        return ab_fail(error, "Replacement circle has no retained force row");
+    entry->data = (AbObjectForceData){0};
+    entry->data.forces.gravity_enabled = source->physics.gravity_enabled;
+    entry->data.forces.object_mass = source->initial_mass;
+    forces->objects[entry->rank] =
+        (AbGamePhysicsObject){.body = source->physics.body,
+                              .forces = entry->data.forces,
+                              .gravity_enabled = &source->physics.gravity_enabled,
+                              .sound = &entry->data.sound,
+                              .random = forces->random,
+                              .resource_host = resource_request,
+                              .resource_context = entry,
+                              .removed = level.removed_objects + object};
+    return true;
+}
+
 bool ab_classic_forces_register_circle(AbClassicForces *forces, size_t object,
                                        AbError *error) {
     AbClassicLevelView level = ab_classic_level_view(forces ? forces->level : NULL);

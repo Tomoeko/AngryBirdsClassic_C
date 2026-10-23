@@ -17,6 +17,7 @@ typedef struct {
     /* Actual named level/catalog hooks outside the implemented redBirdShot
      * route. Mandatory only when the corresponding source call reaches. */
     AbShotHost level_hook, definition_hook;
+    AbClassicShotTrails shot_trails;
 } AbClassicLaunchHostConfig;
 
 typedef struct {

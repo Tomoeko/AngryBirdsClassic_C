@@ -4,12 +4,16 @@
 #include "ab/event_timer.h"
 #include "ab/level_progress.h"
 #include "ab/ui_level_button.h"
+#include "ab/ui_level_facebook.h"
+#include "ab/ui_level_golden.h"
 #include "ab/ui_scroll_frame.h"
 
 /* Implementation storage bounds, checked against the prepared catalog; these
  * are not claims about original engine limits. */
 #define AB_UI_LEVEL_SCROLL_BUTTONS 64
 #define AB_UI_LEVEL_SCROLL_PAGES 8
+#define AB_UI_LEVEL_SCROLL_CHILDREN                                                    \
+    (AB_UI_LEVEL_SCROLL_BUTTONS * 2 + AB_UI_LEVEL_SCROLL_PAGES)
 
 typedef struct {
     AbUiLevelButtonHost buttons;
@@ -21,6 +25,8 @@ typedef struct {
     bool arrows;
     void *context;
     bool (*layout_root)(void *context, AbError *error);
+    bool (*age_filter)(void *context, bool *output, AbError *error);
+    AbSettingsStatistics *golden_eggs;
 } AbUiLevelScrollHost;
 
 typedef struct {
@@ -34,9 +40,11 @@ typedef struct {
     AbUiWidgetMethods base_methods;
     AbUiLevelScrollHost host;
     AbUiLevelButton buttons[AB_UI_LEVEL_SCROLL_BUTTONS];
-    AbUiFrameNode *frames[AB_UI_LEVEL_SCROLL_BUTTONS];
-    AbUiDrawChild draw[AB_UI_LEVEL_SCROLL_BUTTONS];
-    AbUiPointerChild pointer[AB_UI_LEVEL_SCROLL_BUTTONS];
+    AbUiLevelFacebook facebook[AB_UI_LEVEL_SCROLL_PAGES];
+    AbUiLevelGolden golden;
+    AbUiFrameNode *frames[AB_UI_LEVEL_SCROLL_CHILDREN];
+    AbUiDrawChild draw[AB_UI_LEVEL_SCROLL_CHILDREN];
+    AbUiPointerChild pointer[AB_UI_LEVEL_SCROLL_CHILDREN];
     AbVec2 anchors[AB_UI_LEVEL_SCROLL_PAGES];
     AbUiLevelVisible visible_images[AB_UI_LEVEL_SCROLL_BUTTONS * 5];
     AbUiLevelVisible visible_text[AB_UI_LEVEL_SCROLL_BUTTONS];
@@ -51,8 +59,12 @@ typedef struct {
 /* Concrete LevelScrollFrame over real basic grid buttons and ScrollFrame2.
  * Preserve source child order, live stars/unlock refresh, sync subscriptions,
  * timer/update ordering, layout and visible-image/text cache projection. This
- * component supports prepared grid pages without placeholder/locked-page signs
- * or accelerometer control. Other source layouts reject explicitly.
+ * component supports prepared grid, Facebook and Golden Eggs pages without
+ * placeholder/locked-page signs or accelerometer control. Other source layouts
+ * reject explicitly. Facebook levels remain locally open, with live age-filtered
+ * creation, visibility, art and row layout. Golden Eggs retain source unlock,
+ * played/completed state, ordered halos/star children and rotation. Enclosing
+ * root service actions and specialized screen factories remain host bindings.
  *
  * The outer LevelSelection assigns current_selection and the source per-page
  * anchors before layout. The default selection here is its ordinary first-page

@@ -73,6 +73,11 @@ void ab_classic_simulation_close(AbClassicSimulation *simulation);
 size_t ab_classic_simulation_bytes(const AbClassicSimulation *simulation);
 AbClassicSimulationView ab_classic_simulation_view(AbClassicSimulation *simulation);
 
+/* Rebind native force/activity caches after replacing a removed named circle.
+ * Call between simulation passes after collider/body-type assignment. */
+bool ab_classic_simulation_recreate_circle(AbClassicSimulation *simulation,
+                                           size_t object, AbError *error);
+
 /* Register the next source-created direct circle with both actual force and
  * post-physics owners, before its first frame. No source fields are defaulted
  * from a later copied catalog definition. Refresh views after registration.

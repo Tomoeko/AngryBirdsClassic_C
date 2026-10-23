@@ -11,6 +11,7 @@ typedef struct {
     AbClassicLevel *level;
     const bool *physics_enabled;
     size_t storage_bytes;
+    size_t object_capacity;
     void *context;
     bool (*level_step)(void *context, float seconds, AbError *error);
 } AbClassicBlockScriptConfig;
@@ -41,5 +42,9 @@ bool ab_classic_block_scripts_open(AbClassicBlockScriptConfig config,
                                    AbClassicBlockScripts **output, AbError *error);
 void ab_classic_block_scripts_close(AbClassicBlockScripts *scripts);
 AbClassicBlockScriptView ab_classic_block_scripts_view(AbClassicBlockScripts *scripts);
+/* Direct-circle construction does not run the ordinary factory's component
+ * application. Publish its actual empty script row in reserved stable storage. */
+bool ab_classic_block_scripts_register_circle(AbClassicBlockScripts *scripts,
+                                              size_t object, AbError *error);
 
 #endif

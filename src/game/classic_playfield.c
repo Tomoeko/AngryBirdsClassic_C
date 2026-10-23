@@ -115,6 +115,7 @@ static bool open_launch(AbClassicPlayfield *owner, AbError *error) {
                                             config->red_special_available,
                                         .context = config->context,
                                         .level_hook = config->level_hook,
+                                        .shot_trails = config->shot_trails,
                                         .definition_hook = config->definition_hook},
             &owner->launch, error) ||
         !ab_shot_services_open(

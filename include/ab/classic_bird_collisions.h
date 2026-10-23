@@ -49,8 +49,12 @@ typedef struct {
                               AbError *error);
     AbAmbientParticleHost damage_particles;
     size_t storage_bytes;
+    size_t object_capacity;
     AbClassicScores *root_scores;
 } AbClassicBirdCollisionConfig;
+
+bool ab_classic_bird_collisions_register_object(AbClassicBirdCollisions *owner,
+                                                size_t object, AbError *error);
 
 /* Bind every recovered bird-callback phase to the live initial level registry,
  * attached scripts, owned behavior dispatch, visuals, audio and floating scores.
@@ -59,8 +63,8 @@ typedef struct {
  *
  * Publish changed physical fields and shared specialty/score state before each
  * service/lookup, and refresh after successful services. Retain entry objects and
- * immutable catalog definitions through later rebinding. Support initial fixed
- * world identities and immutable catalog tables; dynamic objects, renames and
+ * immutable catalog definitions through later rebinding. Support initial and
+ * explicitly registered dynamic identities and immutable catalog tables; renames and
  * custom gameObjectScript receivers reject when reached. Missing required
  * services fail at their actual boundary, preserving preceding game effects.
  * Achievement processor and delta-sling presence are explicit live values.
@@ -76,7 +80,8 @@ bool ab_classic_bird_collisions_open(AbClassicBirdCollisionConfig config,
                                      AbClassicBirdCollisions **output, AbError *error);
 void ab_classic_bird_collisions_close(AbClassicBirdCollisions *collisions);
 size_t ab_classic_bird_collisions_bytes(const AbClassicBirdCollisions *collisions);
-/* Stable identity for binding the actual flyingGrenades list. Do not edit this
+/* Stable physical-object projection. Actual flyingGrenades records have their
+ * own name/explode fields and need not alias this projection. Do not edit this
  * projection; canonical fields refresh at call/service boundaries. */
 AbBirdCollisionObject *
 ab_classic_bird_collisions_object(AbClassicBirdCollisions *collisions, size_t object);

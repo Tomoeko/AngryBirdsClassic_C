@@ -84,6 +84,12 @@ void ab_classic_post_physics_close(AbClassicPostPhysics *post);
 size_t ab_classic_post_physics_bytes(const AbClassicPostPhysics *post);
 AbClassicPostView ab_classic_post_physics_view(AbClassicPostPhysics *post);
 
+/* Refresh a retained named row after native circle replacement. Native rolling
+ * sound returns to the direct-circle empty name; shape/collider/radius use the
+ * newly constructed native metadata. */
+bool ab_classic_post_physics_recreate_circle(AbClassicPostPhysics *post, size_t object,
+                                             AbError *error);
+
 /* Register the next canonical direct circle between updates. object_capacity
  * must have reserved its stable specialty row and sorted index storage at open
  * (zero retains the initial count). Native direct circles start with an empty

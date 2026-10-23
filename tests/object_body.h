@@ -206,7 +206,7 @@ static bool level_body_edge_checks(AbPhysicsWorld *world) {
     AbDataTableLayout layout = {.table = &placements, .no_nil_assignments = true};
     AbLuaData level = {.globals = &globals, .layouts = &layout};
     AbLevelObject objects[2];
-    AbLevelBodies output = {objects, 2, 0};
+    AbLevelBodies output = {.objects = objects, .capacity = 2, .count = 0};
     size_t indices[2];
     AbStringOrderNode nodes[2];
     AbStringOrderWorkspace order = {indices, 2, nodes, 2};

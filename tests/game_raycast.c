@@ -25,7 +25,8 @@ typedef struct {
 
 static bool create_scene(GameRayFixture *fixture, uint32_t scene, FILE *reference) {
     CHECK(open_fixture(&fixture->query));
-    fixture->bindings = (AbLevelBodies){fixture->objects, WORLD_RAY_BODIES, 0};
+    fixture->bindings = (AbLevelBodies){
+        .objects = fixture->objects, .capacity = WORLD_RAY_BODIES, .count = 0};
     for (uint32_t index = 0; index < WORLD_RAY_BODIES; ++index) {
         uint32_t row[WORLD_RAY_BODY_WORDS];
         world_raycast_body(scene, index, row);
@@ -162,7 +163,8 @@ static bool controls(GameRayFixture *fixture) {
     uint32_t row[WORLD_RAY_BODY_WORDS];
     world_raycast_body(0, 0, row);
     CHECK(create_body(&fixture->query, row));
-    fixture->bindings = (AbLevelBodies){fixture->objects, WORLD_RAY_BODIES, 1};
+    fixture->bindings = (AbLevelBodies){
+        .objects = fixture->objects, .capacity = WORLD_RAY_BODIES, .count = 1};
     fixture->objects[0].name = (AbSpan){(const uint8_t *)"bound", 5};
     fixture->objects[0].physics.body = 0;
     AbWorldFixture *shape = fixture->query.world.storage.fixtures;

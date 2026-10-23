@@ -58,6 +58,15 @@ int main(int argc, char **argv) {
     AbDrawList list = {commands, 4, 4};
     CcFramebuffer frame;
     const float clear[] = {0, 0, 0, 1};
+    /* Capture waits for every submission and masks ordinary slot reuse. Exercise
+     * the asynchronous presentation path before enabling any readback. */
+    for (unsigned index = 0; index < 256; ++index) {
+        bool rendered = native ? ab_common_render_native(renderer, &list, clear, width,
+                                                         height, &error)
+                               : ab_common_render(renderer, &list, clear, &error);
+        if (!rendered)
+            goto release;
+    }
     if (!cc_platform_capture_begin(platform, &frame)) {
         ab_fail(&error, "Cannot begin Common clip capture");
         goto release;

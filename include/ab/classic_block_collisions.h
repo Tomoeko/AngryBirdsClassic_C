@@ -41,7 +41,11 @@ typedef struct {
                   AbError *error);
     AbAmbientParticleHost particles;
     size_t storage_bytes;
+    size_t object_capacity;
 } AbClassicBlockCollisionConfig;
+
+bool ab_classic_block_collisions_register_object(AbClassicBlockCollisions *owner,
+                                                 size_t object, AbError *error);
 
 /* Bind the recovered block callback to canonical physical tables, actual
  * behavior groups, attached block scripts, damage visuals, audio bank, particle

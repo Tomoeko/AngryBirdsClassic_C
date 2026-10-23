@@ -406,10 +406,14 @@ static bool composite_checks(void) {
           commands[0].quad.vertices[0].y == 1 + (-2.0f / 320) * 87);
     state.geometry.angle_radians = 1;
     list.count = fixture.count = 0;
+    CHECK(ab_ui_sprite_render(&sprite, &state, &boundaries, &list, NULL) &&
+          list.count == 2 && fixture.count == 2);
+    state.geometry.direct_vertices = true;
+    list.count = fixture.count = 0;
     CHECK(!ab_ui_sprite_render(&sprite, &state, &boundaries, &list, NULL) &&
           list.count == 0 && fixture.count == 0);
-    puts("UI composite cached order, anchors, natural sizing, scale and failure prefix "
-         "passed");
+    puts("UI composite cached order, anchors, natural sizing, scale, parent rotation "
+         "and failure prefix passed");
     return true;
 }
 

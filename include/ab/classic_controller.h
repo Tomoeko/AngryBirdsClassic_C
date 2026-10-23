@@ -8,6 +8,8 @@
 #include "ab/classic_sling.h"
 #include "ab/block_script.h"
 #include "ab/game_update_tail.h"
+#include "ab/classic_boomerang.h"
+#include "ab/classic_eggs.h"
 
 typedef struct AbClassicController AbClassicController;
 typedef struct AbClassicGameInput AbClassicGameInput;
@@ -60,6 +62,8 @@ typedef struct {
     AbGameTailHost service;
     /* When bound, share source cursor/skip housekeeping with the input owner. */
     AbClassicGameInput *input;
+    AbClassicBoomerang *boomerang;
+    AbClassicEggs *eggs;
 } AbClassicControllerConfig;
 
 /* Bind the recovered GameUpdate tail to actual owned gameplay services. The

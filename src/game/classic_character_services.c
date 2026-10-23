@@ -51,8 +51,10 @@ static bool lose(void *context, bool *output, AbError *error) {
             if (entry->value.kind == AB_DATA_NIL)
                 continue;
             size_t object = SIZE_MAX;
-            for (size_t index = 0; index < services->level.bird_count; ++index) {
-                size_t candidate = services->level.bird_order[index];
+            /* The canonical birds table also contains split children. The
+             * launch queue deliberately contains only the original birds. */
+            for (size_t candidate = 0; candidate < services->level.bodies->count;
+                 ++candidate) {
                 AbSpan name = services->level.bodies->objects[candidate].name;
                 if (entry->key.kind == AB_DATA_STRING &&
                     entry->key.string.size == name.size &&

@@ -44,7 +44,12 @@ static void particle_draw_pass(uint32_t *particles, uint32_t scene, uint32_t pha
     if (end < begin || (end - begin) % 76 || (end - begin) / 76 > 2)
         fail("Unexpected native particle draw vector size\n");
     uint32_t count = (end - begin) / 76, selected = 0;
-    const uint32_t *records = (const uint32_t *)(uintptr_t)begin;
+    uint32_t *records = (uint32_t *)(uintptr_t)begin;
+#if defined(AB_ORACLE_PARTICLE_ZERO_SCALE)
+    /* Controlled ParticleData inputs; original draw instructions are unchanged. */
+    for (uint32_t index = 0; index < count; ++index)
+        records[index * 19 + 11] = scene & 1 ? UINT32_C(0x80000000) : 0;
+#endif
     for (uint32_t index = 0; index < count; ++index)
         if (!layer || records[index * 19 + 6] == (uint32_t)layer)
             ++selected;

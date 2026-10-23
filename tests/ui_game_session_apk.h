@@ -10,8 +10,12 @@ static bool game_test_center(AbUiWidget *widget, AbVec2 *point, AbError *error) 
     if (!ab_ui_widget_screen_position(widget, point, error) ||
         !ab_ui_widget_cumulative_scale(widget, &scale, error) ||
         !images.bounds(images.context, image, &size, error) ||
-        !images.pivot(images.context, image, &pivot, error))
+        !images.pivot(images.context, image, &pivot, error)) {
+        if (!error->message[0])
+            ab_fail(error, "Cannot resolve test button geometry for %.*s",
+                    (int)image.size, image.data);
         return false;
+    }
     float sine, cosine;
     if (!ab_script_sine(menu_real(widget->frame->fields.angle.number_bits), &sine) ||
         !ab_script_cosine(menu_real(widget->frame->fields.angle.number_bits), &cosine))

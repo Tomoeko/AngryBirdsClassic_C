@@ -211,7 +211,8 @@ ab_classic_object_removal_registry(AbClassicObjectRemoval *owner) {
 
 bool ab_classic_object_removal_register_circle(AbClassicObjectRemoval *owner,
                                                size_t object, AbError *error) {
-    if (!owner || owner->calling || owner->invalid || object != owner->count ||
+    if (!owner || owner->calling || owner->invalid || object > owner->count ||
+        (object < owner->count && owner->objects[object].references) ||
         object >= owner->capacity || object >= owner->level.bodies->count ||
         object >= owner->level.frame->count || owner->level.world->failed ||
         owner->level.world->locked || owner->level.removed_objects[object] ||
@@ -246,7 +247,8 @@ bool ab_classic_object_removal_register_circle(AbClassicObjectRemoval *owner,
     if (!ab_string_map_set(owner->registry.objects, source->name,
                            (uintptr_t)&entry->core, true, error))
         return false;
-    ++owner->count;
+    if (object == owner->count)
+        ++owner->count;
     if (source->physics.controllable)
         owner->birds[owner->registry.bird_count++] = &entry->core;
     return true;

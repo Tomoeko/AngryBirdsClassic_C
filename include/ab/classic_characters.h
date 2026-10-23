@@ -47,8 +47,9 @@ typedef struct {
  * Missing host operations fail only when reached. Distance, loss, sound choice/
  * playback and hats remain explicit boundaries; do not replace them with no-ops
  * in a gameplay runtime. Scene submission is separate. Level, visuals, catalog
- * names, host context and RNG must outlive this owner; close it first. Fixed
- * membership only, without insertion/removal or complete frame scheduling.
+ * names, host context and RNG must outlive this owner; close it first. Later
+ * direct-circle identities require reserved capacity and explicit registration.
+ * Complete frame scheduling remains external.
  * storage_bytes bounds all owned allocations. Output is NULL on failure.
  */
 bool ab_classic_characters_open(AbClassicLevel *level, AbClassicVisuals *visuals,
@@ -56,6 +57,24 @@ bool ab_classic_characters_open(AbClassicLevel *level, AbClassicVisuals *visuals
                                 size_t storage_bytes, AbClassicCharacters **output,
                                 AbError *error);
 void ab_classic_characters_close(AbClassicCharacters *characters);
+/* Reserve stable adapter rows for later direct-circle identities. Zero capacity
+ * retains open's initial-only domain. Register the entire new canonical prefix
+ * after its real construction; preserve timers and existing character state. */
+bool ab_classic_characters_open_capacity(AbClassicLevel *level,
+                                         AbClassicVisuals *visuals, AbRandom48 *random,
+                                         AbClassicCharacterHost host,
+                                         size_t object_capacity, size_t storage_bytes,
+                                         AbClassicCharacters **output, AbError *error);
+/* setPigSpecialExpression136690 over a live canonical object. Resolve the raw
+ * extraSprites key and disabled gate, publish the source fields, then refresh
+ * the owned character projection. Missing sprites/world members are source
+ * no-ops. Borrow sprite-name bytes; no allocation, RNG or immediate drawing. */
+bool ab_classic_characters_special_expression(AbClassicCharacters *characters,
+                                              size_t object, AbSpan key, float seconds,
+                                              AbError *error);
+
+bool ab_classic_characters_register_objects(AbClassicCharacters *characters,
+                                            AbError *error);
 size_t ab_classic_characters_bytes(const AbClassicCharacters *characters);
 
 /* Borrow stable views. Update numeric state, special names, controller

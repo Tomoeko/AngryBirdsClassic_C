@@ -58,7 +58,8 @@ add_library(ab_numeric STATIC src/core/rotation.c src/core/angle.c src/core/scri
 target_include_directories(ab_numeric PUBLIC include)
 target_link_libraries(ab_numeric PUBLIC ab_options)
 
-add_library(ab_base STATIC src/core/base.c src/core/utf8.c src/core/string_map.c)
+add_library(ab_base STATIC src/core/base.c src/core/utf8.c src/core/string_map.c
+    src/core/identity_map.c)
 target_include_directories(ab_base PUBLIC include)
 target_link_libraries(ab_base PUBLIC ab_options)
 
@@ -212,6 +213,7 @@ add_library(ab_render STATIC src/render/draw.c src/render/gles2.c
     src/render/game_rectangle.c
     src/render/theme_foreground.c
     src/render/theme_layer_data.c
+    src/render/theme_rect.c
     src/render/theme_sprite.c
     src/render/object_sprite.c src/render/image_rectangle.c src/render/sprite_scene.c
     src/render/lua_asset_sprite.c src/render/scene_id.c src/render/scene_membership.c
@@ -264,6 +266,7 @@ add_library(ab_game STATIC src/game/object_definition.c src/game/object_physics.
     src/game/classic_pause_actions.c
     src/game/collision.c src/game/collision_damage.c src/game/bird_damage.c
     src/game/collision_route.c src/game/slingshot.c src/game/slingshot_body.c
+    src/game/sling_scope.c
     src/game/slingshot_drag.c src/game/slingshot_launch.c src/game/bird_shot.c
     src/game/slingshot_pose.c
     src/game/game_hud.c
@@ -300,6 +303,7 @@ add_library(ab_game STATIC src/game/object_definition.c src/game/object_physics.
     src/game/classic_loader.c
     src/game/native_events.c
     src/game/classic_root.c
+    src/game/classic_level5.c
     src/game/classic_audio_ramp.c
     src/game/url_requests.c
     src/game/session_timer.c
@@ -477,10 +481,15 @@ add_library(ab_scene STATIC src/render/classic_scene.c src/render/classic_visual
     src/game/ui_text_widget.c
     src/game/ui_text_clipping.c
     src/game/ui_episode_button.c src/game/ui_level_button.c
+    src/game/ui_level_facebook.c
+    src/game/ui_level_golden.c
     src/game/ui_episode_services.c src/game/ui_level_services.c
     src/game/ui_episode_scroll.c src/game/ui_level_scroll.c
     src/game/ui_episode_selection.c src/game/ui_level_selection.c
     src/game/ui_level_hidden_eggs.c
+    src/game/ui_level_rmf.c
+    src/game/ui_level_pigs.c
+    src/game/ui_level_eggs.c
     src/game/ui_cutscene.c
     src/game/ui_menu_birds.c
     src/game/ui_bg_box.c
@@ -488,6 +497,7 @@ add_library(ab_scene STATIC src/render/classic_scene.c src/render/classic_visual
     src/game/ui_main_menu_slider.c
     src/game/ui_slider.c
     src/game/ui_hud_powerups.c
+    src/game/ui_powerup_effect.c
     src/game/ui_hud_buttons.c
     src/game/ui_pause_page.c
     src/game/ui_mighty_eagle_button.c
@@ -510,9 +520,16 @@ add_library(ab_scene STATIC src/render/classic_scene.c src/render/classic_visual
     src/game/classic_game_progress.c
     src/game/classic_game_start.c
     src/game/classic_game_powerups.c
+    src/game/classic_powerup_particles.c
+    src/game/classic_superseed.c
+    src/game/classic_powerup_manager.c
     src/game/classic_game_level_particles.c
     src/game/classic_bird_specialty.c
     src/game/classic_bird_boost.c
+    src/game/classic_boomerang.c
+    src/game/classic_explosions.c
+    src/game/classic_eggs.c
+    src/game/classic_object_animation.c
     src/game/classic_touches.c
     src/game/classic_game_input.c
     src/game/classic_menu_input.c
@@ -563,6 +580,23 @@ if(BUILD_TESTING)
     add_executable(ab_string_map_tests tests/string_map.c)
     target_link_libraries(ab_string_map_tests PRIVATE ab_base)
     add_test(NAME string_map_edges COMMAND ab_string_map_tests)
+    add_executable(ab_identity_map_tests tests/identity_map.c)
+    target_link_libraries(ab_identity_map_tests PRIVATE ab_base)
+    add_test(NAME identity_map_edges COMMAND ab_identity_map_tests)
+    set(AB_REFERENCE_IDENTITY_MAP "" CACHE FILEPATH
+        "Private original Android table-key dictionary corpus")
+    if(AB_REFERENCE_IDENTITY_MAP)
+        file(SHA256 "${AB_REFERENCE_IDENTITY_MAP}" identity_map_hash)
+        if(NOT identity_map_hash STREQUAL
+            "a94ee2eeb12fdde90d5dcbd0269be3b4ce68472023160ffae07c9cfbbc98ad2d")
+            message(FATAL_ERROR "Unexpected original table-key dictionary corpus")
+        endif()
+        add_test(NAME identity_map_native COMMAND ab_identity_map_tests
+            "${AB_REFERENCE_IDENTITY_MAP}")
+    endif()
+    add_executable(ab_classic_level5_tests tests/classic_level5.c)
+    target_link_libraries(ab_classic_level5_tests PRIVATE ab_game)
+    add_test(NAME classic_level5_edges COMMAND ab_classic_level5_tests)
     add_executable(ab_world_iteration_tests tests/world_iteration.c)
     target_link_libraries(ab_world_iteration_tests PRIVATE ab_base)
     add_test(NAME world_iteration_edges COMMAND ab_world_iteration_tests)
@@ -922,6 +956,20 @@ if(BUILD_TESTING)
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_frame_clock_reference.cmake")
     endif()
 
+    add_executable(ab_sling_scope_tests tests/sling_scope.c)
+    target_link_libraries(ab_sling_scope_tests PRIVATE ab_game)
+    add_test(NAME sling_scope_edges COMMAND ab_sling_scope_tests)
+    set(AB_REFERENCE_SLING_SCOPE "" CACHE FILEPATH
+        "Private original Android Sling Scope geometry corpus")
+    if(AB_REFERENCE_SLING_SCOPE)
+        file(SHA256 "${AB_REFERENCE_SLING_SCOPE}" sling_scope_hash)
+        if(NOT sling_scope_hash STREQUAL
+            "3671d0184625f7f5f66a43b85f75f75dc67a6ebd15eaec9c6f6581fa88019349")
+            message(FATAL_ERROR "Unexpected original Sling Scope geometry corpus")
+        endif()
+        add_test(NAME sling_scope_native COMMAND ab_sling_scope_tests
+            "${AB_REFERENCE_SLING_SCOPE}")
+    endif()
     add_executable(ab_slingshot_tests tests/slingshot.c)
     target_link_libraries(ab_slingshot_tests PRIVATE ab_game)
     add_test(NAME game_slingshot_edges COMMAND ab_slingshot_tests)
@@ -1283,6 +1331,20 @@ if(BUILD_TESTING)
     add_executable(ab_classic_shot_listeners_tests tests/classic_shot_listeners.c)
     target_link_libraries(ab_classic_shot_listeners_tests PRIVATE ab_game)
     add_test(NAME classic_shot_listeners_edges COMMAND ab_classic_shot_listeners_tests)
+    add_executable(ab_superseed_radius_tests tests/superseed_radius.c)
+    target_link_libraries(ab_superseed_radius_tests PRIVATE ab_scene)
+    add_test(NAME superseed_radius_edges COMMAND ab_superseed_radius_tests)
+    set(AB_REFERENCE_SUPERSEED_RADIUS "" CACHE FILEPATH
+        "Private original Android Super Seeds radius corpus")
+    if(AB_REFERENCE_SUPERSEED_RADIUS)
+        file(SHA256 "${AB_REFERENCE_SUPERSEED_RADIUS}" superseed_radius_hash)
+        if(NOT superseed_radius_hash STREQUAL
+            "5a04f2c4e15f950aaeb35d1cc84575377cf1df74aa004d99d873b7e9d4248ebf")
+            message(FATAL_ERROR "Unexpected original Super Seeds radius corpus")
+        endif()
+        add_test(NAME superseed_radius_native COMMAND ab_superseed_radius_tests
+            "${AB_REFERENCE_SUPERSEED_RADIUS}")
+    endif()
     add_executable(ab_powerup_uses_tests tests/powerup_uses.c)
     target_link_libraries(ab_powerup_uses_tests PRIVATE ab_game)
     add_test(NAME powerup_uses_storage COMMAND ab_powerup_uses_tests)
@@ -1931,6 +1993,18 @@ if(BUILD_TESTING)
                 ENVIRONMENT "AB_TEST_SKIP_END=1")
             set_tests_properties(ui_widget_apk_metal ui_widget_apk_skip_metal PROPERTIES
                 SKIP_RETURN_CODE 77 RESOURCE_LOCK ab_ui_intro_profile)
+            set(AB_REFERENCE_OBJECT_ANIMATION "" CACHE FILEPATH
+                "Private original Android object-animation corpus")
+            if(AB_REFERENCE_OBJECT_ANIMATION)
+                file(SHA256 "${AB_REFERENCE_OBJECT_ANIMATION}" object_animation_hash)
+                if(NOT object_animation_hash STREQUAL
+                    "f018fa43bd0c2a5d435bb7d9b4b035f7ebf4c963e23587ac40f7424231dac575")
+                    message(FATAL_ERROR "Unexpected original object-animation corpus")
+                endif()
+                set_property(TEST ui_widget_apk_metal ui_widget_apk_skip_metal
+                    APPEND PROPERTY ENVIRONMENT
+                    "AB_OBJECT_ANIMATION_REFERENCE=${AB_REFERENCE_OBJECT_ANIMATION}")
+            endif()
         endif()
     endif()
     add_executable(ab_ui_menu_manager_tests tests/ui_menu_manager.c)
@@ -2002,6 +2076,18 @@ if(BUILD_TESTING)
     add_executable(ab_theme_layer_data_tests tests/theme_layer_data.c)
     target_link_libraries(ab_theme_layer_data_tests PRIVATE ab_render)
     add_test(NAME theme_layer_data_edges COMMAND ab_theme_layer_data_tests)
+    add_executable(ab_theme_rect_tests tests/theme_rect.c)
+    target_link_libraries(ab_theme_rect_tests PRIVATE ab_render)
+    add_test(NAME theme_rect_edges COMMAND ab_theme_rect_tests)
+    set(AB_REFERENCE_THEME_RECT "" CACHE FILEPATH
+        "Optional pinned Android rectangle-theme constructor/draw corpus")
+    if(AB_REFERENCE_THEME_RECT)
+        add_test(NAME theme_rect_android
+            COMMAND "${CMAKE_COMMAND}"
+                "-DREFERENCE=${AB_REFERENCE_THEME_RECT}"
+                "-DCHECKER=$<TARGET_FILE:ab_theme_rect_tests>"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_theme_rect_reference.cmake")
+    endif()
     add_executable(ab_theme_catalog_tests tests/theme_catalog.c)
     target_link_libraries(ab_theme_catalog_tests PRIVATE ab_resource)
     add_executable(ab_composite_bounds_tests tests/composite_bounds.c)
@@ -2143,11 +2229,21 @@ if(BUILD_TESTING)
         "Optional original CompoSprite transformed integer bounds")
     set(AB_REFERENCE_COMPOSITE_DRAW "" CACHE FILEPATH
         "Optional original CompoSprite transformed point quads")
+    set(AB_REFERENCE_COMPOSITE_CONTEXT_DRAW "" CACHE FILEPATH
+        "Optional original CompoSprite rotated and reflected parent-context quads")
     if(AB_REFERENCE_COMPOSITE_DRAW)
         add_test(NAME composite_draw_android
             COMMAND "${CMAKE_COMMAND}"
                 "-DREFERENCE=${AB_REFERENCE_COMPOSITE_DRAW}"
                 "-DCHECKER=$<TARGET_FILE:ab_composite_draw_tests>"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_composite_draw_reference.cmake")
+    endif()
+    if(AB_REFERENCE_COMPOSITE_CONTEXT_DRAW)
+        add_test(NAME composite_draw_context_android
+            COMMAND "${CMAKE_COMMAND}"
+                "-DREFERENCE=${AB_REFERENCE_COMPOSITE_CONTEXT_DRAW}"
+                "-DCHECKER=$<TARGET_FILE:ab_composite_draw_tests>"
+                -DROTATED_PARENT=ON
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_composite_draw_reference.cmake")
     endif()
     if(AB_REFERENCE_COMPOSITE_BOUNDS)

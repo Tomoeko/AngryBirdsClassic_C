@@ -7,28 +7,41 @@
 #include "ab/classic_game_render.h"
 #include "ab/classic_game_runtime.h"
 #include "ab/classic_level_runtime.h"
+#include "ab/classic_object_animation.h"
+#include "ab/classic_level5.h"
 #include "ab/classic_shot_effects.h"
 #include "ab/level_effect.h"
 #include "ab/classic_highscores.h"
 #include "ab/camera_touch.h"
 #include "ab/ui_hud_buttons.h"
+#include "ab/classic_powerup_manager.h"
+#include "ab/classic_powerup_particles.h"
+#include "ab/classic_superseed.h"
+#include "ab/ui_hud_powerups.h"
 
 typedef struct PreviewResults PreviewResults;
 typedef struct PreviewPause PreviewPause;
+typedef struct PreviewPowerups PreviewPowerups;
 
 /* Application ownership, above the independently verified runtime phases.
  * Resources/settings/events remain owned by the menu application. */
 struct PreviewGame {
     PreviewMenu *menu;
+    AbClassicLevel5 level5;
+    uint8_t blues_names[65536];
+    AbDataTable egg_event, egg_data;
+    AbDataEntry egg_event_fields[2], egg_count;
     AbClassicLevelRuntime *level;
     AbClassicWorldRuntime *world;
     AbClassicGameRuntime *game;
     AbClassicGameRender *render;
     AbClassicParticles *particles;
+    AbClassicExplosions explosions;
     AbClassicCollisionAchievements *achievements;
     AbClassicHighscores *highscores;
     PreviewResults *results;
     PreviewPause *pause;
+    PreviewPowerups *powerups;
     AbUiPointerValue navigation_action;
     AbClassicCollisionHooks hooks;
     AbObjectRemovalNotifyHost removal_notifications;
@@ -53,8 +66,8 @@ struct PreviewGame {
     AbCameraTouchShared camera_shared;
     AbHeroScreenTinter hero;
     AbBurnManager burn;
-    AbEngineRandom engine_random;
     AbDataValue enabled, disabled, absent, flying, goal_sent, will_end;
+    AbDataValue prevent_ending;
     AbDataValue next_sound, bird_sound, pig_sound, start_sound, clear_sound;
     AbDataValue failed_sound, song, music, model, level_name, level_effect;
     AbDataValue physics_to_world, level_particles, level_particles_enabled;
@@ -64,6 +77,9 @@ struct PreviewGame {
     AbDataTable pressed, held, released;
     AbDataEntry pressed_key, held_key, released_key;
     AbUiWidget notifications;
+    AbUiFrameNode *notification_frames[AB_CLASSIC_POWERUPS];
+    AbUiDrawChild notification_draw[AB_CLASSIC_POWERUPS];
+    AbUiPointerChild notification_pointer[AB_CLASSIC_POWERUPS];
     AbUiHudSkipButton skip;
     AbUiWidgetContext notification_context;
     AbUiFrameFields notification_fields;
@@ -162,19 +178,40 @@ static bool game_session_scroll(PreviewMenu *menu, float amount, AbVec2 point,
  * onAfterLevelObjectsCreated loop. Reject unresolved active scripts before
  * loading; the remaining names have an actual absent source registry entry. */
 static bool game_scripts_available(const AbClassicLevelRequest *level, AbError *error) {
-    static const char *const registered[] = {
-        "Level5",       "Level34",     "LevelP2_64",
-        "Level1268",    "LevelP2_67",  "LevelP3_271",
-        "LevelP3_220",  "LevelP3_313", "LevelP4_426",
-        "LevelP4_440",  "LevelP4_444", "LevelP4_478",
-        "LevelP5_357",  "LevelP5_650", "LevelP5_354",
-        "LevelP5_364",  "Level695",    "Level697",
-        "LevelP6_7",    "LevelH564",   "UGC1Level15_custom",
-        "LevelH900",    "Level974",    "EggDefender_classic_8",
-        "BlackBird_15", "SOUNDBOARD1", "RADIO",
-        "KEYBOARD",     "SEQUENCER",   "ACCORDION",
-        "LevelGE_20",   "Level1261",   "Level1262",
-        "Level1263",    "Level_0003_1"};
+    static const char *const registered[] = {"Level34",
+                                             "LevelP2_64",
+                                             "Level1268",
+                                             "LevelP2_67",
+                                             "LevelP3_271",
+                                             "LevelP3_220",
+                                             "LevelP3_313",
+                                             "LevelP4_426",
+                                             "LevelP4_440",
+                                             "LevelP4_444",
+                                             "LevelP4_478",
+                                             "LevelP5_357",
+                                             "LevelP5_650",
+                                             "LevelP5_354",
+                                             "LevelP5_364",
+                                             "Level695",
+                                             "Level697",
+                                             "LevelP6_7",
+                                             "LevelH564",
+                                             "UGC1Level15_custom",
+                                             "LevelH900",
+                                             "Level974",
+                                             "EggDefender_classic_8",
+                                             "BlackBird_15",
+                                             "SOUNDBOARD1",
+                                             "RADIO",
+                                             "KEYBOARD",
+                                             "SEQUENCER",
+                                             "ACCORDION",
+                                             "LevelGE_20",
+                                             "Level1261",
+                                             "Level1262",
+                                             "Level1263",
+                                             "Level_0003_1"};
     if (menu_route_equal(level->episode_id, menu_route_number(7)) &&
         menu_route_equal(level->page_number, menu_route_number(2)))
         return ab_fail(error,
@@ -313,15 +350,34 @@ static bool game_bird_removed(void *context, AbDataValue name, size_t object,
     return ab_classic_red_bird_removed(false, error);
 }
 
+static bool game_explosion(void *context, AbDataValue object, AbDataValue definition,
+                           AbDataValue sound, AbError *error) {
+    PreviewGame *game = context;
+    AbClassicLevelView level = ab_classic_level_view(game->playfield.level);
+    for (size_t index = 0; index < level.bodies->count; ++index)
+        if (object.kind == AB_DATA_TABLE &&
+            object.table == &level.properties->objects[index].physical)
+            return ab_classic_explosions_make(&game->explosions, index, definition,
+                                              sound, (AbDataValue){0}, error);
+    return ab_fail(error, "Unknown application explosion object");
+}
+
 static bool game_service(void *context, AbGameTailCall *call, AbError *error) {
     PreviewGame *game = context;
+    if (call->operation == AB_GAME_TAIL_ANIMATION && call->object)
+        return ab_classic_object_animation_update(
+            game->playfield.level, game->playfield.visuals, &game->workspace,
+            call->object->identity, call->seconds, error);
     if (call->operation != AB_GAME_TAIL_DRAW)
         return ab_fail(error, "Unbound reached game service %u",
                        (unsigned)call->operation);
-    return ab_classic_game_draw(ab_classic_game_render_draw(game->render),
-                                (uint32_t)game->screen.x, (uint32_t)game->screen.y,
-                                menu_real(game->globals.time.bits),
-                                game->menu->context.draw_list, error);
+    game->draw.eagle_darkness = game->globals.eagle_darkness;
+    bool okay = ab_classic_game_draw(ab_classic_game_render_draw(game->render),
+                                     (uint32_t)game->screen.x, (uint32_t)game->screen.y,
+                                     menu_real(game->globals.time.bits),
+                                     game->menu->context.draw_list, error);
+    game->globals.eagle_darkness = game->draw.eagle_darkness;
+    return okay;
 }
 
 static bool game_result(void *context, AbDataTable *event, AbError *error) {
@@ -381,6 +437,14 @@ static void game_results_free(PreviewGame *game);
 static void game_pause_free(PreviewGame *game);
 static bool game_pause_open(PreviewGame *game, AbError *error);
 static bool game_pause_layout(PreviewGame *game, AbError *error);
+static void game_powerups_free(PreviewGame *game);
+static bool game_powerups_open(PreviewGame *game, AbError *error);
+static bool game_powerups_layout(PreviewGame *game, AbError *error);
+static bool game_powerup_bird_update(void *context, AbClassicBirdUpdate kind,
+                                     size_t object, float seconds, bool *alive,
+                                     AbError *error);
+static bool game_powerup_trails(void *context, size_t object, bool potion, bool king,
+                                AbError *error);
 
 static void game_session_free(PreviewMenu *menu) {
     PreviewGame *game = menu->game;
@@ -391,6 +455,7 @@ static void game_session_free(PreviewMenu *menu) {
         (void)ab_event_manager_remove(menu->events, game_text("EID_LEVEL_ENDED"),
                                       &game->result_listener, &error);
     game_results_free(game);
+    game_powerups_free(game);
     game_pause_free(game);
     game_skip_free(game);
     ab_classic_game_render_close(game->render);
@@ -408,10 +473,12 @@ static void game_session_free(PreviewMenu *menu) {
     menu->game = NULL;
 }
 
+#include "game_level_scripts.h"
 #include "game_session_runtime.h"
 #include "game_results.h"
 #include "game_results_navigation.h"
 #include "game_pause.h"
+#include "game_powerups.h"
 
 static bool game_session_pointer(PreviewMenu *menu, AbSpan action, AbVec2 point,
                                  AbError *error) {
@@ -430,6 +497,10 @@ static bool game_session_pointer(PreviewMenu *menu, AbSpan action, AbVec2 point,
     }
     bool pause_consumed;
     if (!game_pause_pointer(game, action, point, &pause_consumed, error))
+        return false;
+    if (pause_consumed)
+        return true;
+    if (!game_powerups_pointer(game, action, point, &pause_consumed, error))
         return false;
     if (pause_consumed)
         return true;
@@ -457,7 +528,11 @@ static bool game_session_resize(PreviewMenu *menu, AbVec2 screen, AbError *error
     if (!ab_classic_level_runtime_resize(game->level, screen, error))
         return false;
     game->screen = screen;
+    game->notification_context.render.viewport_width = (uint32_t)screen.x;
+    game->notification_context.render.viewport_height = (uint32_t)screen.y;
     return game_skip_layout(game, error) && game_pause_layout(game, error) &&
+           game_powerups_layout(game, error) &&
+           ab_ui_widget_lifecycle(&game->notifications, AB_UI_FRAME_LAYOUT, error) &&
            (!game->results || game_results_layout(game, error));
 }
 
@@ -502,6 +577,9 @@ static bool game_session_draw(PreviewMenu *menu, float seconds, AbError *error) 
                game_service(game, &(AbGameTailCall){.operation = AB_GAME_TAIL_DRAW},
                             error);
     }
+    if (okay && game->powerups)
+        okay =
+            ab_classic_powerup_particles_update(game->powerups->trails, seconds, error);
     if (okay && game->physics)
         okay = ab_particles_update(ab_classic_particles_engine(game->particles),
                                    seconds, false, error) &&
@@ -513,8 +591,11 @@ static bool game_session_draw(PreviewMenu *menu, float seconds, AbError *error) 
     if (okay && game->results)
         okay = game_results_draw(game, error);
     else if (okay)
-        okay = (game->paused || game_skip_draw(game, seconds, error)) &&
+        okay = game_powerups_draw(game, seconds, error) &&
+               (game->paused || game_skip_draw(game, seconds, error)) &&
                game_pause_draw(game, seconds, error);
+    if (okay)
+        okay = menu_reward_draw(menu, error);
     game->pressed_key.value.bits = game->released_key.value.bits = 0;
     game->updating = false;
     game->failed = !okay;

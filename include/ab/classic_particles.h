@@ -54,6 +54,13 @@ size_t ab_classic_particles_resource_bytes(const AbClassicParticles *particles);
 AbParticles *ab_classic_particles_engine(AbClassicParticles *particles);
 AbClassicLevel *ab_classic_particles_level(const AbClassicParticles *particles);
 
+/* Borrow metadata for runtime deep-copied descriptors. Their entries retain
+ * source pairs insertion order and grow from an empty table; hash_capacity is
+ * zero to distinguish that construction from the immutable catalog. Bind once
+ * between calls, unbind before releasing the owning copied tables. */
+bool ab_classic_particles_bind_copies(AbClassicParticles *particles,
+                                      const AbLuaData *copies, AbError *error);
+
 /* Actual addParticlesNew(object.name, descriptor, false, false), suitable for
  * the owned bird-contact service. Resolve live Lua-world membership/pose/size,
  * traverse the immutable catalog descriptor in retained constructor hash order,

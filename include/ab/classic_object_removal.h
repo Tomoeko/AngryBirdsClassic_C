@@ -42,7 +42,8 @@ size_t ab_classic_object_removal_bytes(const AbClassicObjectRemoval *owner);
 AbGameObjectCoreRegistry *
 ab_classic_object_removal_registry(AbClassicObjectRemoval *owner);
 
-/* Register the next direct circle after its actual visual/scene construction,
+/* Register the next direct circle, or rebind a fully removed row with zero
+ * retained renderer references, after actual visual/scene construction,
  * before later gameplay/removal passes. Native circle rolling name starts empty
  * and camera animation absent; copied Lua material/definition fields do not run
  * ObjectCreation again. Native vector insertion uses the circle's creation-time

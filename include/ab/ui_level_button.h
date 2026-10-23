@@ -46,6 +46,12 @@ struct AbUiLevelButton {
 bool ab_ui_level_button_init(AbUiLevelButton *button, AbUiWidgetContext *context,
                              const AbDataTable *level, AbUiLevelButtonHost host,
                              AbError *error);
+/* Source createLevelButton1648's ImageButton/meta constructor without the
+ * basic class's number/stars/eagle/feather children. Specialized layouts append
+ * their actual children before entering the widget. */
+bool ab_ui_level_button_base_init(AbUiLevelButton *button, AbUiWidgetContext *context,
+                                  const AbDataTable *level, AbUiLevelButtonHost host,
+                                  AbError *error);
 bool ab_ui_level_button_open(AbUiLevelButton *button, AbError *error);
 bool ab_ui_level_button_close(AbUiLevelButton *button, AbError *error);
 /* Source LSGridLayout positions one existing level child, using the current

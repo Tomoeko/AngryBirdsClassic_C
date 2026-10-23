@@ -2,6 +2,7 @@
 
 #include "ab/coordinates.h"
 #include "ab/image_points.h"
+#include "ab/ui_image_render.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -9,6 +10,8 @@
 
 typedef struct {
     const AbSpriteRegion *region;
+    const char *name;
+    AbResolvedComposite composite;
     uint32_t texture;
     float uv[8];
     bool alpha;
@@ -18,8 +21,10 @@ struct AbClassicSlingDraw {
     AbClassicSlingDrawConfig config;
     AbClassicLevelView level;
     SlingImage images[4];
+    SlingImage powered[4];
     AbSlingshotPose pose;
     bool prepared, calling, failed;
+    uint32_t powered_ready;
 };
 
 static AbDataValue text(const char *value) {
@@ -44,17 +49,27 @@ static bool bind_image(const AbSpriteProvider *provider, const char *name,
                        SlingImage *output, AbError *error) {
     AbSpriteAtlasBinding binding = {0};
     uint32_t texture = 0;
-    if (!provider->sprite(provider->context, text(name).string, &binding) ||
-        !binding.sprite.region || !binding.image ||
+    if (!provider->sprite(provider->context, text(name).string, &binding)) {
+        AbResolvedComposite composite = {0};
+        if (provider->composite &&
+            provider->composite(provider->context, text(name).string, &composite) &&
+            composite.source) {
+            *output = (SlingImage){.name = name, .composite = composite};
+            return true;
+        }
+        return ab_fail(error, "Missing preloaded sling image binding: %s", name);
+    }
+    if (!binding.sprite.region || !binding.image ||
         binding.alpha == AB_SPRITE_ALPHA_UNKNOWN ||
         !provider->texture(provider->context, binding.image, &texture) || !texture)
-        return ab_fail(error, "Missing preloaded base-sling image binding");
+        return ab_fail(error, "Missing preloaded sling image binding: %s", name);
     AbDrawQuad quad;
     if (!ab_sprite_quad(binding.sprite.region, binding.image->width,
                         binding.image->height,
                         (AbSpritePlacement){.scale_x = 1, .scale_y = 1}, &quad, error))
         return false;
-    *output = (SlingImage){.region = binding.sprite.region,
+    *output = (SlingImage){.name = name,
+                           .region = binding.sprite.region,
                            .texture = texture,
                            .alpha = binding.alpha == AB_SPRITE_ALPHA_PRESENT};
     for (size_t vertex = 0; vertex < 4; ++vertex) {
@@ -168,9 +183,43 @@ bool ab_classic_sling_draw_pose(const AbClassicSlingDraw *draw,
     return true;
 }
 
-static bool sprite(const AbClassicSlingDraw *draw, const SlingImage *image,
-                   AbVec2 position, AbSlingshotDrawState state, uint32_t width,
-                   uint32_t height, AbDrawList *list, AbError *error) {
+typedef struct {
+    const AbClassicSlingDraw *draw;
+    const SlingImage *image;
+} SlingComposite;
+
+static bool composite_lookup(void *context, AbSpan name, AbUiImageRenderBinding *output,
+                             AbError *error) {
+    SlingComposite *selected = context;
+    if (name.size != strlen(selected->image->name) ||
+        memcmp(name.data, selected->image->name, name.size))
+        return ab_fail(error, "Foreign cached sling composite lookup");
+    *output = (AbUiImageRenderBinding){.composite = selected->image->composite};
+    return true;
+}
+
+static bool composite_part(void *context, const AbSpriteBinding *sprite,
+                           AbUiImageRenderBinding *output, AbError *error) {
+    SlingComposite *selected = context;
+    const AbSpriteProvider *provider = selected->draw->config.provider;
+    AbSpriteAtlasBinding binding = {0};
+    uint32_t texture;
+    if (!provider->binding ||
+        !provider->binding(provider->context, *sprite, &binding) || !binding.image ||
+        !binding.sprite.region || binding.alpha == AB_SPRITE_ALPHA_UNKNOWN ||
+        !provider->texture(provider->context, binding.image, &texture) || !texture)
+        return ab_fail(error, "Missing cached sling composite part binding");
+    *output = (AbUiImageRenderBinding){.region = binding.sprite.region,
+                                       .texture = texture,
+                                       .texture_width = binding.image->width,
+                                       .texture_height = binding.image->height,
+                                       .alpha = binding.alpha};
+    return true;
+}
+
+static bool ordinary_sprite(const AbClassicSlingDraw *draw, const SlingImage *image,
+                            AbVec2 position, AbSlingshotDrawState state, uint32_t width,
+                            uint32_t height, AbDrawList *list, AbError *error) {
     AbDrawCommand command = {.texture = image->texture,
                              .blend = image->alpha ? AB_BLEND_PREMULTIPLIED
                                                    : AB_BLEND_OPAQUE,
@@ -181,6 +230,36 @@ static bool sprite(const AbClassicSlingDraw *draw, const SlingImage *image,
     return ab_slingshot_sprite_quad(image->region, position, state, width, height,
                                     image->uv, &command.quad, &visible, error) &&
            (!visible || ab_draw_list_push(list, &command, error));
+}
+
+static bool sprite(const AbClassicSlingDraw *draw, const SlingImage *image,
+                   AbVec2 position, AbSlingshotDrawState state, uint32_t width,
+                   uint32_t height, AbDrawList *list, AbError *error) {
+    if (image->composite.source) {
+        SlingComposite selected = {draw, image};
+        AbUiImageRenderBoundaries boundaries = {.context = &selected,
+                                                .lookup = composite_lookup,
+                                                .part = composite_part,
+                                                .viewport_width = width,
+                                                .viewport_height = height,
+                                                .blend = AB_BLEND_PREMULTIPLIED,
+                                                .color = {1, 1, 1, 1}};
+        AbUiImageRenderState render = {
+            .geometry = {.translation_x = state.translation.x,
+                         .translation_y = state.translation.y,
+                         .scale_x = state.scale.x,
+                         .scale_y = state.scale.y,
+                         .angle_radians = state.angle,
+                         .rotation_origin_x = state.pivot.x,
+                         .rotation_origin_y = state.pivot.y},
+            .alpha = *draw->config.render_alpha};
+        AbUiSpriteRender source = {.image = text(image->name).string,
+                                   .position = position,
+                                   .vertical = AB_ANCHOR_VPIVOT,
+                                   .horizontal = AB_ANCHOR_HPIVOT};
+        return ab_ui_sprite_render(&source, &render, &boundaries, list, error);
+    }
+    return ordinary_sprite(draw, image, position, state, width, height, list, error);
 }
 
 static bool band(const AbClassicSlingDraw *draw, const AbRubberband *geometry,
@@ -204,6 +283,23 @@ static bool part(AbClassicSlingDraw *draw, AbCoordinateCamera camera, uint32_t w
                  uint32_t height, AbSlingshotDrawPart selected, AbDrawList *list,
                  AbError *error) {
     AbClassicSlingView live = ab_classic_sling_view(draw->config.sling);
+    if (live.king || live.has_scope) {
+        const char *const names[] = {"SLING_SHOT_02_BACK", "SLING_SHOT_02_FRONT",
+                                     "SLINGSHOT_POWERUP_KINGSLING",
+                                     "SLINGSHOT_POWERUP_BASIC"};
+        uint32_t required = live.king ? 3 : 0;
+        if (live.has_scope)
+            required |= live.king ? 4 : 8;
+        for (size_t index = 0; index < 4; ++index) {
+            uint32_t bit = UINT32_C(1) << index;
+            if (!(required & bit) || (draw->powered_ready & bit))
+                continue;
+            if (!bind_image(draw->config.provider, names[index], draw->powered + index,
+                            error))
+                return false;
+            draw->powered_ready |= bit;
+        }
+    }
     const AbSpriteRegion *holder = draw->images[AB_SLING_SPRITE_HOLDER].region;
     AbSlingshotDrawInput input = {
         .position = draw->pose.position,
@@ -215,6 +311,7 @@ static bool part(AbClassicSlingDraw *draw, AbCoordinateCamera camera, uint32_t w
         .holder_pivot = {(float)(int32_t)((float)holder->pivot_x + 0.5f),
                          (float)(int32_t)((float)holder->pivot_y + 0.5f)},
         .disabled = live.disabled_for_current_level,
+        .has_scope = live.has_scope,
         .dragged = ab_classic_shots_state(draw->config.shots)->dragged != NULL};
     if (!input.disabled && camera.zoom.x != camera.zoom.y)
         return ab_fail(error, "Unsupported nonuniform base-sling rendering camera");
@@ -228,13 +325,27 @@ static bool part(AbClassicSlingDraw *draw, AbCoordinateCamera camera, uint32_t w
             case AB_SLING_COMMAND_STATE:
                 state = command->state;
                 break;
-            case AB_SLING_COMMAND_SPRITE:
-                if ((unsigned)command->sprite.image >= 3 ||
-                    !sprite(draw, draw->images + command->sprite.image,
-                            command->sprite.position, state, width, height, list,
-                            error))
+            case AB_SLING_COMMAND_SPRITE: {
+                const SlingImage *image = NULL;
+                switch (command->sprite.image) {
+                    case AB_SLING_SPRITE_BACK:
+                        image = live.king ? draw->powered : draw->images;
+                        break;
+                    case AB_SLING_SPRITE_HOLDER:
+                        image = draw->images + 1;
+                        break;
+                    case AB_SLING_SPRITE_FRONT:
+                        image = live.king ? draw->powered + 1 : draw->images + 2;
+                        break;
+                    case AB_SLING_SPRITE_FRONT_SCOPE:
+                        image = draw->powered + (live.king ? 2 : 3);
+                        break;
+                }
+                if (!image || !sprite(draw, image, command->sprite.position, state,
+                                      width, height, list, error))
                     return false;
                 break;
+            }
             case AB_SLING_COMMAND_BAND:
                 if (!band(draw, &command->band, camera, width, height, list, error))
                     return false;

@@ -115,7 +115,7 @@ static bool edges(void) {
         return false;
     AbVec2 previous[4];
     memcpy(previous, points, sizeof(points));
-    parent.angle_radians = 1;
+    parent.direct_vertices = true;
     return !ab_composite_draw_points(&part, parent, (AbVec2){0}, points, NULL) &&
            !memcmp(previous, points, sizeof(points));
 }

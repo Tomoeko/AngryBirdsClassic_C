@@ -19,11 +19,17 @@
 #include "ab/ui_menu_birds.h"
 #include "ab/ui_level_selection.h"
 #include "ab/ui_level_hidden_eggs.h"
+#include "ab/ui_level_rmf.h"
+#include "ab/ui_level_pigs.h"
+#include "ab/ui_level_eggs.h"
 #include "ab/ui_level_services.h"
 #include "ab/settings_file.h"
 #include "ab/ui_cutscene.h"
+#include "ab/classic_root.h"
 #include "ab/classic_level_request.h"
 #include "ab/classic_level_source.h"
+#include "ab/powerup_catalog.h"
+#include "ab/sling_scope.h"
 #include "console_common/support/directory.h"
 
 #include <string.h>
@@ -37,6 +43,7 @@
  * complete root behavior and navigation into levels remain open. */
 typedef struct PreviewGame PreviewGame;
 typedef struct PreviewReward PreviewReward;
+typedef struct PreviewPigs PreviewPigs;
 
 typedef struct {
     AbAndroidAssets *planning;
@@ -53,6 +60,7 @@ typedef struct {
     AbAudioBank *audio;
     AbAudioOutput *audio_output;
     AbRandom48 random;
+    AbEngineRandom engine_random;
     AbAssetSpriteProvider sprites;
     AbUiWidgetResources adapter;
     AbEventManager *events;
@@ -72,10 +80,13 @@ typedef struct {
     float time;
     AbVec2 screen;
     bool highest_resources;
+    bool infinite_powerups, keep_powerups_open;
+    AbSlingScopeState scope_state;
     bool entered;
     const AbZip *archive;
     AbAssetTextureHost texture_host;
     AbEpisodeCatalog *catalog;
+    AbPowerupCatalog *powerup_catalog;
     AbTargetData star_limits;
     AbSettingsStatistics *local_settings, *settings, *highscores;
     const char *state_directory;
@@ -107,6 +118,9 @@ typedef struct {
     AbClassicLoaderCalls intro_calls;
     AbDataTable *pending_intro;
     bool cutscene_active;
+    AbDataValue cutscene_group;
+    AbClassicRootState root_clicks;
+    bool root_pressed, root_released;
     AbClassicLevelRequest level_request;
     bool level_request_ready, level_restart;
     AbFontAsset font_assets[2];
@@ -139,6 +153,9 @@ typedef struct {
     AbUiMenuBirds birds;
     PreviewGame *game;
     AbClassicLevelSource *level_source;
+    AbUiLevelRmf *rmf_levels;
+    AbUiLevelEggs *egg_levels;
+    PreviewPigs *pigs;
     PreviewReward *reward;
 } PreviewMenu;
 
@@ -204,10 +221,13 @@ static bool menu_audio_music(PreviewMenu *menu, AbError *error);
 static bool menu_audio_enabled(PreviewMenu *menu, bool *output, AbError *error);
 static bool menu_audio_toggle(PreviewMenu *menu, AbError *error);
 static bool menu_reward_reveal(PreviewMenu *menu, AbDataTable *event, AbError *error);
+static bool menu_reward_show(PreviewMenu *menu, AbError *error);
+static bool menu_reward_draw(PreviewMenu *menu, AbError *error);
 
 #include "menu_settings_preview.h"
 #include "menu_episode_preview.h"
 #include "menu_background_preview.h"
+#include "menu_pigs_preview.h"
 #include "menu_route_preview.h"
 #include "game_session.h"
 #include "menu_audio_preview.h"
@@ -354,6 +374,7 @@ static void menu_preview_free(PreviewMenu *menu) {
         (void)ab_ui_widget_lifecycle(menu_active_root(menu), AB_UI_FRAME_EXIT, &error);
     menu_route_free(menu);
     menu_episode_free(menu);
+    ab_powerup_catalog_close(menu->powerup_catalog);
     menu_background_free(menu);
     (void)ab_ui_scaling_detach(&menu->scaling, &error);
     ab_event_manager_close(menu->events);
@@ -508,6 +529,10 @@ static bool menu_preview_pointer(PreviewMenu *menu, AbSpan event, AbVec2 point,
                                  AbUiPointerReply *reply, AbError *error) {
     if (menu->pointer_audio_active)
         return ab_fail(error, "Reentrant application pointer dispatch");
+    if (event.size == 6 && !memcmp(event.data, "LPRESS", 6))
+        menu->root_pressed = true;
+    if (event.size == 8 && !memcmp(event.data, "LRELEASE", 8))
+        menu->root_released = true;
     menu->pointer_audio_active = true;
     menu->pointer_confirm_played = false;
     bool okay = menu_pointer_dispatch(menu, event, point, reply, error);
@@ -516,6 +541,10 @@ static bool menu_preview_pointer(PreviewMenu *menu, AbSpan event, AbVec2 point,
 }
 
 static bool menu_preview_draw(PreviewMenu *menu, float seconds, AbError *error) {
+    if (!ab_classic_root_double_click(&menu->root_clicks, menu->root_pressed,
+                                      menu->root_released, seconds, error))
+        return false;
+    menu->root_pressed = menu->root_released = false;
     if (!menu_reward_update(menu, seconds, error))
         return false;
     if (!game_results_route(menu, error))
@@ -542,7 +571,10 @@ static bool menu_preview_draw(PreviewMenu *menu, float seconds, AbError *error) 
         !menu_background_draw(menu, seconds, error))
         return false;
     AbUiDrawInput input = {0};
-    return ab_ui_widget_draw(root, &input, error) && menu_reward_draw(menu, error);
+    return (!menu->level_active || !menu->rmf_levels ||
+            ab_ui_level_rmf_background(menu->rmf_levels, error)) &&
+           ab_ui_widget_draw(root, &input, error) && menu_reward_draw(menu, error) &&
+           menu_pigs_tail(menu, seconds, error);
 }
 
 #endif

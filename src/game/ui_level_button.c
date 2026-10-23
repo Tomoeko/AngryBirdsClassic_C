@@ -156,9 +156,9 @@ static bool basic_children(AbUiLevelButton *button, AbError *error) {
                                 error);
 }
 
-bool ab_ui_level_button_init(AbUiLevelButton *button, AbUiWidgetContext *context,
-                             const AbDataTable *level, AbUiLevelButtonHost host,
-                             AbError *error) {
+bool ab_ui_level_button_base_init(AbUiLevelButton *button, AbUiWidgetContext *context,
+                                  const AbDataTable *level, AbUiLevelButtonHost host,
+                                  AbError *error) {
     if (!button || button->widget.initialized || !context || !level || !host.episodes ||
         !host.scaling || !host.fonts)
         return ab_fail(error, "Missing fresh basic level-button storage/host");
@@ -216,7 +216,14 @@ bool ab_ui_level_button_init(AbUiLevelButton *button, AbUiWidgetContext *context
     button->meta = (AbDataTable){button->meta_fields, count, 5, NULL};
     button->widget.state.meta = (AbUiPointerValue){.kind = AB_UI_POINTER_OBJECT,
                                                    .object = (uintptr_t)&button->meta};
-    return finish(button, basic_children(button, error));
+    return true;
+}
+
+bool ab_ui_level_button_init(AbUiLevelButton *button, AbUiWidgetContext *context,
+                             const AbDataTable *level, AbUiLevelButtonHost host,
+                             AbError *error) {
+    return ab_ui_level_button_base_init(button, context, level, host, error) &&
+           finish(button, basic_children(button, error));
 }
 
 static bool eagle_used(AbUiLevelButton *button, const AbDataTable *score, bool *output,

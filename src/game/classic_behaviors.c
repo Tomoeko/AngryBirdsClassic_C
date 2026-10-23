@@ -350,6 +350,34 @@ bool ab_classic_behaviors_create_object(AbClassicBehaviors *owner, size_t object
     return okay;
 }
 
+bool ab_classic_behaviors_recreate_object(AbClassicBehaviors *owner, size_t object,
+                                          AbDataValue descriptor, AbError *error) {
+    if (!owner || owner->constructing || object >= owner->count ||
+        owner->level.removed_objects[object])
+        return ab_fail(error, "Invalid replacement GameObject behavior binding");
+    ClassicBehaviorObject *row = owner->objects + object;
+    AbStringMap *groups = row->groups;
+    if (!ab_string_map_reset(groups, 0, error))
+        return false;
+    *row = (ClassicBehaviorObject){.owner = owner, .groups = groups};
+    for (size_t index = 0; index < MUSEUM_CLASSES; ++index)
+        row->new_groups[index] = (AbGameBehaviorGroup){row->items + index, 1};
+    AbLevelPropertyObject *properties = owner->level.properties->objects + object;
+    properties->script = (AbDataTable){0};
+    properties->behaviors = (AbDataTable){0};
+    AbObjectPropertyAccess access = {.physics_object = table(&properties->physical)};
+    owner->constructing = true;
+    const AbLuaData *catalog = owner->config.catalog_data ? owner->config.catalog_data
+                                                          : owner->level.catalog_data;
+    bool okay =
+        ab_object_property_set(&access, span("gameObjectScript"), (AbDataValue){0},
+                               error) &&
+        ab_level_properties_bind_script(owner->level.properties, object, error) &&
+        configure(row, descriptor, catalog, error) && publish(owner, object, error);
+    owner->constructing = false;
+    return okay;
+}
+
 size_t ab_classic_behaviors_bytes(const AbClassicBehaviors *owner) {
     return owner ? owner->bytes : 0;
 }

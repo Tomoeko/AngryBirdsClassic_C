@@ -84,7 +84,7 @@ static bool owner_world_properties(OwnerFixture *fixture) {
         objects[index].physics.dimensions = (AbObjectDimensions){
             -1, -1, 0.25f + (float)(fixture->config[0] % 4u) * 0.125f};
     }
-    AbLevelBodies bodies = {objects, 2, 2};
+    AbLevelBodies bodies = {.objects = objects, .capacity = 2, .count = 2};
     fixture->properties = (AbLevelProperties){.objects = fixture->property_objects,
                                               .world_entries = fixture->property_world,
                                               .capacity = 2};

@@ -22,7 +22,7 @@ struct AbClassicBlockCollisions {
     AbClassicLevelView level;
     AbBlockCollisionHost host;
     CollisionObject *objects, *active[2];
-    size_t count, bytes;
+    size_t count, capacity, bytes;
     bool calling, contacting;
 };
 
@@ -367,7 +367,10 @@ bool ab_classic_block_collisions_open(AbClassicBlockCollisionConfig config,
         config.storage_bytes < sizeof(AbClassicBlockCollisions))
         return ab_fail(error, "Invalid owned block collision binding or byte limit");
     size_t remaining = config.storage_bytes - sizeof(AbClassicBlockCollisions);
-    if (level.bodies->count > remaining / sizeof(CollisionObject))
+    size_t capacity =
+        config.object_capacity ? config.object_capacity : level.bodies->count;
+    if (capacity < level.bodies->count || capacity > level.bodies->capacity ||
+        capacity > remaining / sizeof(CollisionObject))
         return ab_fail(error, "Owned block collision rows exceed byte limit");
     AbClassicBlockCollisions *owner = calloc(1, sizeof(*owner));
     if (!owner)
@@ -375,8 +378,9 @@ bool ab_classic_block_collisions_open(AbClassicBlockCollisionConfig config,
     owner->config = config;
     owner->level = level;
     owner->count = level.bodies->count;
-    owner->bytes = sizeof(*owner) + owner->count * sizeof(CollisionObject);
-    owner->objects = calloc(owner->count, sizeof(*owner->objects));
+    owner->capacity = capacity;
+    owner->bytes = sizeof(*owner) + capacity * sizeof(CollisionObject);
+    owner->objects = calloc(capacity, sizeof(*owner->objects));
     if (owner->count && !owner->objects) {
         ab_classic_block_collisions_close(owner);
         return ab_fail(error, "Cannot allocate owned block collision rows");
@@ -405,6 +409,24 @@ bool ab_classic_block_collisions_open(AbClassicBlockCollisionConfig config,
                                          .score = score,
                                          .scores = config.scores};
     *output = owner;
+    return true;
+}
+
+bool ab_classic_block_collisions_register_object(AbClassicBlockCollisions *owner,
+                                                 size_t object, AbError *error) {
+    if (!owner || owner->calling || owner->contacting || object != owner->count ||
+        object >= owner->capacity || object >= owner->level.bodies->count)
+        return ab_fail(error, "Invalid new block-collision row");
+    CollisionObject *entry = owner->objects + object;
+    entry->owner = owner;
+    entry->index = object;
+    entry->object.context = entry;
+    entry->script = (AbBlockCollisionScript){entry, object_script};
+    entry->definition.context = entry;
+    entry->dead_value = (AbDataValue){.kind = AB_DATA_TABLE, .table = physical(entry)};
+    ++owner->count;
+    if (owner->config.script_objects)
+        owner->config.script_object_count = owner->count;
     return true;
 }
 

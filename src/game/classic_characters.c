@@ -19,7 +19,7 @@ struct AbClassicCharacters {
     AbCharacterAnimationBindings *bindings;
     AbClassicCharacterSprites *sprites;
     CharacterEntry *entries;
-    size_t bytes;
+    size_t capacity, bytes;
 };
 
 static AbDataValue field(const AbDataTable *table, const char *name) {
@@ -150,8 +150,8 @@ static bool update_hat(void *context, size_t object, AbError *error) {
 }
 
 static bool bind_entries(AbClassicCharacters *characters, AbClassicLevelView level,
-                         AbError *error) {
-    for (size_t index = 0; index < characters->animations.count; ++index) {
+                         size_t begin, AbError *error) {
+    for (size_t index = begin; index < characters->animations.count; ++index) {
         CharacterEntry *entry = characters->entries + index;
         entry->owner = characters;
         entry->index = index;
@@ -160,7 +160,15 @@ static bool bind_entries(AbClassicCharacters *characters, AbClassicLevelView lev
         if (!object->level_goal && !object->physics.controllable) {
             continue;
         }
-        if (!ab_object_definition_open(level.catalog, object->definition_name, NULL,
+        AbSpan definition_name = object->definition_name;
+        if (!definition_name.size) {
+            AbDataValue definition =
+                field(&level.properties->objects[index].physical, "definition");
+            if (definition.kind != AB_DATA_STRING)
+                return ab_fail(error, "Dynamic character has no definition name");
+            definition_name = definition.string;
+        }
+        if (!ab_object_definition_open(level.catalog, definition_name, NULL,
                                        &entry->definition, error)) {
             return false;
         }
@@ -201,10 +209,11 @@ static bool bind_entries(AbClassicCharacters *characters, AbClassicLevelView lev
     return true;
 }
 
-bool ab_classic_characters_open(AbClassicLevel *level, AbClassicVisuals *visuals,
-                                AbRandom48 *random, AbClassicCharacterHost host,
-                                size_t storage_bytes, AbClassicCharacters **output,
-                                AbError *error) {
+bool ab_classic_characters_open_capacity(AbClassicLevel *level,
+                                         AbClassicVisuals *visuals, AbRandom48 *random,
+                                         AbClassicCharacterHost host,
+                                         size_t object_capacity, size_t storage_bytes,
+                                         AbClassicCharacters **output, AbError *error) {
     if (!output) {
         return ab_fail(error, "Missing classic character output");
     }
@@ -212,14 +221,16 @@ bool ab_classic_characters_open(AbClassicLevel *level, AbClassicVisuals *visuals
     AbClassicLevelView view = ab_classic_level_view(level);
     AbClassicVisualView visual = ab_classic_visuals_view(visuals);
     size_t count = view.bodies ? view.bodies->count : 0;
+    size_t capacity = object_capacity ? object_capacity : count;
     size_t row_bytes = sizeof(AbCharacterAnimationBindings) +
                        sizeof(AbClassicCharacterSprites) + sizeof(CharacterEntry);
     if (!view.bodies || !view.frame || !view.catalog || !view.timers_initialized ||
         !view.sprites_initialized || view.frame->count != count || !random ||
         visual.level != level || visual.count != count ||
         (count && (!view.character_objects || !view.initial_sprites)) ||
-        storage_bytes < sizeof(AbClassicCharacters) ||
-        count > (storage_bytes - sizeof(AbClassicCharacters)) / row_bytes) {
+        storage_bytes < sizeof(AbClassicCharacters) || capacity < count ||
+        capacity > view.bodies->capacity ||
+        capacity > (storage_bytes - sizeof(AbClassicCharacters)) / row_bytes) {
         return ab_fail(error, "Invalid classic character resources or storage limit");
     }
     AbClassicCharacters *characters = calloc(1, sizeof(*characters));
@@ -230,7 +241,8 @@ bool ab_classic_characters_open(AbClassicLevel *level, AbClassicVisuals *visuals
     characters->visuals = visuals;
     characters->random = random;
     characters->host = host;
-    characters->bytes = sizeof(*characters) + count * row_bytes;
+    characters->capacity = capacity;
+    characters->bytes = sizeof(*characters) + capacity * row_bytes;
     characters->animations =
         (AbCharacterAnimations){.objects = view.character_objects,
                                 .count = count,
@@ -243,17 +255,17 @@ bool ab_classic_characters_open(AbClassicLevel *level, AbClassicVisuals *visuals
                                 .context = characters,
                                 .apply_jump = apply_jump,
                                 .update_hat = update_hat};
-    if (count) {
-        characters->bindings = calloc(count, sizeof(*characters->bindings));
-        characters->sprites = calloc(count, sizeof(*characters->sprites));
-        characters->entries = calloc(count, sizeof(*characters->entries));
+    if (capacity) {
+        characters->bindings = calloc(capacity, sizeof(*characters->bindings));
+        characters->sprites = calloc(capacity, sizeof(*characters->sprites));
+        characters->entries = calloc(capacity, sizeof(*characters->entries));
         if (!characters->bindings || !characters->sprites || !characters->entries) {
             ab_fail(error, "Cannot allocate classic character rows");
             goto release_characters;
         }
     }
     characters->animations.bindings = characters->bindings;
-    if (!bind_entries(characters, view, error)) {
+    if (!bind_entries(characters, view, 0, error)) {
         goto release_characters;
     }
     *output = characters;
@@ -262,6 +274,40 @@ bool ab_classic_characters_open(AbClassicLevel *level, AbClassicVisuals *visuals
 release_characters:
     ab_classic_characters_close(characters);
     return false;
+}
+
+bool ab_classic_characters_open(AbClassicLevel *level, AbClassicVisuals *visuals,
+                                AbRandom48 *random, AbClassicCharacterHost host,
+                                size_t storage_bytes, AbClassicCharacters **output,
+                                AbError *error) {
+    return ab_classic_characters_open_capacity(level, visuals, random, host, 0,
+                                               storage_bytes, output, error);
+}
+
+bool ab_classic_characters_register_objects(AbClassicCharacters *characters,
+                                            AbError *error) {
+    if (!characters)
+        return ab_fail(error, "Missing new character adapter owner");
+    AbClassicLevelView level = ab_classic_level_view(characters->level);
+    size_t first = characters->animations.count;
+    if (level.world->failed || level.world->locked || level.bodies->count < first ||
+        level.bodies->count > characters->capacity ||
+        ab_classic_visuals_view(characters->visuals).count != level.bodies->count)
+        return ab_fail(error, "Invalid new character adapter prefix");
+    characters->animations.count = level.bodies->count;
+    if (!bind_entries(characters, level, first, error))
+        return false;
+    for (size_t index = first; index < characters->animations.count; ++index) {
+        const AbDataTable *physical = &level.properties->objects[index].physical;
+        characters->sprites[index].damage =
+            (AbDamageSpriteNames){.sprite = field(physical, "damageSprite"),
+                                  .blink = field(physical, "blinkSprite"),
+                                  .smile = field(physical, "smileSprite"),
+                                  .frozen = field(physical, "frozenSprite")};
+    }
+    characters->animations.bird_count = level.bird_count;
+    characters->animations.goal_count = level.goal_count;
+    return true;
 }
 
 void ab_classic_characters_close(AbClassicCharacters *characters) {
@@ -285,9 +331,73 @@ AbClassicCharacterView ab_classic_characters_view(AbClassicCharacters *character
                : (AbClassicCharacterView){0};
 }
 
+static AbDataValue number(float value) {
+    AbDataValue result = {.kind = AB_DATA_NUMBER};
+    memcpy(&result.bits, &value, sizeof(value));
+    return result;
+}
+
+static bool truthy(AbDataValue value) {
+    return value.kind != AB_DATA_NIL && (value.kind != AB_DATA_BOOLEAN || value.bits);
+}
+
+bool ab_classic_characters_special_expression(AbClassicCharacters *characters,
+                                              size_t object, AbSpan key, float seconds,
+                                              AbError *error) {
+    if (!characters || object >= characters->animations.count || !isfinite(seconds))
+        return ab_fail(error, "Invalid pig special-expression binding");
+    AbClassicLevelView level = ab_classic_level_view(characters->level);
+    if (level.removed_objects[object])
+        return true;
+    AbDataTable *physical = &level.properties->objects[object].physical;
+    AbDataValue sprites = field(physical, "extraSprites");
+    if (!truthy(sprites))
+        return true;
+    if (sprites.kind != AB_DATA_TABLE)
+        return ab_fail(error, "Pig extraSprites is not its source table");
+    const AbDataValue *sprite = ab_data_get(
+        sprites.table, (AbDataValue){.kind = AB_DATA_STRING, .string = key});
+    if (!sprite || !truthy(*sprite) ||
+        truthy(field(physical, "disableSpecialExpressions")))
+        return true;
+    if (!ab_level_property_set(level.properties, object,
+                               (AbSpan){(const uint8_t *)"specialExpression", 17},
+                               *sprite, error) ||
+        !ab_level_property_set(level.properties, object,
+                               (AbSpan){(const uint8_t *)"specialExpressionTimer", 22},
+                               number(seconds), error))
+        return false;
+    characters->sprites[object].special_expression = *sprite;
+    level.character_objects[object].goal.special_expression = true;
+    level.character_objects[object].goal.special_timer = seconds;
+    return true;
+}
+
 bool ab_classic_characters_update(AbClassicCharacters *characters, float seconds,
                                   AbError *error) {
-    return characters
-               ? ab_character_animations_update(&characters->animations, seconds, error)
-               : ab_fail(error, "Missing classic character owner");
+    if (!characters)
+        return ab_fail(error, "Missing classic character owner");
+    if (!ab_character_animations_update(&characters->animations, seconds, error))
+        return false;
+    AbClassicLevelView level = ab_classic_level_view(characters->level);
+    for (size_t rank = 0; rank < level.goal_count; ++rank) {
+        size_t object = level.goal_order[rank];
+        AbDataTable *physical = &level.properties->objects[object].physical;
+        if (level.removed_objects[object] ||
+            field(physical, "specialExpressionTimer").kind == AB_DATA_NIL)
+            continue;
+        AbGoalAnimation *goal = &level.character_objects[object].goal;
+        if (!ab_level_property_set(
+                level.properties, object,
+                (AbSpan){(const uint8_t *)"specialExpressionTimer", 22},
+                number(goal->special_timer), error) ||
+            !ab_level_property_set(level.properties, object,
+                                   (AbSpan){(const uint8_t *)"specialExpression", 17},
+                                   goal->special_expression
+                                       ? characters->sprites[object].special_expression
+                                       : (AbDataValue){0},
+                                   error))
+            return false;
+    }
+    return true;
 }

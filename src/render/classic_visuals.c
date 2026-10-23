@@ -186,7 +186,8 @@ size_t ab_classic_visuals_bytes(const AbClassicVisuals *visuals) {
 bool ab_classic_visuals_attach_object(AbClassicVisuals *visuals, size_t object,
                                       AbError *error) {
     AbClassicLevelView level = ab_classic_level_view(visuals ? visuals->level : NULL);
-    if (!visuals || object != visuals->count || object >= visuals->capacity ||
+    if (!visuals || object > visuals->count || object >= visuals->capacity ||
+        (object < visuals->count && visuals->entries[object].object.attached) ||
         !level.bodies || object >= level.bodies->count ||
         object >= level.properties->count || level.removed_objects[object] ||
         level.frame->objects[object].collider == 7)
@@ -195,10 +196,12 @@ bool ab_classic_visuals_attach_object(AbClassicVisuals *visuals, size_t object,
     if (name.size == 6 && !memcmp(name.data, "ground", 6))
         return ab_fail(error, "Ground has no ordinary visual attachment");
     VisualEntry *entry = visuals->entries + object;
+    *entry = (VisualEntry){0};
     entry->owner = visuals;
     entry->index = object;
     entry->object.attached = &entry->asset;
-    ++visuals->count;
+    if (object == visuals->count)
+        ++visuals->count;
     return true;
 }
 

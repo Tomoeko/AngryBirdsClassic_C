@@ -116,6 +116,12 @@ static bool start_sequence(void *context, const char *name, AbError *error) {
     } else if (!strcmp(name, "RestartLevelCameraSequence")) {
         message = "<CameraSequenceManager> loading sequence from file: "
                   "RestartLevelCameraSequence";
+    } else if (!strcmp(name, "AngerActivationCameraSequence")) {
+        message = "<CameraSequenceManager> loading sequence from file: "
+                  "AngerActivationCameraSequence";
+    } else if (!strcmp(name, "BirdquakeCameraSequence")) {
+        message = "<CameraSequenceManager> loading sequence from file: "
+                  "BirdquakeCameraSequence";
     } else {
         return ab_fail(error, "Unsupported owned camera sequence resource");
     }

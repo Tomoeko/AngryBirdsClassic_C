@@ -32,8 +32,8 @@ typedef struct {
  *
  * This does not supply the root wrapper, native physics/audio/particle schedule,
  * MenuManager, platform input, GUI or renderer. In particular the controller's
- * no-grenades/no-flying-Yellow-special-case tail domain still applies. A caller
- * must establish that actual selected domain; this is not an all-level fallback.
+ * explicit projectile binding and no-flying-Yellow-special-case tail domain apply. A
+ * caller must establish that actual selected domain; this is not an all-level fallback.
  */
 bool ab_classic_game_update_initialize(AbClassicGameUpdateConfig config,
                                        AbClassicGameUpdate *output, AbError *error);

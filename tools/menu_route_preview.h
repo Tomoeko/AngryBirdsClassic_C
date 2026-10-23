@@ -31,6 +31,11 @@ static void menu_route_free(PreviewMenu *menu) {
     menu->levels = NULL;
     free(menu->hidden_eggs);
     menu->hidden_eggs = NULL;
+    free(menu->rmf_levels);
+    menu->rmf_levels = NULL;
+    menu_pigs_free(menu);
+    free(menu->egg_levels);
+    menu->egg_levels = NULL;
     free(menu->cutscene);
     menu->cutscene = NULL;
     ab_target_data_close(&menu->cutscene_data);
@@ -114,6 +119,33 @@ static bool menu_route_event(PreviewMenu *menu, AbDataTable *event, AbError *err
     return true;
 }
 
+/* settingsWrapper.shouldUseAgeFilter48481: nil info is false; an existing
+ * record filters only the strict Boolean isUnderThirteen=true field. */
+static bool menu_level_age_filter(void *context, bool *output, AbError *error) {
+    PreviewMenu *menu = context;
+    AbDataValue info =
+        menu_route_field(ab_settings_statistics_root(menu->settings), "ageGenderInfo");
+    if (info.kind == AB_DATA_NIL) {
+        *output = false;
+        return true;
+    }
+    if (info.kind != AB_DATA_TABLE)
+        return ab_fail(error, "Age filter requires the actual settings record");
+    AbDataValue under = menu_route_field(info.table, "isUnderThirteen");
+    *output = under.kind == AB_DATA_BOOLEAN && under.bits != 0;
+    return true;
+}
+
+static bool menu_eggs_assets(void *context, bool loading, AbError *error) {
+    PreviewMenu *menu = context;
+    AbDataEntry entry = {menu_route_number(1), menu_data("LEVELSELECTION_GOLDEN_EGGS")};
+    AbDataTable request = {&entry, 1, 1, NULL};
+    return ab_android_assets_manage(menu->planning, &request, loading,
+                                    ab_asset_resources_host, menu->resources, error) &&
+           ab_asset_textures_sync(menu->textures,
+                                  ab_asset_resources_owners(menu->resources), error);
+}
+
 static bool menu_route_level(PreviewMenu *menu, AbError *error) {
     AbDataValue episode = menu->episodes->selected_episode;
     AbDataValue record = {0};
@@ -126,7 +158,10 @@ static bool menu_route_level(PreviewMenu *menu, AbError *error) {
     AbDataValue subclass = menu_route_field(record.table, "level_selection_subclass");
     bool danger = menu_route_equal(subclass, menu_data("DangerAboveLevelSelection"));
     bool mine = menu_route_equal(subclass, menu_data("MineAndDineLevelSelection"));
-    if (menu_route_truthy(subclass) && !danger && !mine)
+    bool rmf = menu_route_equal(subclass, menu_data("RMFLevelSelection"));
+    bool pigs = menu_route_equal(subclass, menu_data("BadPiggiesLevelSelection"));
+    bool eggs = menu_route_equal(subclass, menu_data("GoldenEggsLevelSelection"));
+    if (menu_route_truthy(subclass) && !danger && !mine && !rmf && !pigs && !eggs)
         return ab_fail(error,
                        "Selected episode requires its source level-screen subclass");
     AbDataValue exit = menu_route_field(record.table, "exit_link_override");
@@ -142,6 +177,11 @@ static bool menu_route_level(PreviewMenu *menu, AbError *error) {
     }
     free(menu->hidden_eggs);
     menu->hidden_eggs = NULL;
+    free(menu->rmf_levels);
+    menu->rmf_levels = NULL;
+    menu_pigs_free(menu);
+    free(menu->egg_levels);
+    menu->egg_levels = NULL;
     menu->requested_launch = NULL;
     menu->level_request_ready = false;
     menu->level_services = (AbUiLevelServices){
@@ -162,6 +202,9 @@ static bool menu_route_level(PreviewMenu *menu, AbError *error) {
                               .wheel = &menu->wheel},
                    .event_ids = menu->event_data.data.globals,
                    .initial_time = menu->time,
+                   .context = menu,
+                   .age_filter = menu_level_age_filter,
+                   .golden_eggs = menu->highscores,
                    .arrows = true},
         .preferences = &menu->preferences,
         .episode_progress = &menu->progress,
@@ -181,6 +224,32 @@ static bool menu_route_level(PreviewMenu *menu, AbError *error) {
                 menu->hidden_eggs, menu->levels, menu->highscores,
                 danger ? AB_UI_LEVEL_DANGER_ABOVE : AB_UI_LEVEL_MINE_AND_DINE, error))
             return false;
+    }
+    if (rmf) {
+        menu->rmf_levels = calloc(1, sizeof(*menu->rmf_levels));
+        if (!menu->rmf_levels ||
+            !ab_ui_level_rmf_attach(menu->rmf_levels, menu->levels, 63, error))
+            return error && error->message[0]
+                       ? false
+                       : ab_fail(error, "Cannot allocate RMF level-screen controls");
+    }
+    if (pigs && !menu_pigs_attach(menu, error))
+        return false;
+    if (eggs) {
+        menu->egg_levels = calloc(1, sizeof(*menu->egg_levels));
+        if (!menu->egg_levels ||
+            !ab_ui_level_eggs_attach(
+                menu->egg_levels, menu->levels,
+                (AbUiLevelEggsHost){.highscores = menu->highscores,
+                                    .statistics = &menu->statistics,
+                                    .context = menu,
+                                    .assets = menu_eggs_assets,
+                                    .king_pig_enabled = true,
+                                    .release_build = true},
+                error))
+            return error && error->message[0]
+                       ? false
+                       : ab_fail(error, "Cannot allocate Golden Eggs screen");
     }
     if (!ab_ui_widget_lifecycle(&menu->levels->widget, AB_UI_FRAME_ENTRY, error) ||
         !ab_ui_widget_lifecycle(&menu->levels->widget, AB_UI_FRAME_LAYOUT, error))

@@ -172,6 +172,14 @@ AbClassicSimulationView ab_classic_simulation_view(AbClassicSimulation *simulati
                       : (AbClassicSimulationView){0};
 }
 
+bool ab_classic_simulation_recreate_circle(AbClassicSimulation *simulation,
+                                           size_t object, AbError *error) {
+    if (!simulation || simulation->advancing)
+        return ab_fail(error, "Invalid replacement simulation circle binding");
+    return ab_classic_forces_recreate_circle(simulation->forces, object, error) &&
+           ab_classic_post_physics_recreate_circle(simulation->post, object, error);
+}
+
 bool ab_classic_simulation_register_circle(AbClassicSimulation *simulation,
                                            size_t object, AbError *error) {
     if (!simulation || simulation->advancing ||

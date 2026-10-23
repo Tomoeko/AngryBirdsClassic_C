@@ -37,8 +37,9 @@ typedef struct {
  * Museum checkLevelFailed prototype 150733 visits the actual birds table after
  * prevent/timeout/motion gates. A remaining controllable bird returns false
  * before BurnManager. The actual original isBurningObjects method is bound when
- * reached: its distinct unchanged upvalue returns false. Modified/mixed bird
- * table membership and foreign physical identities reject.
+ * reached: its distinct unchanged upvalue returns false. Canonical dynamic
+ * birds participate alongside the initial queue; foreign physical identities
+ * and mismatched name/table pairs reject.
  *
  * Character distance uses the current camera screen position and x/y*20 for a
  * goal, or the actual sling level-start position*20 for a bird. Preserve separate

@@ -116,16 +116,37 @@ static bool trigger(AbClassicBirdSpecialty *owner, AbDataValue bird, float secon
         !ab_settings_statistics_extra_tutorial(config->settings,
                                                field(source.table, "sprite"), error))
         return false;
-    bool remove_parent = named(selected, "CLUSTER_BOMB");
-    if (remove_parent) {
+    bool bomb = named(selected, "BOMB");
+    bool split = named(selected, "CLUSTER_BOMB");
+    if (bomb) {
+        AbDataValue current = {0}, sound = {0};
+        if (!ab_settings_statistics_extra_tutorial(
+                config->settings, field(source.table, "sprite"), error) ||
+            !definition(owner, object, &current, error) ||
+            !ab_audio_bank_name_value(
+                config->audio, field(current.table, "specialSound"), &sound, error) ||
+            !ab_classic_explosions_make(config->explosions, object, source, sound,
+                                        (AbDataValue){0}, error))
+            return false;
+    }
+    if (split) {
         AbClassicBluesSplitResult created;
         if (!ab_classic_blues_split_create(config->blues, object, &created, error))
+            return false;
+        if (config->blues_created &&
+            !config->blues_created(config->blues_context, &created, error))
             return false;
     }
     if (named(selected, "BOOST") &&
         !ab_classic_bird_boost(&config->boost, object, source.table, error))
         return false;
-    static const char *const abilities[] = {"BUBBLES", "BOMB", "GRENADE", "BOOMERANG"};
+    if (named(selected, "BOOMERANG") &&
+        !ab_classic_boomerang_trigger(config->boomerang, object, source.table, error))
+        return false;
+    if (named(selected, "GRENADE") &&
+        !ab_classic_eggs_trigger(config->eggs, object, source.table, error))
+        return false;
+    static const char *const abilities[] = {"BUBBLES"};
     for (size_t index = 0; index < sizeof(abilities) / sizeof(*abilities); ++index)
         if (named(selected, abilities[index]))
             return ab_fail(error, "Active specialty branch is not bound");
@@ -143,8 +164,9 @@ static bool trigger(AbClassicBirdSpecialty *owner, AbDataValue bird, float secon
         script.table != &owner->level.properties->objects[object].script)
         return ab_fail(error, "Rebound specialty GameObject script");
     return ab_classic_behaviors_specialty(config->behaviors, object, error) &&
-           (!remove_parent || ab_classic_birds_remove(config->blues->config.birds,
-                                                      object, (AbDataValue){0}, error));
+           (!(bomb || split) ||
+            ab_classic_birds_remove(bomb ? config->birds : config->blues->config.birds,
+                                    object, (AbDataValue){0}, error));
 }
 
 bool ab_classic_bird_specialty_open(AbClassicBirdSpecialtyConfig config,

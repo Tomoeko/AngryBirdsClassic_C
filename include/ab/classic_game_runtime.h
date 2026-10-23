@@ -31,8 +31,14 @@ typedef struct {
     AbClassicGameLevelParticleConfig level_particles;
     AbClassicGameInputConfig input;
     AbClassicBirdSpecialtyConfig specialty;
+    AbClassicBoomerang boomerang;
+    AbClassicExplosions *explosions;
     AbClassicControllerConfig controller;
     size_t characters_bytes, touches_bytes, touches, storage_bytes;
+    /* Stable application-owned generated-name storage. Keep it until every
+     * borrowing world/level owner is closed, after this runtime closes. */
+    AbBuffer blues_names;
+    AbClassicEggConfig eggs;
 } AbClassicGameRuntimeConfig;
 
 typedef struct {
@@ -48,6 +54,9 @@ typedef struct {
     AbClassicLevelFinish *finish;
     AbClassicLevelEnding *ending;
     AbClassicGameProgress *progress;
+    AbClassicBoomerang *boomerang;
+    AbClassicBluesSplit *blues;
+    AbClassicEggs *eggs;
 } AbClassicGameRuntimeView;
 
 /* Construct the ordinary GameUpdate pipeline over one already prepared fresh

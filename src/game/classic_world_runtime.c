@@ -15,6 +15,7 @@ struct AbClassicWorldRuntime {
     AbBlockRemovalScores destruction_scores;
     AbBirdCollisionGrenades grenades;
     float bird_bonus;
+    size_t count, capacity;
 };
 
 static bool reserve(size_t count, size_t element, size_t *remaining, AbError *error) {
@@ -104,6 +105,7 @@ static bool glue(void *context, AbGameContactCall *call, AbError *error) {
 
 static bool allocate(AbClassicWorldRuntime *runtime, size_t count, AbError *error) {
     AbClassicWorldRuntimeConfig *config = &runtime->config;
+    size_t capacity = runtime->capacity;
     size_t remaining = config->storage_bytes;
     const size_t budgets[] = {sizeof(*runtime),
                               config->blocks.storage_bytes,
@@ -115,14 +117,14 @@ static bool allocate(AbClassicWorldRuntime *runtime, size_t count, AbError *erro
         if (!reserve(1, budgets[index], &remaining, error))
             return false;
     if (!reserve(3, config->map_bytes, &remaining, error) ||
-        !reserve(count, sizeof(*runtime->contacts), &remaining, error) ||
-        !reserve(count, sizeof(*runtime->physical_values), &remaining, error) ||
-        !reserve(count, sizeof(*runtime->bird_scores), &remaining, error) ||
+        !reserve(capacity, sizeof(*runtime->contacts), &remaining, error) ||
+        !reserve(capacity, sizeof(*runtime->physical_values), &remaining, error) ||
+        !reserve(capacity, sizeof(*runtime->bird_scores), &remaining, error) ||
         !reserve(config->score_entries, 2 * sizeof(float), &remaining, error))
         return false;
-    runtime->contacts = calloc(count, sizeof(*runtime->contacts));
-    runtime->physical_values = calloc(count, sizeof(*runtime->physical_values));
-    runtime->bird_scores = calloc(count, sizeof(*runtime->bird_scores));
+    runtime->contacts = calloc(capacity, sizeof(*runtime->contacts));
+    runtime->physical_values = calloc(capacity, sizeof(*runtime->physical_values));
+    runtime->bird_scores = calloc(capacity, sizeof(*runtime->bird_scores));
     if (config->score_entries) {
         runtime->collision_entries = calloc(config->score_entries, sizeof(float));
         runtime->destruction_entries = calloc(config->score_entries, sizeof(float));
@@ -154,6 +156,7 @@ static bool allocate(AbClassicWorldRuntime *runtime, size_t count, AbError *erro
                                       .birds = &runtime->bird_bonus,
                                       .objects = runtime->bird_scores,
                                       .count = count,
+                                      .object_capacity = capacity,
                                       .storage_bytes = remaining},
                &runtime->view.scores, error);
 }
@@ -171,6 +174,7 @@ static bool open_collisions(AbClassicWorldRuntime *runtime, AbError *error) {
     blocks.script_object_count = scripts.count;
     blocks.scores = &runtime->block_scores;
     blocks.dead_blocks = runtime->view.dead_blocks;
+    blocks.object_capacity = runtime->capacity;
     if (!ab_classic_block_collisions_open(blocks, &runtime->view.blocks, error))
         return false;
     AbClassicBirdCollisionConfig birds = runtime->config.birds;
@@ -187,6 +191,7 @@ static bool open_collisions(AbClassicWorldRuntime *runtime, AbError *error) {
     birds.bird_score_count = scripts.count;
     birds.scores = &runtime->block_scores;
     birds.root_scores = runtime->view.scores;
+    birds.object_capacity = runtime->capacity;
     birds.specialty_available = &runtime->config.globals->specialty_available;
     if (!ab_classic_bird_collisions_open(birds, &runtime->view.birds, error))
         return false;
@@ -195,7 +200,7 @@ static bool open_collisions(AbClassicWorldRuntime *runtime, AbError *error) {
     museum.blocks = runtime->view.blocks;
     museum.dead_blocks = runtime->view.dead_blocks;
     museum.physical_values = runtime->physical_values;
-    museum.physical_capacity = scripts.count;
+    museum.physical_capacity = runtime->capacity;
     museum.context = runtime;
     museum.bird = bird;
     museum.break_joint = break_joint;
@@ -226,6 +231,10 @@ static bool open_dynamics(AbClassicWorldRuntime *runtime, AbError *error) {
     dynamics.globals = config->globals;
     dynamics.random = config->random;
     dynamics.physical.teleporters = runtime->view.teleporters;
+    dynamics.physical.object_capacity = runtime->capacity;
+    dynamics.simulation.limits.object_capacity = runtime->capacity;
+    dynamics.removals.object_capacity = runtime->capacity;
+    dynamics.contacts.object_capacity = runtime->capacity;
     dynamics.removals.particles = config->particles;
     dynamics.removals.floating = runtime->view.floating;
     dynamics.removals.scores = &runtime->block_scores;
@@ -257,11 +266,21 @@ bool ab_classic_world_runtime_open(AbClassicWorldRuntimeConfig config,
     runtime->view.physics_enabled = config.physics_enabled;
     runtime->view.flying = config.birds.flying_object;
     AbClassicLevelView level = ab_classic_level_view(playfield.level);
+    runtime->count = level.bodies->count;
+    runtime->capacity =
+        config.object_capacity ? config.object_capacity : runtime->count;
+    runtime->view.object_capacity = runtime->capacity;
+    if (runtime->capacity < runtime->count ||
+        runtime->capacity > level.bodies->capacity) {
+        ab_classic_world_runtime_close(&runtime, NULL);
+        return ab_fail(error, "Invalid reserved world object capacity");
+    }
     if (!allocate(runtime, level.bodies->count, error) ||
         !ab_classic_block_scripts_open(
             (AbClassicBlockScriptConfig){.level = playfield.level,
                                          .physics_enabled = config.physics_enabled,
                                          .storage_bytes = config.script_bytes,
+                                         .object_capacity = runtime->capacity,
                                          .context = config.script_context,
                                          .level_step = config.level_physics},
             &runtime->view.scripts, error) ||
@@ -269,7 +288,37 @@ bool ab_classic_world_runtime_open(AbClassicWorldRuntimeConfig config,
         ab_classic_world_runtime_close(&runtime, NULL);
         return false;
     }
+    runtime->view.physical_values = runtime->physical_values;
+    runtime->view.physical_count = ab_classic_level_view(playfield.level).bodies->count;
     *output = runtime;
+    return true;
+}
+
+bool ab_classic_world_runtime_register_circle(AbClassicWorldRuntime *runtime,
+                                              size_t object, AbError *error) {
+    AbClassicLevelView level = runtime ? ab_classic_level_view(runtime->playfield.level)
+                                       : (AbClassicLevelView){0};
+    if (!runtime || object != runtime->count || object >= runtime->capacity ||
+        object >= level.bodies->count || level.world->failed || level.world->locked)
+        return ab_fail(error, "Invalid new world runtime circle");
+    AbDataValue value = {.kind = AB_DATA_TABLE,
+                         .table = &level.properties->objects[object].physical};
+    runtime->physical_values[object] = value;
+    runtime->contacts[object].script_table_present = true;
+    AbClassicDynamicsView dynamics = ab_classic_dynamics_view(runtime->view.dynamics);
+    if (!ab_classic_block_scripts_register_circle(runtime->view.scripts, object,
+                                                  error) ||
+        !ab_classic_scores_register_object(runtime->view.scores, object, error) ||
+        !ab_classic_block_collisions_register_object(runtime->view.blocks, object,
+                                                     error) ||
+        !ab_classic_bird_collisions_register_object(runtime->view.birds, object,
+                                                    error) ||
+        !ab_classic_simulation_register_circle(dynamics.simulation, object, error) ||
+        !ab_classic_removals_register_object(dynamics.removals, object, error) ||
+        !ab_classic_contacts_register_object(dynamics.contacts, object, error))
+        return false;
+    ++runtime->count;
+    runtime->view.physical_count = runtime->count;
     return true;
 }
 

@@ -70,7 +70,8 @@ static bool base_type(const AbDataTable *table, AbError *error) {
     const char *const special[] = {"rect", "screen", "menu_particles"};
     for (size_t index = 0; index < 3; ++index) {
         if (same_text(type->string, special[index])) {
-            return ab_fail(error, "Theme layer subtype construction requires recovery");
+            return ab_fail(error, "Theme layer subtype '%s' requires recovery",
+                           special[index]);
         }
     }
     return true;
@@ -135,6 +136,11 @@ static bool bind_layer(const AbDataTable *table, const LayerSources *sources,
         return ab_fail(error, "Invalid theme layer type string");
     if (type && type->kind == AB_DATA_STRING && same_text(type->string, "border"))
         return bind_border(table, sources, output, error);
+    if (type && type->kind == AB_DATA_STRING && same_text(type->string, "rect")) {
+        output->kind = AB_THEME_SPRITE_RECT;
+        output->definition.base.scale = 1;
+        return ab_theme_rect_read(table, &output->rect, error);
+    }
     const AbDataValue *name = tuple(table, 2);
     if (!base_type(table, error)) {
         return false;
@@ -362,6 +368,8 @@ bool ab_theme_layers_draw_base(const AbThemeLayers *layers, uintptr_t handle,
     if (layer->kind == AB_THEME_SPRITE_BORDER)
         return ab_fail(error,
                        "Screen-border layers require their explicit draw method");
+    if (layer->kind == AB_THEME_SPRITE_RECT)
+        return ab_fail(error, "Rectangle layers require their explicit draw method");
     if (!layer->definition.has_base_sprite) {
         return true;
     }

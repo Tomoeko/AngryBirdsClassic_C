@@ -93,7 +93,7 @@ static bool missing_case(FILE *file, uint32_t sample, AbPhysicsWorld *world,
     AbWorldStorage storage = prepare_storage(memory, 0, 0);
     CHECK(ab_world_open(world, default_definition(), storage, NULL));
     AbLevelObject objects[2];
-    AbLevelBodies bodies = {objects, 2, 0};
+    AbLevelBodies bodies = {.objects = objects, .capacity = 2, .count = 0};
     size_t index;
     AbStringOrderNode node;
     AbStringOrderWorkspace order = {&index, 1, &node, 1};

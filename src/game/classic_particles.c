@@ -12,6 +12,7 @@ struct AbClassicParticles {
     AbTargetData *files;
     AbParticleSource *sources;
     AbParticles *engine;
+    const AbLuaData *copies;
     size_t bytes, resource_bytes;
     bool calling;
 };
@@ -167,6 +168,14 @@ AbClassicLevel *ab_classic_particles_level(const AbClassicParticles *owner) {
     return owner ? owner->config.level : NULL;
 }
 
+bool ab_classic_particles_bind_copies(AbClassicParticles *owner,
+                                      const AbLuaData *copies, AbError *error) {
+    if (!owner || owner->calling || (copies && owner->copies))
+        return ab_fail(error, "Invalid runtime particle descriptor owner binding");
+    owner->copies = copies;
+    return true;
+}
+
 static bool amount(AbClassicParticles *owner, const AbDataTable *descriptor,
                    float *output, AbError *error) {
     AbDataValue explicit = field(descriptor, "amount");
@@ -246,6 +255,15 @@ static bool body_angle(AbClassicParticles *owner, size_t object, AbDataValue cac
     return true;
 }
 
+static bool new_particles(AbClassicParticles *owner, const AbParticleEmission *emission,
+                          AbError *error) {
+    /* Source newParticles152993 rejects the empty name before reaching the
+     * native engine. Caller-side amount RNG, geometry and angle queries have
+     * already happened; preserve those even for this suppressed request. */
+    return !emission->definition.size ||
+           ab_particles_emit(owner->engine, emission, error);
+}
+
 static bool contact(AbClassicParticles *owner, size_t object, AbDataValue descriptor,
                     bool ignore_limits, bool alternate, AbError *error) {
     AbParticleEmission emission = {.ignore_limits = ignore_limits,
@@ -261,9 +279,15 @@ static bool contact(AbClassicParticles *owner, size_t object, AbDataValue descri
         return ab_fail(error, "Invalid classic particle burst descriptor");
     const AbDataTableLayout *layout =
         ab_lua_table_layout(owner->level.catalog_data, descriptor.table);
+    bool copied = !layout && owner->copies;
+    if (copied)
+        layout = ab_lua_table_layout(owner->copies, descriptor.table);
+    size_t capacity = 0;
     if (!layout || !layout->no_nil_assignments ||
-        !ab_data_string_order(descriptor.table, layout->hash_capacity,
-                              owner->config.workspace, error))
+        !(copied ? ab_data_string_order_growing(
+                       descriptor.table, owner->config.workspace, &capacity, error)
+                 : ab_data_string_order(descriptor.table, layout->hash_capacity,
+                                        owner->config.workspace, error)))
         return ab_fail(error, "Unsupported classic particle descriptor iteration");
     for (size_t index = 0; index < descriptor.table->count; ++index) {
         AbDataValue child =
@@ -278,7 +302,7 @@ static bool contact(AbClassicParticles *owner, size_t object, AbDataValue descri
         emission.definition = definition.string;
         if (!body_angle(owner, object, current, &emission.angle, error))
             return false;
-        if (!ab_particles_emit(owner->engine, &emission, error))
+        if (!new_particles(owner, &emission, error))
             return false;
     }
     return true;
@@ -343,8 +367,9 @@ static bool legacy_emit(AbClassicParticles *owner, size_t object, AbDataValue ca
     if (definition.kind != AB_DATA_STRING)
         return ab_fail(error, "Unsupported legacy particle definition value");
     emission->definition = definition.string;
-    return numeric(amount_value, &emission->amount, error) &&
-           ab_particles_emit(owner->engine, emission, error);
+    return !emission->definition.size ||
+           (numeric(amount_value, &emission->amount, error) &&
+            new_particles(owner, emission, error));
 }
 
 static bool legacy(AbClassicParticles *owner, size_t object, AbDataValue definitions,
@@ -429,12 +454,11 @@ bool ab_classic_particles_ambient(void *context,
     if (!owner || owner->calling || !emission)
         return ab_fail(error, "Invalid or reentrant classic ambient emission");
     owner->calling = true;
-    bool okay =
-        ab_particles_emit(owner->engine,
-                          &(AbParticleEmission){.definition = emission->particles,
-                                                .amount = emission->amount,
-                                                .position = emission->position},
-                          error);
+    bool okay = new_particles(owner,
+                              &(AbParticleEmission){.definition = emission->particles,
+                                                    .amount = emission->amount,
+                                                    .position = emission->position},
+                              error);
     owner->calling = false;
     return okay;
 }

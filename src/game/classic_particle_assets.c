@@ -23,8 +23,14 @@ static bool table(const AbDataTable *value) {
 }
 
 static bool append(AbClassicParticleNames *names, AbDataValue value, AbError *error) {
+    /* newParticles152993 returns for the empty material name. It identifies
+     * no resource file, even though Lua considers an empty string truthy. */
+    if (value.kind == AB_DATA_STRING && !value.string.size)
+        return true;
     if (value.kind != AB_DATA_STRING || !value.string.size || !value.string.data)
-        return ab_fail(error, "Invalid initial particle resource name");
+        return ab_fail(error,
+                       "Invalid initial particle resource name (kind=%u, bytes=%zu)",
+                       (unsigned)value.kind, value.string.size);
     for (size_t index = 0; index < names->count; ++index)
         if (same(names->names[index], value.string))
             return true;
@@ -81,14 +87,31 @@ bool ab_classic_particle_names(AbClassicLevel *owner, AbClassicParticleNames *na
             return ab_fail(error, "Initial particle object traversal exceeds bound");
         --work;
         AbDataValue particles;
+        AbError reached = {0};
         if (!ab_level_property_get(level.properties, index, span("particles"),
-                                   &particles, error) ||
-            !descriptors(particles, names, 0, &work, error))
-            return false;
+                                   &particles, &reached) ||
+            !descriptors(particles, names, 0, &work, &reached))
+            return ab_fail(error, "Object %.*s particle preload: %s",
+                           (int)(object->name.size < 96 ? object->name.size : 96),
+                           object->name.data, reached.message);
         AbObjectDefinition definition;
         if (!ab_object_definition_open(level.catalog, object->definition_name, NULL,
                                        &definition, error))
             return false;
+        AbDataValue specialty = field(definition.source, "specialty");
+        if (specialty.kind == AB_DATA_STRING &&
+            same(specialty.string, span("GRENADE"))) {
+            AbDataValue name = field(definition.source, "projectile");
+            AbObjectDefinition projectile;
+            if (name.kind != AB_DATA_STRING ||
+                !ab_object_definition_open(level.catalog, name.string, NULL,
+                                           &projectile, error) ||
+                !descriptors(field(projectile.source, "particles"), names, 0, &work,
+                             error))
+                return error && error->message[0]
+                           ? false
+                           : ab_fail(error, "Invalid white bird projectile particles");
+        }
         AbDataValue damage = field(definition.source, "damageStateChangedParticles");
         if (damage.kind == AB_DATA_NIL)
             continue;

@@ -7,6 +7,8 @@
 #include "ab/ui_frame_tree.h"
 #include "ab/classic_blues_split.h"
 #include "ab/classic_bird_boost.h"
+#include "ab/classic_boomerang.h"
+#include "ab/classic_eggs.h"
 
 typedef struct AbClassicBirdSpecialty AbClassicBirdSpecialty;
 
@@ -21,6 +23,13 @@ typedef struct {
     AbSettingsStatistics *settings;
     AbClassicBluesSplit *blues;
     AbClassicBirdBoost boost;
+    AbClassicBoomerang *boomerang;
+    AbClassicExplosions *explosions;
+    AbClassicBirds *birds;
+    AbClassicEggs *eggs;
+    void *blues_context;
+    bool (*blues_created)(void *context, const AbClassicBluesSplitResult *result,
+                          AbError *error);
 } AbClassicBirdSpecialtyConfig;
 
 /* Concrete ordinary triggerSpecialty125163 and triggerBirdSpecialty125065.
@@ -44,10 +53,14 @@ size_t ab_classic_bird_specialty_bytes(const AbClassicBirdSpecialty *specialty);
  * Bind actual settings for extra tutorials. CLUSTER_BOMB uses the optional real
  * Blues branch, then common hook/event/parent behavior dispatch before final
  * parent removeBird. BOOST uses the actual impulse/particle/audio/visual/puff
- * bindings before the common tail. Active red tutorials/forced targeting, other
- * ordinary abilities and unresolved named hooks reject when reached. Reentry rejects; a
- * late error retains prior effects and stops this owner. This does not choose the
- * enclosing input gate or execute a complete frame.
+ * bindings before the common tail. BOOMERANG uses its actual shared controller
+ * owner for activation and later flight updates.
+ * BOMB emits the shared real explosion before the common tail and final parent
+ * removal. GRENADE uses the concrete egg owner for creation, real rebound and
+ * subsequent contact-driven explosions. Active red tutorials/forced targeting,
+ * other ordinary abilities and unresolved named hooks reject when reached. Reentry
+ * rejects; a late error retains prior effects and stops this owner. This does not
+ * choose the enclosing input gate or execute a complete frame.
  */
 bool ab_classic_bird_specialty_trigger(AbClassicBirdSpecialty *specialty,
                                        AbDataValue bird, float seconds, AbError *error);

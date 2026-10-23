@@ -8855,3 +8855,429 @@ and registered once after return. The Release Metal route passes with these
 checks, alongside the separate actual win/loss routes. Both natural/fast-forward
 Metal routes and the native shot regression pass with ASan/UBSan; the Windows
 application cross-build and formatting checks pass.
+
+The Red's Mighty Feathers level-screen subclass now composes its actual alternate
+left/right decorations, two-stage slide and second-page background tint over the
+retained LevelSelection owner. Evidence is the pinned episode9 subclass methods
+485/1323/1557/1846/2600/2730; the Metal integration test traverses both pages and
+returns, checks phase endpoints and covers all 30 catalog buttons. This recovers
+selection, not Egg Defender gameplay or a native whole-session comparison.
+
+Ham 'Em High's three additional levels were omitted by the application's
+`disable_external_links` catalog input, which removed its fourth page. That input
+now retains the full Android catalog. The LSFacebookLayout recovery uses source
+methods 8492/8889/9344/9396/10130: the three ordinary level buttons are locally open
+without a social login. The page retains original Like artwork, child order,
+scaled row placement and settingsWrapper.shouldUseAgeFilter48481's strict Boolean
+rule. Tests reach page 4 through real arrows, select all three canonical records,
+verify actual APK resource paths, capture Metal output, and check both live
+age-filter re-entry and filtered fresh construction. The enclosing root's social
+service action and complete playthroughs of those levels remain open. No network,
+authentication response or service reward is simulated.
+
+Continuous native-drawable presentation previously called Common's explicitly
+nonblocking empty-frame entry. Reusing one of its three slots while Metal still
+owned it produced `indexed frame storage is still in flight`; capture-based tests
+hid this because capture waits for each command. Common now also exposes a
+waiting empty-frame entry, and the application uses that entry for native frames.
+It waits only for the slot about to be reused, before dynamic vertices, textures
+or uniforms are copied. Other slots remain queued; submission stays asynchronous.
+The original nonblocking API and outside-frame depth-preparation rule are kept.
+GLES2 uses its existing ordered path through the same new interface.
+
+The regression submits 256 ordinary frames without capture, then compares every
+pixel of a 1200x920 native frame. It reproduced the exact failure before the fix
+and passes after it with Metal API validation. Metal and Apple GLES2 pass tests,
+menu/level/result/pause integration, ASan/UBSan natural/fast-forward routes, and
+the Windows GLES2 cross-build pass. The primary Files/build cache had retained
+AB_SANITIZE=ON despite Release mode; it is now rebuilt with AB_SANITIZE=OFF, as
+shown explicitly in normal README build commands. The rebuilt app links no ASan
+runtime and its actual APK-only launch emits neither the nano-zone warning nor
+the renderer error. No allocator environment override suppresses diagnostics.
+Private logs use the `metal-slot-` prefix in the analysis input directory.
+
+BadPiggiesLevelSelection now wraps the actual three-page/45-level base with its
+original particle Frame and pig ImageButton at child positions 1/2. Methods1751,
+2403,2753,3012,3273 and 3608 supply feature gates, GREEN_UPSELL entry/release,
+shared-script-RNG animation changes, four-frame artwork, entrance cubic tween,
+bob/rotation and alternate-list green_rocket emissions. The source's unused
+floorCoodinates misspelling does not disable Image.floorCoordinates. Its sqrt
+call passes dx*dx and dy*dy separately; only the first argument is consumed.
+Menu and gameplay particle owners now share the retained engine RNG.
+
+Binary Ninja confirms the early menu-particle draw and later update in the pinned
+ARMv7 library: ELF VA0x3070b8 GameLua::drawMenuParticlesInAdvance and
+VA0x323ec0 GameLua::update. This session's Binary Ninja ELF candidate is rebased
+by 0x10000; its displayed addresses are 0x3170b8/0x333ec0. Dynamic ELF symbols and
+PT_LOAD headers independently distinguish those addresses from file/raw VAs.
+The app draws menu particles at the actual first child boundary, then advances
+that list after script draw. The muted reference emulator remains configured
+with `-audio none`.
+
+Rotating Bad Piggies artwork exposed the prior unsupported composite-parent
+rotation. CompoSprite::draw (raw ELF VA0x58639c; Binary Ninja view 0x59639c) measures
+its context columns, applies positive column lengths to context translation and
+anchor, then composes the part offset/rotation and sprite pivot. Rotation origins
+are unused by this overload. The C consumer now supports signed finite nonzero
+parent scales and rotation while retaining its existing positive-axis path.
+A new isolated original-binary probe covers 2,048 cases / 5,120 ordered part quads,
+including reflected contexts and independently rotated parts. Every XY word
+matches. SHA256: 3e4dfdcd3365c73ae71cb38108466a5fe59421874dbf87c474d17cbfb6c85693.
+The original positive-context corpus still matches. Optional
+AB_REFERENCE_COMPOSITE_CONTEXT_DRAW checks the new pinned trace separately.
+
+The Bad Piggies Metal integration test verifies 45 canonical resource paths,
+three pages through actual arrows, real loaded rocket sprite handles, source
+button/event routing, changing animation, and fresh exit/re-entry. Its captured
+screen was visually inspected. Release checks pass for the integration route,
+both native composite corpora and 4,096 existing UI-image native cases. Both
+natural/fast-forward integration routes and composite/UI edges pass under
+ASan/UBSan in the separate build-reference directory; the Windows application
+cross-build and project formatting pass. Service-link dispatch and all 45 level
+playthroughs remain open; these checks do not establish whole-screen native
+fidelity. Private recovery/captures/logs use `pigs-` in the analysis input directory.
+
+Golden Eggs now uses its actual LSGoldenEggsLayout and GoldenEggsLevelSelection
+rather than an ordinary grid. Layout methods 11169/11489/12280/12400/12786/13050/
+13670 create page halos before base ImageButtons, each with its own carved-star
+child. They preserve source scattered coordinates, disabled-override silhouettes,
+unlock/played/completed visibility, scaling and rotating halos. Screen methods
+308/752/1548/1711 retain LEVELSELECTION_GOLDEN_EGGS lifecycle, second-page
+unlock/anchor/dot rules, and the King Pig control with the original seven-episode
+gold-score gate and explicit debug-build bypass. Enclosing hint dialogs, King Pig
+mode routing and gameplay remain separate recovery work.
+
+The application's highscore graph formerly reserved 16 entries per nested map;
+creating all 32 Golden Egg rows exhausted that bound. It now reserves 64 entries
+per map within a 16 MiB bound, retaining the 1024-entry root and 1024 table slots.
+These are implementation capacities; native constructor hints, hash growth,
+iteration and table identities are unchanged. A separate test-owned profile
+writes all 32 actual unlock/played records through the application opener and
+APK-key encrypted save, releases both owners, reopens/restores, and verifies
+all 32 flags. Runtime user profiles are not used by this fixture.
+
+Metal checks cover all 32 source button classes/metadata, 27 physical APK paths,
+the five fileless registered music/toy entries, silhouettes, an initially hidden
+second page, unlock/re-entry/selection, played/completed refresh, halo clock and
+release/debug King Pig visibility with its real artwork. SOUNDBOARD1, RADIO,
+KEYBOARD, SEQUENCER and ACCORDION have no physical level file; their registered
+controllers remain unimplemented and are not counted as playable by this test.
+Captures use the application's actual theme clear color, unlike earlier explicitly
+black component fixtures, and both pages were visually inspected. Release and
+both ASan/UBSan natural/fast-forward integration routes pass, as do the Windows
+application build and formatting. Native whole-screen fidelity and all-level
+playthroughs remain unverified. Private logs/captures use the `golden-` prefix.
+
+
+Green-bird flight now binds triggerSpecialty125163 instructions 413..519 and
+updateBoomerangBirds108793 through a shared first-party owner. Activation reads
+cached physical velocity and creation mass, records the source turning forces
+and velocity limits using the current ordinary sling power, changes the actual
+sprite, plays its resolved sound, and attaches a trajectory puff. The controller
+runs pre-activation lift/spin and activated force/spin updates after the camera.
+Forces enter the existing measured per-physics-step queue; the application now
+reserves 1024 requests rather than leaving that queue at zero capacity. The
+Facebook branch retains the source native-velocity/cache separation; it is not
+claimed as exercised by an ordinary target catalog bird.
+
+Museum load bounds are now retained alongside level bodies before generated
+ground construction, including the original full-width circle sentinel. Swish
+volume uses these immutable physical edges, not camera bounds or moved bodies.
+The selected ordinary sling exposes its existing power-one state: Slingshot
+constructor26738 initializes power=1, getPower29185 reads it, and
+SlingshotSystem.getSlingshotPower23570 delegates to that selected sling. Powered
+sling classes remain separate work.
+
+The actual Danger Above 6-5 metadata selects LevelP3_224 and three BoomerangBird
+objects. A controlled APK test checks queued lift, ordered turning forces, spin
+caps, real specialty sprite/audio/puff and the angle-crossing swish with edge
+attenuation. A fresh session then uses only mouse aim/release/activation and
+ordinary frame updates to launch right and reverse the bird's simulated X
+velocity. Its final game frame renders on Metal. The native original full-flight
+trace has not yet been compared; these are functional checks and source recovery,
+not a claim of whole-session 1:1 fidelity.
+
+That cross-episode test exposed a separate menu-theme lifetime defect under
+ASan: menu_theme_select retained a level-owned name after the level closed. It
+now resolves the identical key owned by the persistent decoded theme catalog,
+which also keeps the settings/theme observers valid. Both natural and
+fast-forward Metal integration routes pass ASan/UBSan after this repair. The
+ordinary Release Metal route, all 14 episode screen factories, 105 related
+classic/level/object/bird/force/controller regressions, and Windows compilation
+also pass. Private recovery, captures and logs use the boomerang- prefix.
+
+Black-bird BOMB activation now binds the shared explosion boundary used by TNT
+and removeBlocks as well as the source timed fuse. The recovered source is
+triggerSpecialty125163, Museum.updateBird19137, makeExplosion152242,
+ObjectFunctions.museumCreateExplosion166 and inflictDamage151911. Preserve
+strict timer<0 detonation, both warning sprites, source radius/defence and
+distance arithmetic, physical impulse/cache separation, death-map insertion,
+damage-sprite writes, particle order, channel-one sound at 0.7 and shake. The
+explosion scale changes shake only; addExplosionScore152497 is empty. Joint
+break callbacks remain explicit reached boundaries where no concrete queue is
+bound. This does not establish joint-connected explosion fidelity.
+
+Actual Poached Eggs 2-5 selects Level88 and four BlackBirds. Controlled checks
+cover manual activation, real pig damage/death, impulse, art/audio/effects and
+parent removal; fuse checks retain a live bird at exactly zero. Fresh sessions
+use actual mouse aim/release/activation and a natural ground collision to start
+and expire the fuse, then draw on Metal. The related 130 regressions, Windows
+compilation and both Metal ASan/UBSan routes pass. Full original black-bird
+flight/detonation traces remain unverified. Private logs use the bomb- prefix.
+
+That first explosion exposed zero-scale world particles at their first frame.
+Native Particles.drawParticles (BN VA0x30155c) submits zero-context-scale quads
+whose coordinates are nonfinite after division by scale. Thirty original draw
+records for three actual definitions and six phases are retained, SHA-256
+4522033e1256087ee91f9b32abf66b2aece58098ab1a59e10a6fc70fbd360eaa.
+The ordinary draw adapter suppresses only those nonrasterizable submissions;
+particle simulation, lifetime, RNG and resource validation remain active. Their
+invisibility is inferred from submitted geometry, without a separate original
+GPU pixel capture. Existing nonzero native particle comparisons still pass.
+
+The catalog-wide private startup audit resolves actual episode/page metadata,
+opens the application session and runs three ordinary frames per request. It
+does not grant progression or replace missing scripts. The first run exposed
+the absent res.stopAllAudio call at Museum.loadLevel2711 instructions50..52;
+restoring that original load boundary prevents accumulated music/effect voices
+across transitions. The harness explicitly drains audio even after constructor
+failure, reflecting the application audio thread's normal work.
+
+Source newParticles152993 returns before the engine for nil/empty names. Static
+fragile materials legitimately retain an empty string; the preloader no longer
+treats it as a filename. Contact RNG and geometry/angle queries still precede
+the wrapper at their original boundaries. The actual LevelP3_216 regression
+checks that the empty single-name call consumes neither engine nor script RNG.
+The removal owner now reserves exact-size normalized immutable definitions in
+one bounded pool, reusing aliases, instead of reserving the full per-definition
+ceiling for every object. Large Level745 now starts and renders without raising
+its memory budget. The full 590-request pre-rectangle audit completes under
+ASan/UBSan without a memory error, with 468 constructors and 432 three-frame
+starts. Inventory scope excludes full playthroughs and native session parity.
+
+RectThemeLayer constructor/draw (BN VAs 0x2f491c/0x2f2110; raw ELF VAs subtract
+0x10000) now bind the recovered nested RGBA/relative rectangle data. Relative
+bottom is actually used as a top-down Y fraction. Preserve the original
+binary32 color reciprocal, nil/default rules, alpha>0 gate, nonfused extent
+arithmetic and existing GameLua.drawRect color packing/reset boundary. All
+57,344 output words from 4,096 original constructor/draw cases match, SHA-256
+ded27318b8e86350cfd114ab6c0e8a3dd77ef9a8b607261b0b52375b44303469.
+This verifies the constructor and rectangle submission, not full-screen GPU
+composition or later mutable theme operations. Short Fuse BlackBird_1 now gets
+past theme construction and reaches its still-unbound flame component.
+
+Theme drawing also resolves cached sheet/region identities through the retained
+binding service. A later resource group's registry entry can mask a composite
+part's name while its original sprite remains live. Resolving the name again
+caused thirteen real level frames to reject. All thirteen pass after retaining
+the original selection; actual EggDefender_classic_1 is an always-on Metal
+regression. Resources still reject stale, foreign or unloaded selections.
+
+Ordinary updateAnimation136934 now advances canonical physical animation state
+and invokes the real damage-sprite adapter. Preserve nil-only timer setup,
+single-frame advancement despite overshoot, false-vs-nil frame presence,
+looping, retained final frames and finished/disabled gates. An isolated original
+ARM oracle runs the unchanged updateAnimation, getDamageSpriteNames151134 and
+getDamageSprite151699 prototypes. All 20,480 field words from 2,048 calls match,
+SHA-256 f018fa43bd0c2a5d435bb7d9b4b035f7ebf4c963e23587ac40f7424231dac575.
+The corpus covers raw timer/frame/completion/override/sprite writes with the
+original nil-definition damage boundary and suppressed setSprite. Actual
+EggDefender_classic_2 additionally exercises its catalog frames and Metal draw;
+full native animated-level visuals remain unverified. The latest all 590 audit
+has 487 constructors and 487 three-frame starts, with 103 explicit constructor
+failures and no frame failures. Ambient/flame owners, registered level hooks,
+remaining bird powers, full HUD and complete playthroughs remain open.
+
+
+The live game now binds the recovered Blues owner, rather than leaving its
+specialty slot absent. Direct-circle children receive stable behavior, shot,
+camera, physical, simulation, contact, collision, scoring, removal, controller
+and character rows. Reservations derive from each authored bird count. The
+actual Level8 mouse test creates three children, removes the parent, continues
+flight and captures Metal output. The existing original child/split/trajectory
+corpora remain separate from this application integration check; complete native
+flight and collision parity remains unverified.
+
+Nine standard pack intros now use their selected source artwork and command
+lists, including vertical width fitting, scroll positions and restrictions.
+Each reaches its source end time and renders on Metal. The three special actor
+intros remain open. Level5 now runs its registered treasure update and the real
+root double-click transition. An actual mouse/zoom test grants LevelGE_15,
+constructs the zero-score record, publishes the gained event, draws its reward
+and verifies the encrypted save after reopening.
+
+The application now owns the source power-up slider and counters. The ordinary
+six-entry catalog supplies metadata and its infinite flags; --inf and --infinite
+apply source makeInfinite behavior to all registrations. Source inventory
+consumption and use/events stay separate from activation eligibility. KingSling
+uses its recovered 1.5-second activation, PowerupEffect notification, actual
+AngerActivationCameraSequence, class power increment, images, audio, base
+particles and named flight spawner. Private source evidence covers
+PowerupManager3432/4438/4806/6798/8715/8815, PowerupEffect498..2217,
+Powerup_KingSling331..1764 and SlingshotSystem14427/23659/23933.
+The normal/infinite mouse test starts from controlled balances of three/zero,
+checks consumption of one/zero, source infinity text, notification expiry,
+resize without asset reload, the powered launch and its actual particle trail.
+Other power-up effects, Eagle/Shockwave/RMF controls and full HUD parity remain
+open; these changes do not establish native full-session equivalence.
+
+
+Super Seeds now binds Powerup_SuperSeed230/679/736/1070/2228 and the
+MuseumMode updateBird growth continuation. Activation uses the actual source
+notification/camera and delays. The bird receives its definition-specific radius,
+density and velocity modifier; each growth visit destroys the old native body,
+recreates its circle and renderer, copies missing physical fields and builds a
+fresh GameObject. Native bird-vector membership, force/activity caches and launch
+mass refresh with the replacement. Logical object indices remain stable; this
+representation does not establish fidelity for arbitrary retained physical-table
+aliases outside the supported world/birds views.
+
+The isolated original ARMv7 superSeedGetRadius736 function matches 2,048 cases
+and 6,144 output words, including nil timers, growth oscillation, source bird
+radii and both neighboring float values at the half-second boundary. Corpus
+SHA-256: 5a04f2c4e15f950aaeb35d1cc84575377cf1df74aa004d99d873b7e9d4248ebf.
+The original selected function is a private research input; no original bytecode
+or runtime is shipped. This verifies radius arithmetic and timer clearing, not
+native whole-session physics or image parity.
+
+The shared named power-up spawner owner now includes Super Seeds bubbles and
+flight trails. It preserves the recovered random bubble interval, position,
+physics/removal gates and immediate trail behavior. A powered launch deep-copies
+its own particle descriptor graph, changes collision/removal smoke to
+smokeBuffBirdsPurple and retains the shared catalog unchanged. The source copy's
+empty-table growth order is kept for later emission traversal. Complete native
+manager/RNG ordering remains unverified. Actual HUD mouse tests cover finite and
+zero-balance infinite Red activation, and Blues, Chuck, Bomb and Hal activation,
+growth, launch and subsequent flight/collisions on Metal. Tests check the native
+bird-vector size, rebuilt shape/mass, refreshed launch mass, per-bird eligibility,
+particle isolation and live trail. Scope/Quake/Shockwave/RMF effects, separate
+Eagle controls and full HUD/session equivalence remain open.
+
+The Super Seeds integration passes all 759 primary checks, both complete Metal
+UI routes and both radius checks under ASan/UBSan, the Windows MinGW build and
+the format/diff checks. The normal Metal build keeps AB_SANITIZE disabled;
+sanitizers remain in the separate reference build.
+
+The latest full catalog audit reaches 488 constructors and 488 three-frame starts
+out of 590 requests, with 102 explicit construction failures and no frame
+failures. This includes the recovered Level5 hook. It is a loading audit, not
+488 completed playthroughs.
+
+Birdquake now binds the actual source activation195, reset817 and update993,
+cancelLevelEnding88106, setPigSpecialExpression136690 and the named
+BirdquakeCameraSequence. Explicit tweenEaseCubicInOut selects the already recovered
+default curve. Preserve the one-second startup, two-second scaled impulse phase,
+strict 0.05-second particle loop, one-element random selection, current world
+iteration, airborne-bird exclusion and definition-group dust. The source impulse
+uses current physical mass and position; live bodies receive it directly.
+
+The application shares the actual prevention/darkness state with completion,
+controller and drawing. The existing GameUpdate darkness subtraction/clamp now
+publishes to that canonical global at source service boundaries; completion
+clears it. Pig extraSprites are available as immutable catalog-backed views in
+the supported read-only path. Special expression assignment and later expiry
+update both character state and the raw physical fields. Mutations of those
+extraSprites tables require separate owned-copy recovery.
+
+The finite/infinite mouse integration test reaches the actual notification,
+camera, scared expressions, decoded earthquake sound, real body impulses and
+menu dust, renders Metal output, then checks release of completion/activation
+and darkness gates. Native full-Birdquake numeric/RNG/frame parity remains open.
+
+
+### Sling Scope and repeated Blues lifecycle
+
+The same pinned APK/native library now supplies Sling Scope activation323,
+reset802, update867 and draw1423, with SlingshotSystem helpers
+24653/24786/25285/26068. Its angle/phase table survives level resets; activation
+moves the effect to the actual passive list. The real accessory, basic/King
+scope-front composites, stretched-shot gates, definition force/acceleration,
+current mass, direct laser audio and launch/reset rearm policy are bound.
+King selection uses actual active/passive scope membership, as setSlingshot4762
+requires. No replacement trajectory art or ballistic approximation is used.
+
+An isolated Android oracle calls unchanged native GameLua.drawSlingScope with
+controlled world/object/resource/render boundaries. Across 256 cases, all 3,942
+dots match the C plan exactly: speed limiting, gravity/force, interpolation,
+phase spacing, image rectangle, translation, scale, alpha and final native state.
+The retained corpus SHA-256 is
+`3671d0184625f7f5f66a43b85f75f75dc67a6ebd15eaec9c6f6581fa88019349`.
+`AB_REFERENCE_SLING_SCOPE` validates that hash before enabling the native test.
+This validates native numeric/draw submissions, not a full original GPU frame
+or the angle/update lifecycle. ARM scalar VMOV register copies were checked
+against LLVM instruction decoding after the Binary Ninja rendering disagreed.
+The original library was not patched.
+
+The actual mouse/Metal integration activates finite and zero-balance infinite
+Scope, checks inventory and passive membership, aims with the sight/sound,
+combines Super Seeds then King Sling without discarding the scope, captures the
+result and launches the bird. The front decorations use the existing native-
+validated composite renderer; they are composite resources, not atlas sprites.
+
+Repeated Blues exposed three initial-queue assumptions and a capacity mismatch.
+The default otherBirds generation budget now reserves one initial table and
+both launch/split replacements per queued bird, preserving old table aliases.
+Physics-phase flushing resolves a live name/body pair, since destroyed body
+slots can be reused by new children. The source loss query visits canonical
+dynamic birds as well as initial birds. Application trajectory renderer capacity
+now matches its already allocated point budget. No shared renderer slots or
+old table identities are reused while retained aliases may remain.
+
+The live Level8 regression launches and splits all five original Blues through
+mouse input, pans back to the sling between launches, verifies all 15 children
+and original retained numeric table entries, then runs 240 further frames and
+captures Metal output. This covers repeated construction, retirement, body-slot
+reuse and the former generation exhaustion. Original full-flight/collision
+parity and unbounded retained trajectory storage remain separate open work.
+
+
+### Concurrent power-up notifications
+
+Each reached activation now owns a separate stable PowerupEffect widget in the
+actual NotificationsFrame. The notification pool and child storage cover the
+registered six-effect catalog. One active notification no longer rejects a
+second activation. Each widget retains its own source entry audio, timer,
+scale/shake/particle state and 1.25-second removal. Detached storage is reused
+only after that widget has left the tree; cleanup removes every live child.
+The native drawMenuParticlesInAdvance guard remains shared for the frame.
+
+The mouse regression activates all four visible powers consecutively in both
+finite and zero-balance infinite modes, verifies four sibling widgets and
+separate ages, captures Metal output, observes staggered removal without
+removing siblings, checks all four effects finish independently, then activates
+a second Birdquake through a reused detached slot. Both complete primary Metal
+UI routes pass. The five-Blues/Scope change also passed all 761 primary checks,
+six selected ASan/UBSan checks and a complete Windows cross-build; the newer
+notification change has its own sanitizer and Windows validation logs.
+
+### Matilda egg lifecycle and identity-key tables
+
+The white-bird GRENADE branch of triggerSpecialty125163 now creates the actual
+EggGranade projectile, retains the parent's physical properties and source
+damage fields, selects DROPPABLE_EGG, registers the new native body/renderer and
+applies the recovered rebound impulse to Matilda. The projectile has its own
+flyingGrenades record, separate from the physical object and bird queue. Its
+source timer value of five is retained; no invented countdown fuse is applied.
+The GameUpdate110400 grenade phase observes the collision's explode flag,
+emits the original shell particle groups, calls the shared explosion service
+with the source audio, removes the body/world entry and compacts the list.
+
+The real Level26 mouse test launches Matilda, triggers her ability, checks the
+egg and parent rebound, waits for an actual collision, checks the explosion,
+shell particles and complete projectile retirement, and continues for another
+180 frames. Metal captures were inspected. All 761 primary checks and both
+complete Metal UI routes under ASan/UBSan pass; the Windows cross-build passes.
+This establishes the exercised functional path. A whole native Matilda flight
+and frame comparison remains open.
+
+The new bounded identity-key map preserves the ARMv7 native table's pointer-key
+hash, collision relocation, growth, traversal, retained nil entries and resume
+behavior. An isolated original-library oracle uses 64 real table identities
+across 16 instances and 256 commands per instance, comparing every slot, link,
+lookup and traversal result. Both edge and native comparison tests pass.
+The retained corpus SHA-256 is
+`a94ee2eeb12fdde90d5dcbd0269be3b4ce68472023160ffae07c9cfbbc98ad2d`;
+`AB_REFERENCE_IDENTITY_MAP` checks this hash. The map compares complete host
+identities while preserving the native 32-bit hash input. This does not establish
+native allocation addresses, garbage collection, mixed-key tables or full-frame
+random ordering, and ambient component integration remains open.

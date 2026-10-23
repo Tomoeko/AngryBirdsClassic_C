@@ -26,6 +26,7 @@ static int game_rectangle_fill(void *context, uint32_t color, int32_t left, int3
     return 0;
 }
 
+#if defined(AB_ORACLE_GAME_RECTANGLE_ONLY)
 static void probe_game_rectangle(void) {
     typedef void (*Draw)(void *, float, float, float, float, float, float, float, float,
                          int);
@@ -65,5 +66,6 @@ static void probe_game_rectangle(void) {
     }
     semihost(4, "AB game rectangle reference complete\n");
 }
+#endif
 
 #endif

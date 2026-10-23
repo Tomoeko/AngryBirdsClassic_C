@@ -25,9 +25,10 @@ static AbDataTable *physical(AbClassicLevel *level, size_t object, AbError *erro
     return &view.properties->objects[object].physical;
 }
 
-bool ab_classic_shot_attach_particles(AbClassicLevel *level, size_t object,
-                                      const AbPowerupUses *uses, bool powerups_enabled,
-                                      AbError *error) {
+bool ab_classic_shot_attach_particles_host(AbClassicLevel *level, size_t object,
+                                           const AbPowerupUses *uses,
+                                           bool powerups_enabled, void *context,
+                                           AbClassicShotTrails create, AbError *error) {
     AbDataTable *bird = physical(level, object, error);
     if (!bird)
         return false;
@@ -48,9 +49,20 @@ bool ab_classic_shot_attach_particles(AbClassicLevel *level, size_t object,
         !ab_object_property_set(&raw, span("shotWithPowerPotion"), potion, error))
         return false;
     if (truthy(field(bird, "shotWithPowerPotion")) ||
-        truthy(field(bird, "shotWithKingSling")))
-        return ab_fail(error, "Powered shot trail spawners remain unsupported");
+        truthy(field(bird, "shotWithKingSling"))) {
+        if (!create)
+            return ab_fail(error, "Powered shot trail spawners remain unsupported");
+        return create(context, object, truthy(field(bird, "shotWithPowerPotion")),
+                      truthy(field(bird, "shotWithKingSling")), error);
+    }
     return true;
+}
+
+bool ab_classic_shot_attach_particles(AbClassicLevel *level, size_t object,
+                                      const AbPowerupUses *uses, bool powerups_enabled,
+                                      AbError *error) {
+    return ab_classic_shot_attach_particles_host(level, object, uses, powerups_enabled,
+                                                 NULL, NULL, error);
 }
 
 bool ab_classic_red_bird_shot(AbClassicLevel *level, size_t object,

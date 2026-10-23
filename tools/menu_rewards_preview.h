@@ -122,6 +122,12 @@ static bool menu_reward_reveal(PreviewMenu *menu, AbDataTable *event, AbError *e
     if (!ab_settings_golden_egg_unlock(menu->highscores, level.string, error) ||
         !menu_preview_flush(menu, error))
         return false;
+    return menu_reward_show(menu, error);
+}
+
+static bool menu_reward_show(PreviewMenu *menu, AbError *error) {
+    if (menu->reward)
+        return ab_fail(error, "Overlapping source golden-egg reward");
     PreviewReward *reward = calloc(1, sizeof(*reward));
     if (!reward)
         return ab_fail(error, "Cannot allocate golden-egg notification");

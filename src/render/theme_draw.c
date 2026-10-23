@@ -30,10 +30,16 @@ static bool image(void *context, const AbSpriteBinding *sprite,
     AbSpriteAtlasBinding binding;
     uint32_t texture = 0;
     (void)tint;
-    if (!sprite || !sprite->region ||
-        !config->provider->sprite(config->provider->context, sprite->region->name,
-                                  &binding) ||
-        binding.sprite.region != sprite->region ||
+    if (!sprite || !sprite->region)
+        return ab_fail(error, "Missing retained theme sprite metadata");
+    /* A composite part retains its original sprite selection. A later resource
+     * group can mask that name without changing the already bound part. */
+    bool found =
+        config->provider->binding
+            ? config->provider->binding(config->provider->context, *sprite, &binding)
+            : config->provider->sprite(config->provider->context, sprite->region->name,
+                                       &binding);
+    if (!found || binding.sprite.region != sprite->region ||
         binding.sprite.sheet != sprite->sheet || !binding.image ||
         binding.alpha == AB_SPRITE_ALPHA_UNKNOWN ||
         !config->provider->texture(config->provider->context, binding.image, &texture))
@@ -59,11 +65,20 @@ static bool image(void *context, const AbSpriteBinding *sprite,
            (!visible || ab_draw_list_push(call->list, &command, error));
 }
 
+static bool fill(void *context, const AbGameRectanglePlan *plan, AbError *error);
+
 static bool layer(void *context, uintptr_t handle, uint32_t filter, AbError *error) {
     DrawCall *call = context;
     const AbThemeLayerBinding *binding;
     if (!ab_theme_layers_binding(call->owner->config.layers, handle, &binding))
         return ab_fail(error, "Missing cached theme layer handle");
+    if (binding->kind == AB_THEME_SPRITE_RECT) {
+        AbGameRectanglePlan plan;
+        bool active = false;
+        return ab_theme_rect_plan(&binding->rect, (uint32_t)call->layer.viewport_width,
+                                  call->height, &plan, &active, error) &&
+               (!active || fill(call, &plan, error));
+    }
     call->force_alpha = binding->kind == AB_THEME_SPRITE_BORDER;
     if (call->force_alpha)
         return ab_theme_layers_draw_border(

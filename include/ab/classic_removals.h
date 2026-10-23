@@ -30,7 +30,11 @@ typedef struct {
     AbObjectRemovalNotifyHost *notifications;
     AbBlockRemovalSpawnHost *spawns;
     float block_increment, goal_increment, floating_scaling;
+    /* Per-definition field ceiling. Distinct normalized definitions borrow
+     * stable exact-size spans from one pool within storage_bytes, rather than
+     * reserving this ceiling again for every physical object. */
     size_t definition_fields, storage_bytes;
+    size_t object_capacity;
     void *context;
     bool (*destroyed_sound)(void *context, size_t object, AbDataValue definition,
                             AbDataValue *output, AbError *error);
@@ -46,6 +50,9 @@ typedef struct {
     bool (*call)(void *context, AbUiPointerValue function, size_t object,
                  AbError *error);
 } AbClassicRemovalConfig;
+
+bool ab_classic_removals_register_object(AbClassicRemovals *owner, size_t object,
+                                         AbError *error);
 
 /* Compose the native-matched removeBlocks phases over actual canonical state.
  * Own bounded stable normalized definition tables; borrow all supplied owners,

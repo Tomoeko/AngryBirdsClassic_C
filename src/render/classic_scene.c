@@ -228,11 +228,11 @@ size_t ab_classic_scene_bytes(const AbClassicScene *scene) {
     return scene ? scene->bytes : 0;
 }
 
-bool ab_classic_scene_append_object(AbClassicScene *scene, size_t object, float layer,
-                                    AbError *error) {
+static bool construct_object(AbClassicScene *scene, size_t object, float layer,
+                             bool replacing, AbError *error) {
     AbClassicLevelView level = ab_classic_level_view(scene ? scene->level : NULL);
-    if (!scene || object != scene->count || object >= scene->capacity ||
-        !level.bodies || object >= level.bodies->count ||
+    if (!scene || (replacing ? object >= scene->count : object != scene->count) ||
+        object >= scene->capacity || !level.bodies || object >= level.bodies->count ||
         level.frame->count != level.bodies->count || level.removed_objects[object] ||
         level.frame->objects[object].collider == 7 || !isfinite(layer) ||
         layer < -2147483648.0f || layer >= 2147483648.0f)
@@ -245,9 +245,20 @@ bool ab_classic_scene_append_object(AbClassicScene *scene, size_t object, float 
         .blend = scene->blend,
         .visible = true,
         .unbound = true};
-    ++scene->count;
+    if (!replacing)
+        ++scene->count;
     return ab_sprite_scene_order(scene->items, scene->count, scene->order,
                                  scene->capacity, error);
+}
+
+bool ab_classic_scene_append_object(AbClassicScene *scene, size_t object, float layer,
+                                    AbError *error) {
+    return construct_object(scene, object, layer, false, error);
+}
+
+bool ab_classic_scene_recreate_object(AbClassicScene *scene, size_t object, float layer,
+                                      AbError *error) {
+    return construct_object(scene, object, layer, true, error);
 }
 
 static bool ordinary_object(const AbClassicScene *scene, size_t object) {

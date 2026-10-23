@@ -16,6 +16,12 @@
 bool ab_classic_shot_attach_particles(AbClassicLevel *level, size_t object,
                                       const AbPowerupUses *uses, bool powerups_enabled,
                                       AbError *error);
+typedef bool (*AbClassicShotTrails)(void *context, size_t object, bool potion,
+                                    bool king, AbError *error);
+bool ab_classic_shot_attach_particles_host(AbClassicLevel *level, size_t object,
+                                           const AbPowerupUses *uses,
+                                           bool powerups_enabled, void *context,
+                                           AbClassicShotTrails create, AbError *error);
 
 /* redBirdShot's inactive/previous-collision gates. A falsy feature flag returns
  * without touching the argument. An enabled call reads the live raw collided

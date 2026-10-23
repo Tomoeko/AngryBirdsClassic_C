@@ -67,6 +67,14 @@ static void probe_composite_draw(void) {
         input[3] = sx.bits;
         input[4] = sy.bits;
         input[5] = 0;
+#if defined(AB_ORACLE_COMPOSITE_ROTATED_PARENT)
+        FloatBits angle = {.number = (float)((int32_t)(item % 129) - 64) / 16};
+        input[5] = angle.bits;
+        if (item % 4 == 1)
+            input[3] ^= UINT32_C(0x80000000);
+        if (item % 4 == 2)
+            input[4] ^= UINT32_C(0x80000000);
+#endif
         input[10] = (uint32_t)(item % 5);
         input[11] = (uint32_t)(item % 4);
         for (size_t index = 0; index < 39; ++index)
@@ -77,6 +85,7 @@ static void probe_composite_draw(void) {
             composite_draw_state[8 + index] = input[1 + index];
         composite_draw_state[12] = input[6];
         composite_draw_state[13] = input[7];
+        composite_draw_state[18] = input[5];
         print_words(input, 12);
         for (size_t index = 0; index < count; ++index) {
             uint32_t fields[12];

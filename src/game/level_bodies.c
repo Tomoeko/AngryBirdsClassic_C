@@ -194,6 +194,7 @@ bool ab_level_bodies_create(AbPhysicsWorld *world, const AbLevelBodySource *sour
         return ab_fail(error, "Invalid classic level body request");
     }
     output->count = 0;
+    output->load_edges_present = false;
     const AbDataTable *level = source->level->globals;
     AbDataValue placements = field(level, "world");
     if (placements.kind != AB_DATA_TABLE || !placements.table ||
@@ -269,6 +270,8 @@ bool ab_level_bodies_create(AbPhysicsWorld *world, const AbLevelBodySource *sour
     AbVec2 ground_position = source->ground_position;
     if (source->derive_ground_position) {
         ground_position = (AbVec2){(left + right) * 0.5f, 5};
+        output->load_edges = (AbVec2){left, right};
+        output->load_edges_present = true;
     }
     if (!ab_ground_body_create(world, ground_position,
                                (uintptr_t)(output->objects + output->count),

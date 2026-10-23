@@ -45,8 +45,8 @@ typedef struct {
  * preserving its native anchors, current geometry and alpha. No state reset,
  * resource allocation or empty-identifier policy is applied here. KA3D/RVIO
  * composites use cached part bindings and ignore explicit width/height,
- * as Resources.drawSprite does. The current composite route supports positive
- * axis-aligned context scale, including transformed RVIO parts. Rotated/direct
+ * as Resources.drawSprite does. Composite contexts support finite signed scale
+ * and native rotation, including transformed RVIO parts. Direct composite
  * context states reject before drawing. Ordinary sprites retain their existing
  * transform support. */
 bool ab_ui_sprite_render(const AbUiSpriteRender *sprite,
