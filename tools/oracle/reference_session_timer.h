@@ -12,9 +12,9 @@ static void reference_session_timer(unsigned profile, float date[6],
         {-1, -2, -3.25f},  {0, 0, 59.75f},  {0, 0, -0.75f}, {0, 0, 3600},
         {0.5f, -1, -0.5f}, {0, 0, -59.25f}, {0, 0, -1.75f}, {0, 0, -3600},
     };
-    date[0] = profile & 8 ? 2024 : 2026;
-    date[1] = profile & 8 ? 2 : 12;
-    date[2] = profile & 8 ? 29 : 31;
+    date[0] = profile & 8 ? 2024.0f : 2026.0f;
+    date[1] = profile & 8 ? 2.0f : 12.0f;
+    date[2] = profile & 8 ? 29.0f : 31.0f;
     date[3] = 23;
     date[4] = 59;
     date[5] = profile & 4 ? 59.75f : 0;

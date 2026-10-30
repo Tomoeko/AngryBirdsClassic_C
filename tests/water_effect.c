@@ -94,7 +94,7 @@ static bool native_checks(FILE *file) {
         AbDataEntry root[] = {{string("waterLevel"), typed(input[0], input[1], &empty)},
                               {string("water"), typed(input[2], input[4], &water)}};
         AbDataTable level = {root, 2, 2, NULL};
-        AbWaterEffect effect;
+        AbWaterEffect effect = {0};
         CHECK(ab_water_effect(&level, &effect, NULL));
         uint32_t actual[] = {effect.enabled, effect.freezing, effect.kill_level_present,
                              bits(effect.level), bits(effect.kill_level)};
@@ -143,7 +143,7 @@ static bool apk_checks(const char *path) {
         memcpy(resource, name.data, name.size);
         resource[name.size] = 0;
         AbTargetData level = {0};
-        AbWaterEffect effect;
+        AbWaterEffect effect = {0};
         okay = ab_target_data_open(&archive, resource, (AbSpan){key, sizeof(key)},
                                    32 * 1024 * 1024, NULL, &level, &error) &&
                ab_water_effect(level.data.globals, &effect, &error);

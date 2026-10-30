@@ -136,9 +136,9 @@ static bool boundary_cases(void) {
         AbCalendarTime start = {2026, 10, 22, 0, 0, 0};
         CHECK(date(&fixture, start));
         fixture.times[0] = start;
-        fixture.times[0].hour = sample == 0 ? 6 : sample == 2 ? -7 : 7;
-        fixture.times[0].minutes = sample == 0 ? 59 : 0;
-        fixture.times[0].seconds = sample == 0 ? 59 : 0;
+        fixture.times[0].hour = sample == 0 ? 6.0f : sample == 2 ? -7.0f : 7.0f;
+        fixture.times[0].minutes = sample == 0 ? 59.0f : 0.0f;
+        fixture.times[0].seconds = sample == 0 ? 59.0f : 0.0f;
         if (sample == 3) {
             fixture.mutate_saved = true;
             fixture.times[0].hour = 9;

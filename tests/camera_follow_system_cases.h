@@ -52,18 +52,18 @@ static void camera_follow_system_config(uint32_t scene, uint32_t output[24]) {
     scene += 2;
 #endif
     output[0] = scene;
-    const float values[] = {scene & 1u ? 640 : 480,
-                            scene & 1u ? 360 : 320,
+    const float values[] = {scene & 1u ? 640.0f : 480.0f,
+                            scene & 1u ? 360.0f : 320.0f,
                             -200,
-                            scene & 2u ? -40 : 0,
+                            scene & 2u ? -40.0f : 0.0f,
                             2,
                             1000,
-                            scene & 2u ? 40 : 0,
+                            scene & 2u ? 40.0f : 0.0f,
                             1,
                             (float)(scene % 3u),
-                            scene & 4u ? -4 : -20,
-                            scene & 8u ? -8 : 8,
-                            scene & 4u ? 4 : -12,
+                            scene & 4u ? -4.0f : -20.0f,
+                            scene & 8u ? -8.0f : 8.0f,
+                            scene & 4u ? 4.0f : -12.0f,
                             40,
                             scene < 2   ? -2.5f
                             : scene < 4 ? -20
@@ -80,20 +80,20 @@ static void camera_follow_system_config(uint32_t scene, uint32_t output[24]) {
                  (scene & 1u ? 4u : 0u) | (scene & 2u ? 8u : 0u);
     output[19] = owner_follow_word(-2);
     output[20] = owner_follow_word(-16);
-    output[21] = owner_follow_word(scene & 8u ? 6 : -6);
+    output[21] = owner_follow_word(scene & 8u ? 6.0f : -6.0f);
     output[22] = owner_follow_word(-8);
     output[23] = 0;
 #if defined(AB_TEST_CAMERA_FOLLOW_WORLD) || defined(AB_ORACLE_CAMERA_FOLLOW_WORLD)
     output[9] = owner_follow_word((float)(scene % 3u) - 1);
     output[10] = owner_follow_word(-6 + (float)(scene % 3u));
-    output[11] = owner_follow_word(scene % 4u == 0   ? 0
-                                   : scene % 4u == 1 ? 1
-                                   : scene % 4u == 2 ? -1
-                                                     : 2);
-    output[12] = owner_follow_word(scene & 4u ? 0 : -2);
+    output[11] = owner_follow_word(scene % 4u == 0   ? 0.0f
+                                   : scene % 4u == 1 ? 1.0f
+                                   : scene % 4u == 2 ? -1.0f
+                                                     : 2.0f);
+    output[12] = owner_follow_word(scene & 4u ? 0.0f : -2.0f);
     output[19] = owner_follow_word(-1);
     output[20] = owner_follow_word(-4);
-    output[21] = owner_follow_word(scene & 1u ? -1 : 2);
+    output[21] = owner_follow_word(scene & 1u ? -1 : 2.0f);
     output[22] = owner_follow_word(-1);
     if (scene >= 18) {
         output[10] = owner_follow_word(-12 + (float)(scene % 3u));

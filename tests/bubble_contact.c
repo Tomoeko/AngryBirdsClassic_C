@@ -291,7 +291,7 @@ static bool edge_checks(void) {
               host.objects[0].in_bubble.kind == AB_DATA_BOOLEAN &&
               host.objects[0].in_bubble.bits &&
               host.count == (failure == 3 ? 2u : 1u) &&
-              host.geometry_calls == (failure > 1));
+              host.geometry_calls == (failure > 1 ? 1u : 0u));
     }
     prepare(&host, 0);
     CHECK(ab_bubble_contact_begin(host.objects, host.objects + 1,
