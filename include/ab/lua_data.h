@@ -76,7 +76,10 @@ bool ab_lua_data_literal_table(const AbLuaChunk *chunk, size_t word_count,
  * registers and may not read globals, parameters, upvalues or earlier state.
  * Children outside the window are never entered. Resource-specific owners must
  * establish the window and validate surrounding registration independently.
- * first_word/word_count include extended SETLIST words; failure empties output. */
+ * first_word/word_count include extended SETLIST words; failure empties output.
+ * A borrowed chunk view may select a child prototype as root. Declared arguments
+ * and upvalues remain unavailable: every read must be defined within the window.
+ * Do not close that view; close only the original owning chunk. */
 bool ab_lua_data_literal_table_range(const AbLuaChunk *chunk, size_t first_word,
                                      size_t word_count, unsigned register_index,
                                      size_t memory_limit, AbLuaData *output,

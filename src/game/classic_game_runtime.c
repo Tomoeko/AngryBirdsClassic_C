@@ -53,6 +53,15 @@ static bool open_birds(AbClassicGameRuntime *runtime, AbError *error) {
     birds.audio = config->audio;
     birds.explosions = config->explosions;
     birds.object_capacity = runtime->world.object_capacity;
+    if (!birds.other_entries) {
+        AbClassicLevelView level = ab_classic_level_view(playfield.level);
+        if (level.bird_count > (SIZE_MAX - 4) / 4)
+            return ab_fail(error, "Other-bird identity reservation overflow");
+        /* Each queued bird can retire itself and three Blues children. The
+         * fresh split table also has two numeric entries; reserve the two
+         * Eagle identities separately. Pig factories never enter this table. */
+        birds.other_entries = 4 * level.bird_count + 4;
+    }
     birds.hats = runtime->world.hats;
     birds.flying_object = config->flying;
     birds.specialty_available = &runtime->globals->specialty_available;
@@ -83,7 +92,10 @@ static bool open_characters(AbClassicGameRuntime *runtime, AbError *error) {
                playfield.level, playfield.visuals, config->random,
                ab_classic_character_services_host(&runtime->conditions),
                runtime->world.object_capacity, config->characters_bytes,
-               &runtime->view.characters, error);
+               &runtime->view.characters, error) &&
+           ab_classic_characters_bind_goals(
+               runtime->view.characters, ab_classic_goals_map(runtime->dynamics.goals),
+               error);
 }
 
 static bool open_progress(AbClassicGameRuntime *runtime, AbError *error) {

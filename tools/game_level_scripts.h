@@ -122,6 +122,8 @@ static AbLevelEggHost game_egg_host(PreviewGame *game) {
 
 static bool game_level_script_prepare(PreviewGame *game, const AbLuaData *level,
                                       AbError *error) {
+    if (!game_boomerang_prepare(game, level, error))
+        return false;
     if (menu_route_equal(game->level_name, game_text("LevelGE_20"))) {
         AbCalendarTime time;
         return ab_calendar_time_now(&time, error) &&
@@ -136,7 +138,11 @@ static bool game_removal_level(void *context, AbDataValue name,
     PreviewGame *game = context;
     if (!menu_route_equal(name, game->level_name))
         return ab_fail(error, "Game level-script registry identity changed");
-    *output = game->egg_script ? &game->level_removal : NULL;
+    *output =
+        game->egg_script || (game->full_version &&
+                             menu_route_equal(game->level_name, game_text("LevelH900")))
+            ? &game->level_removal
+            : NULL;
     return true;
 }
 
@@ -144,9 +150,26 @@ static bool game_removal_call(void *context, AbObjectRemovalNotice notice,
                               AbUiPointerValue function, AbObjectRemovalObject *object,
                               AbError *error) {
     PreviewGame *game = context;
+    if (notice == AB_OBJECT_REMOVAL_LEVEL && object && game->full_version &&
+        menu_route_equal(game->level_name, game_text("LevelH900")) &&
+        function.kind == AB_UI_POINTER_FUNCTION && function.function == 2)
+        return game_cake_removed(game, object->context, error);
     if (notice != AB_OBJECT_REMOVAL_LEVEL || !game->egg_script || !object ||
         function.kind != AB_UI_POINTER_FUNCTION || function.function != 1)
         return ab_fail(error, "Unbound actual level removal callback");
+    if (menu_route_equal(game->level_name, game_text("BlackBird_15")) &&
+        menu_route_truthy(game->eagle_bait_launched)) {
+        AbClassicLevelView level = ab_classic_level_view(game->playfield.level);
+        AbDataValue name = game_text("ExtraGoldenEgg_1");
+        const AbDataValue *egg = ab_data_get(&level.properties->world, name);
+        if (egg && menu_route_truthy(*egg) &&
+            !ab_classic_object_removal_call(
+                ab_classic_dynamics_view(
+                    ab_classic_world_runtime_view(game->world).dynamics)
+                    .physical,
+                name.string, error))
+            return false;
+    }
     return ab_level_egg_removed(game->egg_script, object->context, game_egg_host(game),
                                 error);
 }

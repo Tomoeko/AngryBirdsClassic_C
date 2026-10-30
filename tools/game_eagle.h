@@ -193,10 +193,14 @@ static bool game_eagle_launch(PreviewGame *game, AbError *error) {
         return false;
     size_t cursor = 0;
     AbStringMapEntry hat;
-    if (!ab_string_map_next(world.hats, &cursor, &hat, error))
-        return false;
-    if (hat.present)
-        return ab_fail(error, "Mighty Eagle requires the actual releaseHat owner");
+    for (;;) {
+        if (!ab_string_map_next(world.hats, &cursor, &hat, error))
+            return false;
+        if (!hat.present)
+            break;
+        if (!game_hat_release(game, hat.key, error))
+            return false;
+    }
     AbClassicSlingView sling = ab_classic_sling_view(game->playfield.sling);
     float index = sling.current_bird_index;
     bool removed_current = false;

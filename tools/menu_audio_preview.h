@@ -65,7 +65,7 @@ static bool menu_audio_initialize(PreviewMenu *menu, AbError *error) {
 
 /* changeAudio92979's Android branch, from MainMenu's actual pointer action.
  * Native output continues to drain while track gains are muted. */
-static bool menu_audio_toggle(PreviewMenu *menu, AbError *error) {
+static bool menu_audio_change(PreviewMenu *menu, const char *location, AbError *error) {
     bool enabled = false;
     if (!menu_audio_enabled(menu, &enabled, error))
         return false;
@@ -81,12 +81,16 @@ static bool menu_audio_toggle(PreviewMenu *menu, AbError *error) {
     AbDataEntry fields[] = {
         {menu_data("id"), menu_event(menu, "EID_AUDIO_STATE_CHANGED")},
         {menu_data("state"), menu_route_number(enabled ? 1 : 0)},
-        {menu_data("from"), menu_data("mainMenu")}};
+        {menu_data("from"), menu_data(location)}};
     AbDataTable notice = {fields, 3, 3, NULL};
     return ab_event_manager_notify(menu->events, &notice, error) &&
            ab_classic_set_music_volume(menu->mixer, enabled ? 1 : 0, error) &&
            menu_audio_indicator(menu, enabled, error) &&
            menu_preview_flush(menu, error);
+}
+
+static bool menu_audio_toggle(PreviewMenu *menu, AbError *error) {
+    return menu_audio_change(menu, "mainMenu", error);
 }
 
 /* MainMenuRoot.update7373 words44..61. Direct resource playback avoids an

@@ -283,7 +283,8 @@ static bool register_object(AbClassicPostPhysics *post, size_t object, bool box,
     if (rank < post->count && !name_order(post->entries[rank].name, source->name))
         return ab_fail(error, "Duplicate direct-circle post-physics name");
     AbSpan name = {0};
-    if (box && !initial_rolling(level, source, &name, error))
+    if ((box || source->defined_constructor) &&
+        !initial_rolling(level, source, &name, error))
         return false;
     size_t rolling = 0;
     while (rolling < post->rolling_count &&
@@ -314,6 +315,23 @@ static bool register_object(AbClassicPostPhysics *post, size_t object, bool box,
                                       .radius = source->physics.dimensions.radius};
     post->source_indices[rank] = object;
     ++post->count;
+    return true;
+}
+
+bool ab_classic_post_physics_resize_circle(AbClassicPostPhysics *post, size_t object,
+                                           AbError *error) {
+    AbClassicLevelView level = ab_classic_level_view(post ? post->level : NULL);
+    if (!post || !level.bodies || object >= level.bodies->count ||
+        level.removed_objects[object] || level.world->failed || level.world->locked)
+        return ab_fail(error, "Invalid circle rolling-radius refresh");
+    const AbLevelObject *source = level.bodies->objects + object;
+    size_t rank = 0;
+    while (rank < post->count && post->entries[rank].source != object)
+        ++rank;
+    if (rank == post->count || source->physics.dimensions.radius < 0 ||
+        !ab_world_has_body(level.world, source->physics.body))
+        return ab_fail(error, "Resized circle lost its rolling projection");
+    post->entries[rank].radius = source->physics.dimensions.radius;
     return true;
 }
 

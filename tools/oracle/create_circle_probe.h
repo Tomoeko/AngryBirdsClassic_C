@@ -61,7 +61,13 @@ static void probe_create_circle(void) {
     reference((uint8_t *)game + 0x1810);
     damage_lua.set_field(lua, 1, "world");
     damage_lua.set_top(lua, 0);
+#if defined(AB_ORACLE_RESIZE_CIRCLE_ONLY)
+    void (*resize_circle)(void *, const char **, float) = (void (*)(
+        void *, const char **, float))find_function("_ZN7GameLua12resizeCircleESsf");
+    semihost(4, "AB_ANDROID_RESIZE_CIRCLE_V1 128\n");
+#else
     semihost(4, "AB_ANDROID_CREATE_CIRCLE_V1 128\n");
+#endif
     for (unsigned sample = 0; sample < CREATE_CIRCLE_CASES; ++sample) {
         uint32_t input[9];
         reference_create_circle(sample, input);
@@ -73,6 +79,11 @@ static void probe_create_circle(void) {
                       value[2].number, value[3].number, value[4].number,
                       value[5].number, input[7], value[6].number);
         print_words(input, 9);
+#if defined(AB_ORACLE_RESIZE_CIRCLE_ONLY)
+        FloatBits radius = {.bits = reference_resize_circle(sample)};
+        resize_circle(game, &name, radius.number);
+        print_words(&radius.bits, 1);
+#endif
         uint32_t *object = *object_entry(game + 0x17a4 / 4, &name);
         const uint32_t *body = object ? (const void *)(uintptr_t)object[11] : NULL;
         if (!body || game[0x17b8 / 4] != 1 || body[26] != 1)
@@ -136,7 +147,11 @@ static void probe_create_circle(void) {
     table_destroy((uint8_t *)game + 0x17f8);
     world_destroy(world);
     release(wrapper);
+#if defined(AB_ORACLE_RESIZE_CIRCLE_ONLY)
+    semihost(4, "AB resize circle reference complete\n");
+#else
     semihost(4, "AB create circle reference complete\n");
+#endif
 }
 
 #endif

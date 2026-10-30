@@ -181,7 +181,9 @@ static bool allocate_arrays(AbClassicLevel *level, AbClassicLevelLimits limits,
         {limits.joints, 2 * sizeof(size_t)},
         {limits.joints, sizeof(AbClassicJointRecord)},
         {limits.glue_joints, sizeof(AbClassicJointRecord)},
-        {joint_requirements.immediate + joint_requirements.deferred, sizeof(size_t)},
+        /* Pruning retains every original constructor key. Its order workspace
+         * must cover those nil slots independently of live engine capacity. */
+        {joint_requirements.hash_capacity, sizeof(size_t)},
         {joint_requirements.hash_capacity, sizeof(AbStringOrderNode)},
         {bodies, sizeof(bool)},
         {bodies, sizeof(AbLevelPropertyObject)},
@@ -237,8 +239,7 @@ static bool allocate_arrays(AbClassicLevel *level, AbClassicLevelLimits limits,
     level->joints.storage = (AbClassicJointStorage){
         arrays[JOINT_RECORDS], limits.joints, arrays[GLUE_RECORDS], limits.glue_joints};
     level->joint_order = (AbStringOrderWorkspace){
-        arrays[JOINT_CONSTRUCTOR_INDICES],
-        joint_requirements.immediate + joint_requirements.deferred,
+        arrays[JOINT_CONSTRUCTOR_INDICES], joint_requirements.hash_capacity,
         arrays[JOINT_CONSTRUCTOR_NODES], joint_requirements.hash_capacity};
     level->bodies =
         (AbLevelBodies){.objects = arrays[OBJECTS], .capacity = bodies, .count = 0};
@@ -310,7 +311,7 @@ static bool initialize_character(AbClassicLevel *level, size_t index, AbError *e
     AbBodyPose pose = level->frame.objects[index].rendered;
     character->jump.position = pose.position;
     character->jump.rotation = pose.angle;
-    if (index + 1 == level->bodies.count) {
+    if (object->name.size == 6 && !memcmp(object->name.data, "ground", 6)) {
         /* MuseumMode prototype 2711, instructions 1018..1019. */
         character->goal.strength = 30;
         return true;
@@ -560,6 +561,11 @@ bool ab_classic_level_open(const AbLevelBodySource *source,
     level->world.listener = (AbWorldListener){.context = level, .filter = pair_allowed};
     level->data = source->level;
     level->catalog = source->catalog;
+    if (source->catalog_data && source->catalog_data->globals != source->catalog) {
+        ab_classic_level_close(level);
+        return ab_fail(error, "Defined-object catalog layouts have a foreign owner");
+    }
+    level->catalog_source = source->catalog_data;
     if (!ab_level_bodies_create(&level->world, source, &level->bodies,
                                 &level->order.strings, error) ||
         !ab_level_joints_create(&level->joints, source->level, &level->bodies,
@@ -599,8 +605,9 @@ static bool random_timer_pair(AbRandom48 *random, int32_t minimum, float *first,
     return true;
 }
 
-bool ab_classic_level_initialize_objects(AbClassicLevel *level, AbRandom48 *random,
-                                         bool queue_controllables, AbError *error) {
+bool ab_classic_level_initialize_birds(AbClassicLevel *level, AbRandom48 *random,
+                                       bool queue_controllables,
+                                       AbClassicInitialBirdHost host, AbError *error) {
     if (!level || !random || random->value > UINT64_C(0xffffffffffff) ||
         level->timers_initialized || level->world.failed || level->world.locked ||
         level->frame.clock.time != 0 || level->frame.clock.accumulator != 0 ||
@@ -636,6 +643,8 @@ bool ab_classic_level_initialize_objects(AbClassicLevel *level, AbRandom48 *rand
                 character->jump.position = pose.position;
                 character->jump.rotation = pose.angle;
             }
+            if (host.added && !host.added(host.context, level, index, random, error))
+                return false;
         }
         /* The generated ground is always the final constructor object. Its
          * metadata is authored separately and has no levelGoal field. */
@@ -653,6 +662,12 @@ bool ab_classic_level_initialize_objects(AbClassicLevel *level, AbRandom48 *rand
     }
     level->timers_initialized = true;
     return true;
+}
+
+bool ab_classic_level_initialize_objects(AbClassicLevel *level, AbRandom48 *random,
+                                         bool queue_controllables, AbError *error) {
+    return ab_classic_level_initialize_birds(level, random, queue_controllables,
+                                             (AbClassicInitialBirdHost){0}, error);
 }
 
 static size_t data_bytes(const AbTargetData *data) {
@@ -788,8 +803,9 @@ bool ab_classic_level_load(const AbZip *archive, const AbClassicLevelAssets *ass
         goto release_resources;
     }
     AbRandom48 random = assets->random ? *assets->random : (AbRandom48){0};
-    if (assets->random && !ab_classic_level_initialize_objects(
-                              level, &random, queue_controllables, error)) {
+    if (assets->random &&
+        !ab_classic_level_initialize_birds(level, &random, queue_controllables,
+                                           assets->initial_birds, error)) {
         goto release_resources;
     }
     level->owned_data = data;
@@ -985,50 +1001,78 @@ bool ab_classic_level_create_box(AbClassicLevel *level, AbGameBoxInput input,
                                   &box.frame, &box.properties, output, error);
 }
 
-static bool create_defined_box(AbClassicLevel *level, AbSpan name,
-                               AbSpan definition_name, AbVec2 position,
-                               AbVec2 sprite_size, float density, bool bait,
-                               size_t *output, AbError *error) {
-    if (!level || !output)
-        return ab_fail(error, "Missing defined box level/output");
+static bool create_defined_object(AbClassicLevel *level, AbSpan name,
+                                  AbSpan definition_name, AbVec2 position,
+                                  AbVec2 sprite_size, float density, bool circle,
+                                  bool bait, bool goal, size_t *output,
+                                  AbError *error) {
+    if (!level || !output || level->world.failed || level->world.locked)
+        return ab_fail(error, "Missing defined object level/output");
     AbDataEntry entry = {property_key("density"), property_number(density)};
     AbDataTable overrides = {&entry, 1, 1, NULL};
     AbObjectDefinition definition;
     AbObjectPhysics physics;
     AbDamageSpriteNames sprites;
+    /* The solver has returned before unlocked creation callbacks run. Reuse
+     * its bounded scratch; persistent world/goal permutations stay untouched. */
+    AbStringOrderWorkspace workspace = {
+        .indices = level->solve.body_order,
+        .index_capacity = level->world.storage.body_capacity,
+        .nodes = level->order.strings.nodes,
+        .node_capacity = level->order.strings.node_capacity};
     if (!ab_object_definition_open(level->catalog, definition_name, &overrides,
                                    &definition, error) ||
         !ab_object_physics(&definition, sprite_size, 0.05f, &physics, error) ||
-        !ab_object_initial_sprites(&definition, level->catalog_source, NULL, &sprites,
-                                   error))
+        !ab_object_initial_sprites(&definition, level->catalog_source, &workspace,
+                                   &sprites, error))
         return false;
     AbDataValue type = ab_object_property(&definition, property_key("type").string);
-    if (type.kind != AB_DATA_STRING || !type.string.data || type.string.size != 3 ||
-        memcmp(type.string.data, "box", 3) || physics.dimensions.width <= 0 ||
-        physics.dimensions.height <= 0 || sprites.sprite.kind != AB_DATA_STRING ||
-        !sprites.sprite.string.data || !sprites.sprite.string.size)
-        return ab_fail(error, "Defined runtime box requires explicit geometry/sprite");
+    const char *shape_name = circle ? "circle" : "box";
+    if (type.kind != AB_DATA_STRING || !type.string.data ||
+        type.string.size != strlen(shape_name) ||
+        memcmp(type.string.data, shape_name, type.string.size) ||
+        (circle ? physics.dimensions.radius <= 0
+                : physics.dimensions.width <= 0 || physics.dimensions.height <= 0) ||
+        sprites.sprite.kind != AB_DATA_STRING || !sprites.sprite.string.data ||
+        !sprites.sprite.string.size)
+        return ab_fail(error,
+                       "Defined runtime object requires explicit geometry/sprite");
     const char *const active[] = {"controllable",   "levelGoal",    "createFunction",
                                   "updateFunction", "animation",    "extraSprites",
                                   "components",     "isGiftBoxable"};
     for (size_t index = 0; index < sizeof(active) / sizeof(*active); ++index) {
         if (bait && (index == 0 || index == 2 || index == 3))
             continue;
+        if (goal && (index == 1 || index == 5 || index == 7))
+            continue;
         AbDataValue value =
             ab_object_property(&definition, property_key(active[index]).string);
         if (value.kind != AB_DATA_NIL && (value.kind != AB_DATA_BOOLEAN || value.bits))
-            return ab_fail(error, "Defined box requires its active %s factory phase",
+            return ab_fail(error, "Defined object requires its active %s factory phase",
                            active[index]);
+    }
+    AbDataValue extra =
+        ab_object_property(&definition, property_key("extraSprites").string);
+    if (extra.kind != AB_DATA_NIL) {
+        if (extra.kind != AB_DATA_TABLE ||
+            extra.table->count > AB_LEVEL_EXTRA_SPRITE_CAPACITY)
+            return ab_fail(error,
+                           "Defined object extra-sprite copy exceeds its storage");
+        for (size_t index = 0; index < extra.table->count; ++index)
+            if (extra.table->entries[index].key.kind != AB_DATA_STRING ||
+                extra.table->entries[index].value.kind == AB_DATA_TABLE)
+                return ab_fail(error,
+                               "Defined object requires a nested extra-sprite copy");
     }
     if (definition.collider.kind != AB_DATA_NUMBER ||
         definition.z_order.kind != AB_DATA_NUMBER)
-        return ab_fail(error, "Defined box requires numeric collider/draw order");
+        return ab_fail(error, "Defined object requires numeric collider/draw order");
     float collider, z_order;
     memcpy(&collider, &definition.collider.bits, sizeof(collider));
     memcpy(&z_order, &definition.z_order.bits, sizeof(z_order));
     if (!isfinite(collider) || collider < 0 || collider >= AB_GAME_COLLIDER_TYPES ||
         collider != (float)(uint32_t)collider)
-        return ab_fail(error, "Invalid defined box collider");
+        return ab_fail(error, "Invalid defined object collider");
     AbDataValue collision =
         ab_object_property(&definition, property_key("collision").string);
     AbGameBoxInput input = {
@@ -1042,10 +1086,26 @@ static bool create_defined_box(AbClassicLevel *level, AbSpan name,
         .collision = collision.kind == AB_DATA_NIL ||
                      collision.kind != AB_DATA_BOOLEAN || collision.bits};
     size_t index;
-    if (!ab_classic_level_create_box(level, input, &index, error))
+    bool created = circle ? ab_classic_level_create_circle(
+                                level,
+                                (AbGameCircleInput){.name = name,
+                                                    .position = position,
+                                                    .radius = physics.dimensions.radius,
+                                                    .density = physics.density,
+                                                    .friction = physics.friction,
+                                                    .restitution = physics.restitution,
+                                                    .z_order = z_order},
+                                &index, error)
+                          : ab_classic_level_create_box(level, input, &index, error);
+    if (!created)
         return false;
     AbLevelObject *object = level->bodies.objects + index;
     object->definition_name = definition_name;
+    object->defined_constructor = true;
+    AbDataValue level_goal =
+        ab_object_property(&definition, property_key("levelGoal").string);
+    object->level_goal = level_goal.kind != AB_DATA_NIL &&
+                         (level_goal.kind != AB_DATA_BOOLEAN || level_goal.bits);
     object->physics.collider = definition.collider;
     AbDataValue gravity =
         ab_object_property(&definition, property_key("gravityEnabled").string);
@@ -1055,19 +1115,33 @@ static bool create_defined_box(AbClassicLevel *level, AbSpan name,
     bool enabled =
         sensor.kind != AB_DATA_NIL && (sensor.kind != AB_DATA_BOOLEAN || sensor.bits);
     if (!ab_world_set_fixture_sensor(&level->world, object->physics.fixture, enabled))
-        return ab_fail(error, "Cannot publish defined box sensor");
+        return ab_fail(error, "Cannot publish defined object sensor");
     level->frame.objects[index].collider = (uint32_t)collider;
     level->initial_sprites[index] = sprites;
     if (!initial_property(
             level, index, "definition",
             (AbDataValue){.kind = AB_DATA_STRING, .string = definition_name}, error) ||
         !initialize_definition_properties(level, index, error) ||
+        !initialize_character(level, index, error) ||
         !initial_property(level, index, "damageSprite", sprites.sprite, error) ||
         !initial_property(level, index, "blinkSprite", sprites.blink, error) ||
         !initial_property(level, index, "smileSprite", sprites.smile, error) ||
         !initial_property(level, index, "disableForce",
                           (AbDataValue){.kind = AB_DATA_BOOLEAN}, error))
         return false;
+    if (extra.kind == AB_DATA_TABLE) {
+        AbLevelPropertyObject *properties = level->properties.objects + index;
+        memcpy(properties->extra_sprite_entries, extra.table->entries,
+               extra.table->count * sizeof(*extra.table->entries));
+        properties->extra_sprites =
+            (AbDataTable){properties->extra_sprite_entries, extra.table->count,
+                          AB_LEVEL_EXTRA_SPRITE_CAPACITY, NULL};
+        if (!initial_property(level, index, "extraSprites",
+                              (AbDataValue){.kind = AB_DATA_TABLE,
+                                            .table = &properties->extra_sprites},
+                              error))
+            return false;
+    }
     if (collider != AB_COLLIDER_STATIC) {
         AbObjectPropertyAccess access = {
             .physics_object = {.kind = AB_DATA_TABLE,
@@ -1087,8 +1161,63 @@ bool ab_classic_level_create_defined_box(AbClassicLevel *level, AbSpan name,
                                          AbSpan definition_name, AbVec2 position,
                                          float density, size_t *output,
                                          AbError *error) {
-    return create_defined_box(level, name, definition_name, position, (AbVec2){0},
-                              density, false, output, error);
+    return create_defined_object(level, name, definition_name, position, (AbVec2){0},
+                                 density, false, false, false, output, error);
+}
+
+bool ab_classic_level_create_defined_circle(AbClassicLevel *level, AbSpan name,
+                                            AbSpan definition_name, AbVec2 position,
+                                            float density, size_t *output,
+                                            AbError *error) {
+    return create_defined_object(level, name, definition_name, position, (AbVec2){0},
+                                 density, true, false, false, output, error);
+}
+
+bool ab_classic_level_create_defined_goal_circle(AbClassicLevel *level, AbSpan name,
+                                                 AbSpan definition_name,
+                                                 AbVec2 position, float density,
+                                                 size_t *output, AbError *error) {
+    AbObjectDefinition definition;
+    if (!level || !ab_object_definition_open(level->catalog, definition_name, NULL,
+                                             &definition, error))
+        return ab_fail(error, "Missing defined goal circle source");
+    AbDataValue value =
+        ab_object_property(&definition, property_key("levelGoal").string);
+    if (value.kind == AB_DATA_NIL || (value.kind == AB_DATA_BOOLEAN && !value.bits))
+        return ab_fail(error, "Defined goal circle requires its actual goal flag");
+    return create_defined_object(level, name, definition_name, position, (AbVec2){0},
+                                 density, true, false, true, output, error);
+}
+
+bool ab_classic_level_sync_goal_order(AbClassicLevel *level, AbStringMap *goals,
+                                      AbError *error) {
+    if (!level || !goals || level->world.failed || level->world.locked)
+        return ab_fail(error, "Invalid canonical level-goal traversal binding");
+    size_t cursor = 0, count = 0;
+    AbStringMapEntry entry;
+    while (true) {
+        if (!ab_string_map_next(goals, &cursor, &entry, error))
+            return false;
+        if (!entry.present)
+            break;
+        uintptr_t object = 0;
+        bool present;
+        const AbDataValue *value = (const AbDataValue *)entry.value;
+        if (!ab_string_map_get(level->world_names, entry.key, &object, &present,
+                               error) ||
+            !present || object >= level->bodies.count || !value ||
+            value->kind != AB_DATA_TABLE ||
+            value->table != &level->properties.objects[object].physical ||
+            count == level->goal_order.strings.index_capacity)
+            return ab_fail(error, "Foreign or exhausted canonical level-goal identity");
+        level->goal_order.strings.indices[count++] = (size_t)object;
+    }
+    AbStringMapLayout layout;
+    if (!ab_string_map_layout(goals, &layout))
+        return ab_fail(error, "Missing canonical level-goal layout");
+    level->goal_count = count;
+    level->goal_order.hash_capacity = layout.capacity;
+    return true;
 }
 
 bool ab_classic_level_create_bait_box(AbClassicLevel *level, AbSpan name,
@@ -1124,8 +1253,8 @@ bool ab_classic_level_create_bait_box(AbClassicLevel *level, AbSpan name,
     if (control.kind != AB_DATA_BOOLEAN || !control.bits ||
         density.kind != AB_DATA_NUMBER || !isfinite(value))
         return ab_fail(error, "Invalid source bait control/density");
-    return create_defined_box(level, name, definition_name, position, sprite_size,
-                              value, true, output, error);
+    return create_defined_object(level, name, definition_name, position, sprite_size,
+                                 value, false, true, false, output, error);
 }
 
 bool ab_classic_level_recreate_circle(AbClassicLevel *level, size_t index,
@@ -1156,6 +1285,18 @@ bool ab_classic_level_recreate_circle(AbClassicLevel *level, size_t index,
     level->character_objects[index].jump.position = input.position;
     return ab_string_map_set(level->world_names, input.name, index, true, error) &&
            refresh_world_order(level, error);
+}
+
+bool ab_classic_level_resize_circle(AbClassicLevel *level, size_t index, float radius,
+                                    AbError *error) {
+    if (!level || index >= level->bodies.count || level->removed_objects[index])
+        return ab_fail(error, "Invalid live circle resize identity");
+    AbLevelObject *object = level->bodies.objects + index;
+    if (!ab_object_body_resize_circle(&level->world, &object->physics, radius, error))
+        return false;
+    float mass = level->world.storage.bodies[object->physics.body].motion.mass.mass;
+    return initial_property(level, index, "radius", property_number(radius), error) &&
+           initial_property(level, index, "mass", property_number(mass), error);
 }
 
 bool ab_classic_level_raycast(const AbClassicLevel *level, AbVec2 first, AbVec2 second,

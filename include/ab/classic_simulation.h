@@ -61,7 +61,9 @@ typedef struct {
  * before the level and preserve fixed object/body slots. Successful physical
  * removal must call ab_classic_level_forget_object before later passes; removed
  * rows skip force/history/publication even when an orphan body stays live.
- * Direct circles can register between frames in explicitly reserved rows.
+ * Direct objects can register between frames or during unlocked AFTER_STEP in
+ * explicitly reserved rows. Appending refreshes the next force-pass prefix;
+ * registration during the other active simulation phases rejects.
  * General insertion/reinsertion remains unsupported. No initial RNG,
  * effects or world changes. Unsupported bindings reject and output starts NULL.
  * This is the simulation portion of GameLua.update, before its root controller;
@@ -79,6 +81,10 @@ bool ab_classic_simulation_set_limits(AbClassicSimulation *simulation, int32_t m
  * Call between simulation passes after collider/body-type assignment. */
 bool ab_classic_simulation_recreate_circle(AbClassicSimulation *simulation,
                                            size_t object, AbError *error);
+/* After live fixture resizing, refresh only its current rolling radius. Native
+ * force preparation retains the object's cached creation mass and intervals. */
+bool ab_classic_simulation_refresh_circle_radius(AbClassicSimulation *simulation,
+                                                 size_t object, AbError *error);
 
 /* Register the next source-created direct circle with both actual force and
  * post-physics owners, before its first frame. No source fields are defaulted

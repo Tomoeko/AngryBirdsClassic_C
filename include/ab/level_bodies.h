@@ -15,6 +15,10 @@ typedef struct {
     bool level_goal;
     /* Creation-time cached Lua mass, independent of later queued body types. */
     float initial_mass;
+    /* Later defined-object factories apply ObjectCreation's native setters.
+     * A direct native circle remains false even if script definition fields
+     * are subsequently assigned or copied from another physical object. */
+    bool defined_constructor;
 } AbLevelObject;
 
 typedef struct {
@@ -32,6 +36,9 @@ typedef struct {
      * source data/world. Native diagnostic formatting is an outer boundary. */
     void *missing_context;
     void (*missing_definition)(void *context, AbSpan definition);
+    /* Optional borrowed constructor layouts for later defined-object factories.
+     * globals must equal catalog; keep this data owner alive with the level. */
+    const AbLuaData *catalog_data;
 } AbLevelBodySource;
 
 typedef struct {

@@ -146,16 +146,30 @@ static bool trigger(AbClassicBirdSpecialty *owner, AbDataValue bird, float secon
     if (named(selected, "GRENADE") &&
         !ab_classic_eggs_trigger(config->eggs, object, source.table, error))
         return false;
-    static const char *const abilities[] = {"BUBBLES"};
-    for (size_t index = 0; index < sizeof(abilities) / sizeof(*abilities); ++index)
-        if (named(selected, abilities[index]))
-            return ab_fail(error, "Active specialty branch is not bound");
+    if (named(selected, "BUBBLES") && !truthy(field(bird.table, "inBubble"))) {
+        if (!config->bubbles)
+            return ab_fail(error, "Active BUBBLES specialty branch is not bound");
+        if (!ab_settings_statistics_extra_tutorial(
+                config->settings, field(source.table, "sprite"), error) ||
+            !config->bubbles(config->bubbles_context, object, error))
+            return false;
+    }
     AbDataValue hook = field(source.table, "onTriggerSpecialty");
     if (truthy(hook)) {
-        if (!named(hook, "triggerRedBirdSpecialty"))
-            return ab_fail(error, "Unresolved ordinary specialty hook");
-        if (!red_callback(owner, object, error))
-            return false;
+        if (named(hook, "triggerRedBirdSpecialty")) {
+            if (!red_callback(owner, object, error))
+                return false;
+        } else if (config->hook) {
+            if (!config->hook(config->hook_context, hook, object, error))
+                return false;
+        } else {
+            return hook.kind == AB_DATA_STRING
+                       ? ab_fail(error, "Unresolved ordinary specialty hook: %.*s",
+                                 (int)(hook.string.size < 128 ? hook.string.size : 128),
+                                 hook.string.data)
+                       : ab_fail(error, "Unresolved ordinary specialty hook type %u",
+                                 (unsigned)hook.kind);
+        }
     }
     if (!notify(owner, error))
         return false;

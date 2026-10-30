@@ -141,6 +141,26 @@ static bool checks(bool reject) {
           ab_classic_joint_updates_register(fixture.updates, text("motor").string,
                                             NULL) &&
           ab_classic_joint_updates_refresh(fixture.updates, NULL));
+    AbGameJointQueue *queue = ab_classic_joint_updates_tail(fixture.updates)->destroy;
+    CHECK(ab_classic_joint_updates_defer_object(fixture.updates,
+                                                text("unconnected").string, NULL) &&
+          !queue->count);
+    CHECK(ab_classic_joint_updates_defer_object(fixture.updates, text("first").string,
+                                                NULL) &&
+          queue->count == 2);
+    AbSpan first_name = queue->names[0], second_name = queue->names[1];
+    CHECK(first_name.size != second_name.size ||
+          memcmp(first_name.data, second_name.data, first_name.size));
+    CHECK(ab_classic_joint_updates_defer_object(fixture.updates, text("second").string,
+                                                NULL) &&
+          queue->count == 4 && queue->names[2].size == first_name.size &&
+          !memcmp(queue->names[2].data, first_name.data, first_name.size) &&
+          queue->names[3].size == second_name.size &&
+          !memcmp(queue->names[3].data, second_name.data, second_name.size));
+    CHECK(!ab_classic_joint_updates_defer_object(fixture.updates, text("first").string,
+                                                 NULL) &&
+          queue->count == 4 && joints.joint_count == 2 && world.joint_count == 2);
+    queue->count = 0;
     AbEventListener listener = {.name = text("observer").string,
                                 .context = &fixture,
                                 .event_triggered = notified};

@@ -71,6 +71,8 @@ static bool menu_route_start_loader(PreviewMenu *menu, AbClassicLoaderCalls *cal
 #include "menu_cutscene_preview.h"
 
 static bool menu_route_load(PreviewMenu *menu, AbDataTable *event, AbError *error) {
+    if (menu_minigame_is_loading(menu, event))
+        return menu_minigame_start_loader(menu, error);
     AbUiEpisodeSelection *owner = menu->episodes;
     AbDataValue items = menu_route_field(event, "items");
     AbDataValue completion = menu_route_field(event, "completion_event");
@@ -94,11 +96,21 @@ static bool menu_route_event(PreviewMenu *menu, AbDataTable *event, AbError *err
     AbDataValue id = menu_route_field(event, "id");
     if (menu_route_equal(id, menu_event(menu, "EID_GOLDEN_EGG_FROM_MENU")))
         return menu_reward_reveal(menu, event, error);
+    if (menu_route_equal(id, menu_event(menu, "EID_BOOMERANG_BIRD_POPUP")))
+        return menu_reward_show_image(menu, menu_data("BIRD_BOOMERANG"),
+                                      menu_data("star_collect"), error);
+    if (menu_route_equal(id, menu_event(menu, "EID_REWARD_POPUP")))
+        return menu_reward_show_image(menu, menu_route_field(event, "sprite"),
+                                      menu_route_field(event, "sound"), error);
+    if (menu_route_equal(id, menu_event(menu, "EID_STAR_POPUP")))
+        return menu_reward_show_star(
+            menu, menu_route_truthy(menu_route_field(event, "first_time")), error);
     if (menu_route_equal(id, menu_event(menu, "EID_DO_LOADING")))
         return menu_route_load(menu, event, error);
     if (menu_route_equal(id, menu_event(menu, "EID_CHANGE_SCENE"))) {
         AbDataValue target = menu_route_field(event, "target");
-        if (menu_route_equal(target, menu_data("EPISODE_SELECTION")) ||
+        if (menu_minigame_is_target(menu, target) ||
+            menu_route_equal(target, menu_data("EPISODE_SELECTION")) ||
             (target.kind == AB_DATA_STRING && target.string.size > 16 &&
              !memcmp(target.string.data, "LEVEL_SELECTION_", 16)))
             menu->pending_scene = target;
@@ -168,6 +180,8 @@ static bool menu_route_level(PreviewMenu *menu, AbError *error) {
     if (!menu_route_truthy(exit))
         exit = menu_data("EPISODE_SELECTION");
     if (!ab_ui_widget_lifecycle(menu_active_root(menu), AB_UI_FRAME_EXIT, error))
+        return false;
+    if (!menu_minigame_close(menu, error))
         return false;
     if (menu->levels) {
         if (!ab_ui_level_selection_detach(menu->levels, error))
@@ -292,6 +306,10 @@ static bool menu_route_apply(PreviewMenu *menu, AbError *error) {
         return true;
     AbDataValue target = menu->pending_scene;
     menu->pending_scene = (AbDataValue){0};
+    if (menu_minigame_is_target(menu, target))
+        return menu_minigame_enter(menu, error);
+    if (menu->minigame && menu_route_equal(target, menu_data("LEVEL_SELECTION_G")))
+        return menu_route_level(menu, error);
     if (menu_route_equal(target, menu_data("EPISODE_SELECTION")))
         return menu_episode_change(menu, true, error);
     AbDataValue expected = menu_route_field(&menu->episodes->completion, "target");

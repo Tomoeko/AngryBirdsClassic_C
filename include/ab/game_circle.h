@@ -35,4 +35,10 @@ bool ab_game_circle_create(AbPhysicsWorld *world, AbGameCircleInput input,
                            uintptr_t fixture_user_data, AbGameCircle *output,
                            AbError *error);
 
+/* GameLua.resizeCircle32195c: recreate the fixture, then publish radius and
+ * current body mass in the same physical table. Refresh initial_mass to the
+ * mass of this latest fixture construction. Borrowed table identity survives. */
+bool ab_game_circle_resize(AbPhysicsWorld *world, AbGameCircle *circle, float radius,
+                           AbError *error);
+
 #endif

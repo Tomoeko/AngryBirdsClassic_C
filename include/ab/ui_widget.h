@@ -141,6 +141,11 @@ bool ab_ui_widget_clear_pointer_flags(AbUiWidget *widget, AbError *error);
  * self scroll and every scale/angle; cumulative scale ignores positions/scroll. */
 bool ab_ui_widget_screen_position(AbUiWidget *widget, AbVec2 *output, AbError *error);
 bool ab_ui_widget_cumulative_scale(AbUiWidget *widget, AbVec2 *output, AbError *error);
+/* Actual ImageButton.hitTest can also receive an Image-derived class. Read
+ * resource bounds/pivot rather than the mutable draw dimensions; absent/false
+ * hit padding is the source's empty table. Frame-only receivers are invalid. */
+bool ab_ui_widget_image_hit(AbUiWidget *widget, AbVec2 point, bool *output,
+                            AbError *error);
 /* Real screen-clip host for ScrollFrame. Context is the shared
  * AbUiWidgetContext; retain clip through subsequent render-state changes. */
 bool ab_ui_widget_set_screen_clip(void *context, AbScreenClipRect clip, AbError *error);

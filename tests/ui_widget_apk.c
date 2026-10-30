@@ -358,8 +358,18 @@ release:
 #include "ui_level_golden_apk.h"
 #include "ui_level_facebook_apk.h"
 #include "ui_bird_abilities_apk.h"
+#include "ui_level_ugc_apk.h"
 #include "ui_joint_updates_apk.h"
 #include "ui_tnt_apk.h"
+#include "ui_explosion_joints_apk.h"
+#include "ui_vial_collision_apk.h"
+#include "ui_shockwave_apk.h"
+#include "ui_birthday_apk.h"
+#include "ui_puffer_apk.h"
+#include "ui_physics_replay_apk.h"
+#include "ui_spawn_apk.h"
+#include "ui_goal_factory_apk.h"
+#include "ui_vial_effects_apk.h"
 #include "ui_terrain_apk.h"
 #include "ui_ambient_apk.h"
 #include "ui_powerups_apk.h"
@@ -367,6 +377,14 @@ release:
 #include "ui_level_start_audit.h"
 #include "ui_level5_apk.h"
 #include "ui_level_egg_apk.h"
+#include "ui_level_rewards_apk.h"
+#include "ui_mode_egg_apk.h"
+#include "ui_soundboard_apk.h"
+#include "ui_keyboard_apk.h"
+#include "ui_sequencer_apk.h"
+#include "ui_radio_apk.h"
+#include "ui_accordion_apk.h"
+#include "ui_rocket_apk.h"
 
 int main(int argc, char **argv) {
     if (argc < 2 || argc > 17)
@@ -430,6 +448,106 @@ int main(int argc, char **argv) {
                                     &error) ||
         !menu_bird_widgets(&menu, renderer, argc >= 11 ? argv[10] : NULL, &error))
         goto release;
+    if (getenv("AB_TEST_SHOCKWAVE_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               shockwave_widgets(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_BIRTHDAY_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               birthday_widgets(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_SPAWN_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               spawn_widgets(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_GOAL_FACTORY_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               goal_factory_widgets(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_LEVEL_REWARDS_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               registered_level_reward_widgets(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_PHYSICS_REPLAY_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               physics_replay_widgets(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_MODE_EGG_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               mode_egg_widgets(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_VIAL_CONTACT_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               vial_collision_widgets(&menu, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_VIAL_EFFECTS_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               vial_effect_widgets(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_BLUE_VIAL_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               vial_blue_widgets(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_PINK_VIAL_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               vial_pink_widgets(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_VIAL_CHAIN_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               vial_chain_widgets(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_SOUNDBOARD_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               soundboard_widgets_test(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_KEYBOARD_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               keyboard_widgets_test(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_SEQUENCER_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               sequencer_widgets_test(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_RADIO_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               radio_widgets_test(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_ACCORDION_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               accordion_widgets_test(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_ROCKET_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               rocket_widgets(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_PUFFER_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               puffer_widgets(&menu, renderer, &error);
+        goto release;
+    }
+    if (getenv("AB_TEST_AUDIT_ONLY")) {
+        okay = menu_resolution_widgets(&zip, &menu, renderer, &list, &error) &&
+               level_start_audit(&menu, &error);
+        goto release;
+    }
     if (!menu_resolution_widgets(&zip, &menu, renderer, &list, &error) ||
         !theme_seam_widgets(&menu, renderer, &error) ||
         !level_grid_widgets(&menu, renderer, argc >= 12 ? argv[11] : NULL, &error) ||
@@ -450,6 +568,7 @@ int main(int argc, char **argv) {
         !facebook_level_widgets(&menu, renderer, &error) ||
         !pigs_level_widgets(&menu, renderer, &error) ||
         !golden_level_widgets(&menu, renderer, &error) ||
+        !ugc_level_widgets(&menu, renderer, &error) ||
         !ability_test_yellow(&menu, renderer, &error) ||
         !ability_test_green(&menu, renderer, &error) ||
         !ability_test_flying_mouse(&menu, renderer, ABILITY_MOUSE_BLUES, &error) ||
@@ -457,6 +576,13 @@ int main(int argc, char **argv) {
         !ability_test_white(&menu, renderer, &error) ||
         !ability_test_black(&menu, renderer, &error) ||
         !tnt_explosion_widgets(&menu, renderer, &error) ||
+        !explosion_joint_widgets(&menu, renderer, &error) ||
+        !vial_collision_widgets(&menu, &error) ||
+        !shockwave_widgets(&menu, renderer, &error) ||
+        !birthday_widgets(&menu, renderer, &error) ||
+        !puffer_widgets(&menu, renderer, &error) ||
+        !vial_effect_widgets(&menu, renderer, &error) ||
+        !mode_egg_widgets(&menu, renderer, &error) ||
         !powerup_king_widgets(&menu, renderer, &error) ||
         !powerup_seed_widgets(&menu, renderer, &error) ||
         !powerup_quake_widgets(&menu, renderer, &error) ||
@@ -476,7 +602,8 @@ int main(int argc, char **argv) {
             ab_fail(&error, "Level5 reward fixture did not reopen the menu");
         goto release;
     }
-    if (!level_start_audit(&menu, &error))
+    if (!registered_level_reward_widgets(&menu, renderer, &error) ||
+        !level_start_audit(&menu, &error))
         goto release;
     okay = true;
 

@@ -30,6 +30,13 @@ typedef struct {
     void *blues_context;
     bool (*blues_created)(void *context, const AbClassicBluesSplitResult *result,
                           AbError *error);
+    void *bubbles_context;
+    /* Actual BUBBLES branch, before the named hook and common notification. */
+    bool (*bubbles)(void *context, size_t object, AbError *error);
+    void *hook_context;
+    /* Actual named onTriggerSpecialty functions other than the owned red hook.
+     * Dispatch occurs between the branch and common event/behavior tail. */
+    bool (*hook)(void *context, AbDataValue name, size_t object, AbError *error);
 } AbClassicBirdSpecialtyConfig;
 
 /* Concrete ordinary triggerSpecialty125163 and triggerBirdSpecialty125065.

@@ -272,6 +272,50 @@ static bool edges(void) {
                                 &found, NULL) &&
           found);
     close_fixture(&fixture);
+    AbStringMap *map = NULL;
+    CHECK(ab_string_map_open(0, 8, 16384, &map, NULL));
+    AbDataEntry strength = {text("strength"),
+                            {.kind = AB_DATA_NUMBER, .bits = UINT32_C(0x3f800000)}};
+    AbDataTable physical = {&strength, 1, 1, NULL};
+    AbDataValue value = {.kind = AB_DATA_TABLE, .table = &physical};
+    const char *const pending[] = {"a", "b", "c", "d", "e", "f", "g", "h", "o"};
+    AbDataEntry world_entries[9];
+    for (size_t index = 0; index < 9; ++index) {
+        world_entries[index] = (AbDataEntry){text(pending[index]), value};
+        if (index < 8)
+            CHECK(ab_string_map_set(map, span(pending[index]), (uintptr_t)&value, true,
+                                    NULL));
+    }
+    for (size_t index = 0; index < 8; ++index)
+        if (index != 6)
+            CHECK(ab_string_map_set(map, span(pending[index]), 0, false, NULL));
+    AbDataTable world = {world_entries, 9, 9, NULL};
+    AbDataEntry world_field = {text("world"), {.kind = AB_DATA_TABLE, .table = &world}};
+    AbDataTable objects = {&world_field, 1, 1, NULL};
+    AbBlockRemovalState state = {{.kind = AB_DATA_TABLE, .table = &objects}, map};
+    AbBlockRemovalCursor cursor;
+    CHECK(ab_block_removal_open(&state, &cursor, NULL) &&
+          ab_block_removal_next(&state, &cursor, NULL, &entry, &found, NULL) && found &&
+          entry.key.size == 1 && entry.key.data[0] == 'g' && cursor.cursor == 7);
+    /* An explosion inserts a new death while the current key is still live.
+     * Eight retained constructor keys force a rehash from eight slots to two. */
+    CHECK(ab_string_map_set(map, span("o"), (uintptr_t)&value, true, NULL));
+    AbStringMapLayout layout;
+    CHECK(ab_string_map_layout(map, &layout) && layout.capacity == 2 &&
+          layout.count == 2 && ab_string_map_set(map, span("g"), 0, false, NULL) &&
+          ab_block_removal_next(&state, &cursor, NULL, &entry, &found, NULL) && found &&
+          entry.key.size == 1 && entry.key.data[0] == 'o' && cursor.cursor == 2);
+    AbBlockRemovalCursor end = cursor;
+    CHECK(ab_block_removal_next(&state, &end, NULL, &entry, &found, NULL) && !found &&
+          end.finished);
+    /* Native next rejects when mutation actually discards its retained key;
+     * do not hide that error by restarting or reporting an empty queue. */
+    CHECK(ab_string_map_set(map, span("o"), 0, false, NULL) &&
+          ab_string_map_set(map, span("b"), (uintptr_t)&value, true, NULL) &&
+          !ab_block_removal_next(&state, &cursor, NULL, &entry, &found, NULL));
+    ab_string_map_close(map);
+    puts("Removal traversal resumes its retained key after explosion-driven hash "
+         "shrink, visits the pending death and rejects a discarded iterator key.");
     return true;
 }
 

@@ -161,6 +161,7 @@ static bool open_goals(AbClassicDynamics *owner, AbError *error) {
     goals.score = &globals->score;
     goals.last_score_time = &globals->last_score_time;
     goals.old_score = &globals->old_score;
+    goals.object_capacity = config->physical.object_capacity;
     if (!ab_classic_goals_open(goals, &owner->view.goals, error))
         return false;
     AbClassicDestructionStatisticsConfig statistics = config->statistics;

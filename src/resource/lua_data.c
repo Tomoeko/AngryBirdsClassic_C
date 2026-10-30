@@ -441,14 +441,16 @@ bool ab_data_literal_tables(const AbLuaChunk *chunk, size_t first_word,
         return ab_fail(error, "Invalid literal table selection storage");
     }
     memset(tables, 0, count * sizeof(*tables));
-    if (!chunk || !chunk->input.data || chunk->root.upvalue_count ||
-        chunk->root.parameter_count || !chunk->root.instructions.data ||
+    if (!chunk || !chunk->input.data || !chunk->root.instructions.data ||
         chunk->root.instructions.size % 4 || !word_count ||
         first_word > chunk->root.instructions.size / 4 ||
         word_count > chunk->root.instructions.size / 4 - first_word) {
         ab_lua_data_close(output);
         return ab_fail(error, "Invalid closed literal table constructor bounds");
     }
+    /* A closed window may occur inside a callable prototype. Its arguments and
+     * upvalues are not imported: every register begins undefined, and the
+     * opcode allowlist excludes all external reads and function execution. */
     DataRecovery recovery = {.prototype = &chunk->root, .data = output, .error = error};
     size_t end_word = first_word + word_count;
     for (size_t index = first_word; index < end_word; ++index) {
@@ -501,7 +503,8 @@ bool ab_lua_data_literal_table_range(const AbLuaChunk *chunk, size_t first_word,
 bool ab_lua_data_literal_table(const AbLuaChunk *chunk, size_t word_count,
                                unsigned register_index, size_t memory_limit,
                                AbLuaData *output, AbError *error) {
-    if (chunk && chunk->root.child_count) {
+    if (chunk && (chunk->root.child_count || chunk->root.parameter_count ||
+                  chunk->root.upvalue_count)) {
         if (output)
             *output = (AbLuaData){0};
         return ab_fail(error, "Closed literal constructor has child functions");

@@ -126,6 +126,16 @@ static bool menu_reward_reveal(PreviewMenu *menu, AbDataTable *event, AbError *e
 }
 
 static bool menu_reward_show(PreviewMenu *menu, AbError *error) {
+    return menu_reward_show_image(menu, menu_data("GOLDEN_EGG_5"),
+                                  menu_data("goldenegg"), error);
+}
+
+/* BoomerangBirdPopup2439 and RewardPopup5314 share the glow, child placement,
+ * layout, shade and the three process actions with GoldenEgg. */
+static bool menu_reward_show_image(PreviewMenu *menu, AbDataValue image,
+                                   AbDataValue sound, AbError *error) {
+    if (image.kind != AB_DATA_STRING || sound.kind != AB_DATA_STRING)
+        return ab_fail(error, "Reward requires its actual sprite and sound names");
     if (menu->reward)
         return ab_fail(error, "Overlapping source golden-egg reward");
     PreviewReward *reward = calloc(1, sizeof(*reward));
@@ -144,9 +154,10 @@ static bool menu_reward_show(PreviewMenu *menu, AbError *error) {
         !ab_ui_widget_init(&reward->egg, &menu->context, AB_UI_WIDGET_IMAGE,
                            (AbUiWidgetChildren){0}, NULL,
                            &(AbUiImageArguments){.frame = arguments}, NULL, error) ||
-        !ab_ui_image_state_set_image(&reward->egg.state.image,
-                                     menu_text("GOLDEN_EGG_5"), &menu->context.images,
-                                     error))
+        !ab_ui_image_state_set_image(
+            &reward->egg.state.image,
+            (AbUiPointerValue){.kind = AB_UI_POINTER_TEXT, .text = image.string},
+            &menu->context.images, error))
         return false;
     reward->egg.frame->fields.name = menu_text("egg");
     reward->glow.frame->fields.x = menu_number(menu->screen.x * 0.5f);
@@ -154,13 +165,26 @@ static bool menu_reward_show(PreviewMenu *menu, AbError *error) {
     uint32_t handle;
     return ab_ui_widget_add(&reward->glow, &reward->egg, error) &&
            ab_audio_bank_play(menu->audio,
-                              (AbAudioPlay){.name = menu_data("goldenegg"),
+                              (AbAudioPlay){.name = sound,
                                             .volume = menu_route_number(1),
                                             .loop = {.kind = AB_DATA_BOOLEAN}},
                               &handle, error) &&
            ab_ui_widget_lifecycle(&reward->glow, AB_UI_FRAME_ENTRY, error) &&
            ab_ui_scaling_set_to(&menu->scaling, &reward->glow.frame->fields, error) &&
            reward_process(reward, error);
+}
+
+/* StarPopup3671 shares the same showRewardPopup94726 process actions, with a
+ * distinct actual star image and the repeated-award alpha/no-glow policy. */
+static bool menu_reward_show_star(PreviewMenu *menu, bool first, AbError *error) {
+    if (!menu_reward_show_image(menu, menu_data("BIG_STAR_2"),
+                                menu_data("star_collect"), error))
+        return false;
+    if (first)
+        return true;
+    menu->reward->egg.state.image.alpha = menu_number(.5f);
+    return ab_ui_image_state_set_image(&menu->reward->glow.state.image, menu_text(""),
+                                       &menu->context.images, error);
 }
 
 static bool menu_reward_update(PreviewMenu *menu, float seconds, AbError *error) {

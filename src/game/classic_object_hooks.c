@@ -128,6 +128,16 @@ bool ab_classic_object_hooks_register(AbClassicObjectHooks *owner, size_t object
     return true;
 }
 
+bool ab_classic_object_hooks_updates(AbClassicObjectHooks *owner, size_t object,
+                                     AbObjectUpdates **output, AbError *error) {
+    AbClassicLevelView level = ab_classic_level_view(owner ? owner->level : NULL);
+    if (!owner || !output || !level.bodies || object >= level.bodies->count ||
+        object >= owner->capacity)
+        return ab_fail(error, "Invalid object-update property query");
+    *output = owner->rows[object].updates;
+    return true;
+}
+
 bool ab_classic_object_hooks_bind(AbClassicObjectHooks *owner,
                                   AbClassicController *controller,
                                   AbGameTailHooks **output, AbError *error) {

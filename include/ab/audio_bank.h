@@ -48,6 +48,9 @@ size_t ab_audio_bank_count(const AbAudioBank *bank);
 bool ab_audio_bank_clip(const AbAudioBank *bank, AbSpan name, AbAudioBankClip *output);
 /* Sorted name order, with the same stable borrowed view as a name lookup. */
 bool ab_audio_bank_at(const AbAudioBank *bank, size_t index, AbAudioBankClip *output);
+/* Borrow the actual audioGroups constructor for source menu operations that
+ * traverse a whole group rather than selecting one random member. */
+const AbDataTable *ab_audio_bank_groups(const AbAudioBank *bank);
 
 /* getAudioName is a separate ordered RNG boundary. A nil input/result remains
  * NULL; other names are NUL-terminated strings. Unknown names pass through as

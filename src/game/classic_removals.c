@@ -488,9 +488,12 @@ bool ab_classic_removals_open(AbClassicRemovalConfig config, AbClassicRemovals *
 
 bool ab_classic_removals_register_object(AbClassicRemovals *owner, size_t object,
                                          AbError *error) {
-    if (!owner || owner->calling || object != owner->count ||
-        object >= owner->capacity || object >= owner->level.bodies->count)
+    if (!owner || object != owner->count || object >= owner->capacity ||
+        object >= owner->level.bodies->count || owner->level.world->failed ||
+        owner->level.world->locked)
         return ab_fail(error, "Invalid new removal adapter row");
+    /* A spawn appends a stable row inside this owner's ordinary removal pass.
+     * No borrowed prefix storage moves; recursive removal calls still reject. */
     ++owner->count;
     return true;
 }

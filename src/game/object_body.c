@@ -145,6 +145,31 @@ bool ab_ground_body_create(AbPhysicsWorld *world, AbVec2 position,
     return true;
 }
 
+bool ab_object_body_resize_circle(AbPhysicsWorld *world, AbObjectBody *object,
+                                  float radius, AbError *error) {
+    if (!world || !object || world->failed || world->locked || !isfinite(radius) ||
+        radius < 0 || !ab_world_has_body(world, object->body) ||
+        !ab_world_has_fixture(world, object->fixture))
+        return ab_fail(error, "Invalid circle fixture recreation input");
+    AbWorldFixture fixture = world->storage.fixtures[object->fixture];
+    if (fixture.body != object->body || fixture.shape.kind != AB_SHAPE_CIRCLE)
+        return ab_fail(error, "Circle recreation requires its actual fixture");
+    for (size_t index = 0; index < world->fixture_count; ++index) {
+        size_t other = world->fixture_order[index];
+        if (other != object->fixture &&
+            world->storage.fixtures[other].body == object->body)
+            return ab_fail(error, "Circle recreation requires a single fixture");
+    }
+    /* ARM GameObject.recreate3448b4 destroys the fixture, not the body.
+     * createFixture34458c restores default filter/sensor fields. */
+    fixture.shape.data.circle = (AbCircle){.radius = radius};
+    fixture.filter = (AbCollisionFilter){1, 0xffff, 0};
+    fixture.sensor = false;
+    object->dimensions.radius = radius;
+    return ab_world_destroy_fixture(world, object->fixture, error) &&
+           ab_world_create_fixture(world, &fixture, &object->fixture, error);
+}
+
 bool ab_object_body_queue(AbPhysicsWorld *world, const AbObjectBody *object,
                           AbError *error) {
     if (!object || !ab_world_has_body(world, object->body)) {

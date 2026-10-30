@@ -248,6 +248,17 @@ static bool register_object(AbClassicObjectRemoval *owner, size_t object, bool b
                                  .collider = (AbGameColliderType)frame->collider,
                                  .renderable = visual->attached ? (uintptr_t)entry : 0},
                         .references = visual->attached ? 2u : 0u};
+    if (source->defined_constructor) {
+        AbObjectDefinition definition;
+        if (!ab_object_definition_open(owner->level.catalog, source->definition_name,
+                                       NULL, &definition, error))
+            return false;
+        AbDataValue rolling = field(definition.material, "rollingSound");
+        if (truthy(rolling) && (rolling.kind != AB_DATA_STRING ||
+                                (rolling.string.size && !rolling.string.data)))
+            return ab_fail(error, "Unsupported new defined-object rolling name");
+        entry->core.rolling_sound = truthy(rolling) ? rolling.string : (AbSpan){0};
+    }
     if (!ab_string_map_set(owner->registry.objects, source->name,
                            (uintptr_t)&entry->core, true, error))
         return false;

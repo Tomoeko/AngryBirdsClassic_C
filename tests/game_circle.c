@@ -148,25 +148,95 @@ static bool edge_checks(AbPhysicsWorld *world) {
     return true;
 }
 
+#if defined(AB_TEST_RESIZE_CIRCLE)
+static bool resize_edges(AbPhysicsWorld *world) {
+    uint32_t words[9];
+    reference_create_circle(2, words);
+    AbGameCircleInput input = input_value(words);
+    input.radius = input.density = 1;
+    AbGameCircle circle = {0}, other = {0};
+    CHECK(ab_game_circle_create(world, input, (uintptr_t)&circle, &circle, NULL));
+    input.name = span("other");
+    input.position.x = 1;
+    input.density = 0;
+    CHECK(ab_game_circle_create(world, input, (uintptr_t)&other, &other, NULL));
+    size_t joint;
+    AbWorldSolveJoint definition = {.first_body = circle.physics.body,
+                                    .second_body = other.physics.body,
+                                    .constraint.kind = AB_JOINT_WELD,
+                                    .collide_connected = true};
+    CHECK(ab_world_create_joint(world, &definition, &joint, NULL));
+    CHECK(ab_world_step(world, 0, 8, 3, NULL) && world->contact_count);
+    size_t body = circle.physics.body;
+    AbBodyMotion *motion = &world->storage.bodies[body].motion;
+    CHECK(ab_body_velocity_set(motion, (AbVec2){7, -3}) &&
+          ab_body_angular_velocity_set(motion, 2));
+    AbDataTable *physical = &circle.properties.physical;
+    AbObjectBody prior = circle.physics;
+    world->locked = true;
+    bool resized = ab_game_circle_resize(world, &circle, 2, NULL);
+    world->locked = false;
+    CHECK(!resized && !memcmp(&prior, &circle.physics, sizeof(prior)) &&
+          !ab_game_circle_resize(world, &circle, NAN, NULL) &&
+          !ab_game_circle_resize(world, &circle, -1, NULL));
+    CHECK(ab_world_set_fixture_filter(world, circle.physics.fixture,
+                                      (AbCollisionFilter){8, 8, -2}, NULL) &&
+          ab_world_set_fixture_sensor(world, circle.physics.fixture, true));
+    CHECK(ab_game_circle_resize(world, &circle, 2, NULL));
+    const AbWorldFixture *fixture = world->storage.fixtures + circle.physics.fixture;
+    CHECK(world->body_count == 2 && circle.physics.body == body &&
+          ab_world_has_joint(world, joint) && world->joint_count == 1 &&
+          !world->contact_count && !fixture->sensor && fixture->filter.category == 1 &&
+          fixture->filter.mask == 0xffff && fixture->filter.group == 0 &&
+          fixture->user_data == (uintptr_t)&circle &&
+          &circle.properties.physical == physical &&
+          motion->mass.linear_velocity.x == 7 && motion->mass.linear_velocity.y == -3 &&
+          motion->mass.angular_velocity == 2);
+    float mass = motion->mass.mass;
+    CHECK(ab_game_circle_resize(world, &circle, 1, NULL) &&
+          motion->mass.mass == mass * .25f && ab_world_has_joint(world, joint));
+    CHECK(ab_world_destroy_body(world, body, NULL) &&
+          ab_world_destroy_body(world, other.physics.body, NULL));
+    return true;
+}
+#endif
+
 static bool run(FILE *reference) {
     WorldStorage storage;
     AbPhysicsWorld world = {0};
     CHECK(ab_world_open(&world, default_definition(), prepare_storage(&storage, 0, 0),
                         NULL));
     bool okay = edge_checks(&world);
+#if defined(AB_TEST_RESIZE_CIRCLE)
+    okay = okay && resize_edges(&world);
+#endif
     if (reference) {
         char header[128];
         okay = okay && fgets(header, sizeof(header), reference) &&
-               !strcmp(header, "AB_ANDROID_CREATE_CIRCLE_V1 128\n");
+               !strcmp(header,
+#if defined(AB_TEST_RESIZE_CIRCLE)
+                       "AB_ANDROID_RESIZE_CIRCLE_V1 128\n"
+#else
+                       "AB_ANDROID_CREATE_CIRCLE_V1 128\n"
+#endif
+               );
     }
     for (unsigned sample = 0; okay && sample < CREATE_CIRCLE_CASES; ++sample) {
         uint32_t words[9], expected_fields[38], expected_state[26];
         reference_create_circle(sample, words);
+#if defined(AB_TEST_RESIZE_CIRCLE)
+        uint32_t radius = reference_resize_circle(sample);
+#endif
         if (reference) {
             uint32_t native_input[9];
             okay = read_words(reference, native_input, 9) &&
-                   compare(words, native_input, 9, sample, "input") &&
-                   read_words(reference, expected_fields, 38) &&
+                   compare(words, native_input, 9, sample, "input");
+#if defined(AB_TEST_RESIZE_CIRCLE)
+            uint32_t expected_radius;
+            okay = okay && read_words(reference, &expected_radius, 1) &&
+                   compare(&radius, &expected_radius, 1, sample, "radius");
+#endif
+            okay = okay && read_words(reference, expected_fields, 38) &&
                    read_words(reference, expected_state, 26);
         }
         if (!okay)
@@ -175,8 +245,11 @@ static bool run(FILE *reference) {
         AbError error = {0};
         uint32_t fields[38], state[26];
         okay = ab_game_circle_create(&world, input_value(words), (uintptr_t)&circle,
-                                     &circle, &error) &&
-               snapshot(&world, &circle, fields, state);
+                                     &circle, &error);
+#if defined(AB_TEST_RESIZE_CIRCLE)
+        okay = okay && ab_game_circle_resize(&world, &circle, number(radius), &error);
+#endif
+        okay = okay && snapshot(&world, &circle, fields, state);
         if (!okay)
             fprintf(stderr, "Circle %u: %s\n", sample, error.message);
         if (okay && reference)
@@ -207,6 +280,10 @@ int main(int argc, char **argv) {
     if (reference)
         fclose(reference);
     if (okay)
+#if defined(AB_TEST_RESIZE_CIRCLE)
+        puts("Native circle fixture recreation: 128 cases pass");
+#else
         puts("Native circle construction: 128 cases pass");
+#endif
     return okay ? 0 : 1;
 }

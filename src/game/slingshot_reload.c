@@ -2,6 +2,22 @@
 
 #include <math.h>
 
+bool ab_slingshot_reload_gain(float range, float distance, float *output) {
+    if (!output || !isfinite(range) || !isfinite(distance))
+        return false;
+    float gain;
+    if (range == 0) {
+        bool negative_ratio = !!signbit(range) != !!signbit(distance);
+        gain = distance != 0 && negative_ratio ? 1 : 0.25f;
+    } else {
+        gain = 1 - distance / range;
+        gain = 0.25f < gain ? gain : 0.25f;
+        gain = gain < 1 ? gain : 1;
+    }
+    *output = gain;
+    return true;
+}
+
 bool ab_slingshot_reload_gate(const AbSlingReloadState *state, float seconds,
                               bool next_bird_present, AbSlingReloadGate *output) {
     if (!state || !output || !isfinite(state->timer) || !isfinite(seconds) ||

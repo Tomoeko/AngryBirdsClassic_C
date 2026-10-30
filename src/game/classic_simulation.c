@@ -12,7 +12,7 @@ struct AbClassicSimulation {
     AbGamePhysicsPrepare prepare;
     size_t bytes;
     float planned_time;
-    bool advancing;
+    bool advancing, after_step;
 };
 
 static bool call_phase(AbClassicSimulation *simulation, AbClassicSimulationStage stage,
@@ -51,7 +51,12 @@ static bool before_step(void *context, AbPhysicsWorld *world, float seconds,
 
 static bool after_step(void *context, AbPhysicsWorld *world, AbError *error) {
     (void)world;
-    return call_phase(context, AB_CLASSIC_SIMULATION_AFTER_STEP, 0x1.111112p-5f, error);
+    AbClassicSimulation *simulation = context;
+    simulation->after_step = true;
+    bool okay =
+        call_phase(simulation, AB_CLASSIC_SIMULATION_AFTER_STEP, 0x1.111112p-5f, error);
+    simulation->after_step = false;
+    return okay;
 }
 
 static bool after_world_step(void *context, AbPhysicsWorld *world, AbError *error) {
@@ -188,24 +193,43 @@ bool ab_classic_simulation_recreate_circle(AbClassicSimulation *simulation,
            ab_classic_post_physics_recreate_circle(simulation->post, object, error);
 }
 
-bool ab_classic_simulation_register_circle(AbClassicSimulation *simulation,
-                                           size_t object, AbError *error) {
-    if (!simulation || simulation->advancing ||
+bool ab_classic_simulation_refresh_circle_radius(AbClassicSimulation *simulation,
+                                                 size_t object, AbError *error) {
+    if (!simulation || simulation->advancing)
+        return ab_fail(error, "Invalid simulation circle-radius refresh");
+    return ab_classic_post_physics_resize_circle(simulation->post, object, error);
+}
+
+static bool register_object(AbClassicSimulation *simulation, size_t object, bool box,
+                            AbError *error) {
+    if (!simulation || (simulation->advancing && !simulation->after_step) ||
         ab_classic_forces_view(simulation->forces).count != object ||
         ab_classic_post_physics_view(simulation->post).count != object)
-        return ab_fail(error, "Invalid new simulation circle binding");
-    return ab_classic_forces_register_circle(simulation->forces, object, error) &&
-           ab_classic_post_physics_register_circle(simulation->post, object, error);
+        return ab_fail(error, "Invalid new simulation object binding");
+    bool okay =
+        (box ? ab_classic_forces_register_box(simulation->forces, object, error)
+             : ab_classic_forces_register_circle(simulation->forces, object, error)) &&
+        (box ? ab_classic_post_physics_register_box(simulation->post, object, error)
+             : ab_classic_post_physics_register_circle(simulation->post, object,
+                                                       error));
+    if (okay && simulation->advancing) {
+        /* removeBlocks creates bodies between world steps. The next force pass
+         * must see the appended, potentially reordered native object vector. */
+        AbClassicForceView forces = ab_classic_forces_view(simulation->forces);
+        simulation->prepare.objects = forces.objects;
+        simulation->prepare.count = forces.count;
+    }
+    return okay;
+}
+
+bool ab_classic_simulation_register_circle(AbClassicSimulation *simulation,
+                                           size_t object, AbError *error) {
+    return register_object(simulation, object, false, error);
 }
 
 bool ab_classic_simulation_register_box(AbClassicSimulation *simulation, size_t object,
                                         AbError *error) {
-    if (!simulation || simulation->advancing ||
-        ab_classic_forces_view(simulation->forces).count != object ||
-        ab_classic_post_physics_view(simulation->post).count != object)
-        return ab_fail(error, "Invalid new simulation box binding");
-    return ab_classic_forces_register_box(simulation->forces, object, error) &&
-           ab_classic_post_physics_register_box(simulation->post, object, error);
+    return register_object(simulation, object, true, error);
 }
 
 bool ab_classic_simulation_advance(AbClassicSimulation *simulation,

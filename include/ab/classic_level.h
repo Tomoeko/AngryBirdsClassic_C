@@ -16,8 +16,15 @@
 #include "ab/random.h"
 #include "ab/sprite_set.h"
 #include "ab/classic_level_source.h"
+#include "ab/string_map.h"
 
 typedef struct AbClassicLevel AbClassicLevel;
+
+typedef struct {
+    void *context;
+    bool (*added)(void *context, AbClassicLevel *level, size_t object,
+                  AbRandom48 *random, AbError *error);
+} AbClassicInitialBirdHost;
 
 /* Query the current owned physics world and canonical live level names. */
 bool ab_classic_level_raycast(const AbClassicLevel *level, AbVec2 first, AbVec2 second,
@@ -151,6 +158,7 @@ typedef struct {
     /* Optional verified shared blocks/key owner. Borrow until this level closes;
      * catalog_path must select blocks.lua. Its storage is bounded separately. */
     const AbClassicLevelSource *source;
+    AbClassicInitialBirdHost initial_birds;
 } AbClassicLevelAssets;
 
 /* Register a new direct native circle in an unused stable level slot. Publish
@@ -189,6 +197,28 @@ bool ab_classic_level_create_defined_box(AbClassicLevel *level, AbSpan name,
                                          AbSpan definition, AbVec2 position,
                                          float density, size_t *output, AbError *error);
 
+/* The same definition/material publication for an explicit positive circle.
+ * The enclosing factory owns renderer, scripts, behaviors and adapter registration;
+ * active controllable/goal/constructor paths retain the gates described above. */
+bool ab_classic_level_create_defined_circle(AbClassicLevel *level, AbSpan name,
+                                            AbSpan definition, AbVec2 position,
+                                            float density, size_t *output,
+                                            AbError *error);
+
+/* Goal-circle variant after the caller has resolved the gift-box replacement
+ * phase. Publishes the actual definition goal flag and character strength, but
+ * does not insert levelGoals or initialize its timers: ObjectCreation does not
+ * own those script continuations. Other active factory phases still reject. */
+bool ab_classic_level_create_defined_goal_circle(AbClassicLevel *level, AbSpan name,
+                                                 AbSpan definition, AbVec2 position,
+                                                 float density, size_t *output,
+                                                 AbError *error);
+/* Refresh the borrowed animation traversal from current levelGoals in native
+ * string-map order, validating every canonical physical identity. Storage stays
+ * fixed. Call outside traversal; failure requires discarding the partial view. */
+bool ab_classic_level_sync_goal_order(AbClassicLevel *level, AbStringMap *goals,
+                                      AbError *error);
+
 /* Source sardine-bait ObjectFunctions box path with actual sprite geometry and
  * all ordinary definition projections. Only the recovered Eagle callback family
  * is accepted. The caller must construct its renderer/GameObject/behaviors and
@@ -206,6 +236,12 @@ bool ab_classic_level_create_bait_box(AbClassicLevel *level, AbSpan name,
  * services. No retained physical-table alias may be read during this boundary. */
 bool ab_classic_level_recreate_circle(AbClassicLevel *level, size_t object,
                                       AbGameCircleInput input, AbError *error);
+/* GameLua.resizeCircle on a live authored or dynamically created circle. Keep
+ * the canonical object/table/body/joints and native cached creation mass; replace
+ * only its fixture, then publish current radius/mass. Simulation's rolling-radius
+ * projection must be refreshed separately before its next post-physics pass. */
+bool ab_classic_level_resize_circle(AbClassicLevel *level, size_t object, float radius,
+                                    AbError *error);
 
 /* Own the fixed world/solver/object/order/history arrays for an ordinary classic
  * level. Source data and strings remain borrowed until close; the sprite callback
@@ -256,6 +292,15 @@ bool ab_classic_level_open(const AbLevelBodySource *source,
  */
 bool ab_classic_level_initialize_objects(AbClassicLevel *level, AbRandom48 *random,
                                          bool queue_controllables, AbError *error);
+/* Same initialization with Museum's per-bird onBirdAdded boundary immediately
+ * after that bird's queue/static transition. The real producer receives the
+ * in-progress shared RNG; source-owned resource tables are already available.
+ * Callbacks may publish fields/register later services, but may not mutate the
+ * object topology or advance simulation. The host remains borrowed during this
+ * call only. Earlier timer, host and RNG effects survive a later failure. */
+bool ab_classic_level_initialize_birds(AbClassicLevel *level, AbRandom48 *random,
+                                       bool queue_controllables,
+                                       AbClassicInitialBirdHost host, AbError *error);
 
 /* Apply resolved native position/rotation assignment to one fixed object. Its
  * character jump position/rotation and physical x/y/angle are canonical script

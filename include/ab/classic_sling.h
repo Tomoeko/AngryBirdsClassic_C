@@ -11,6 +11,18 @@
 
 typedef struct AbClassicSling AbClassicSling;
 
+typedef enum {
+    AB_SLING_HAT_HOLD,
+    AB_SLING_HAT_TRANSFER,
+    AB_SLING_HAT_ACTIVATE,
+} AbClassicSlingHatPhase;
+
+typedef struct {
+    void *context;
+    bool (*call)(void *context, size_t bird, AbClassicSlingHatPhase phase,
+                 float transfer_time, AbError *error);
+} AbClassicSlingHatHost;
+
 typedef struct {
     AbClassicLevel *level;
     AbClassicShots *shots;
@@ -33,6 +45,7 @@ typedef struct {
     bool (*reload_sound)(void *context, float gain, AbError *error);
     size_t storage_bytes;
     bool disabled_for_current_level;
+    AbClassicSlingHatHost hats;
 } AbClassicSlingConfig;
 
 typedef struct {
@@ -54,7 +67,8 @@ typedef struct {
  * currentBirdName, readiness, firing and reload timers; do not keep another copy.
  * Initial queue names/start numbers and controllable properties are read from
  * the live owned level in birds-table order. No dynamic insertion/reuse, delta
- * gestures, custom reload functions or hats. KingSling selection changes power
+ * gestures or custom reload functions. Hats require their real borrowed host.
+ * KingSling selection changes power
  * and the live sprite profile; scope trajectory/effect scheduling is external. Reached
  * unsupported work rejects, retaining preceding effects. No frame allocation.
  * Keep calls serialized and stop the session after an error. */
@@ -118,6 +132,14 @@ bool ab_classic_sling_next_bird(AbClassicSling *sling, float index, size_t *obje
 bool ab_classic_sling_clear_selection(AbClassicSling *sling, AbError *error);
 bool ab_classic_sling_reload_after(AbClassicSling *sling, float index, float delay,
                                    AbError *error);
+/* Actual named abilities may change the shared allowResetToBirdCamera flag. */
+bool ab_classic_sling_allow_camera_reset(AbClassicSling *sling, bool allowed,
+                                         AbError *error);
+/* Bind the source hat service once after construction, before any hat-bearing
+ * frame. Hold/transfer/activation calls remain at their original native body
+ * and script boundaries. The host/registry outlive the sling; no effects here. */
+bool ab_classic_sling_bind_hats(AbClassicSling *sling, AbClassicSlingHatHost host,
+                                AbError *error);
 /* Source disableSlingshotForCurrentLevel3559 ignores arguments and sets its
  * private flag true; isSlingshotDisabledForCurrentLevel3611 returns that flag.
  * Level reset/bootstrap supplies the false initial value in config. */

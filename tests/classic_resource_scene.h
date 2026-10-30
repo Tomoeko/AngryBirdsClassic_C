@@ -5,6 +5,8 @@
 #include "ab/asset_sprite_provider.h"
 #include "ab/camera_bootstrap.h"
 #include "ab/target_resources.h"
+
+#include <stdlib.h>
 #if defined(AB_CLASSIC_SCENE_COMMON)
 #include "classic_scene_common.h"
 #endif
@@ -260,16 +262,31 @@ static bool resource_scene_actions(AbClassicLevel *level, AbClassicScene *scene,
     memcpy(before, view.items, sizeof(before));
     size = (AbVec2){123, 456};
     AbResolvedComposite bounds;
-    CHECK(composite.size &&
-          ab_asset_resources_find_composite(adapter->resources, composite, &bounds) &&
-          ab_asset_sprite_provider_size(adapter, composite, &size, NULL) &&
-          size.x == (float)bounds.bounds.width &&
-          size.y == (float)bounds.bounds.height &&
-          ab_classic_visuals_set_sprite(visuals, 0, composite, NULL) &&
-          ab_classic_visuals_object(visuals, 0)->attached->composite &&
-          !ab_classic_scene_sync_visuals(scene, visuals, NULL) &&
-          memcmp(before, view.items, sizeof(before)) == 0 &&
-          ab_classic_visuals_set_sprite(visuals, 0, original, NULL) &&
+    CHECK(
+        composite.size &&
+        ab_asset_resources_find_composite(adapter->resources, composite, &bounds) &&
+        ab_asset_sprite_provider_size(adapter, composite, &size, NULL) &&
+        size.x == (float)bounds.bounds.width && size.y == (float)bounds.bounds.height &&
+        ab_classic_visuals_set_sprite(visuals, 0, composite, NULL) &&
+        ab_classic_visuals_object(visuals, 0)->attached->composite &&
+        ab_classic_scene_sync_visuals(scene, visuals, NULL) && !view.items[0].unbound);
+    AbDrawCommand *commands = calloc(bounds.source->part_count, sizeof(*commands));
+    CHECK(commands && bounds.source->part_count);
+    AbDrawList list = {commands, 0, bounds.source->part_count};
+    AbObjectSpritePose pose = view.items[0].pose;
+    AbCoordinateCamera camera = {
+        {20 * pose.physics_position.x - 240, 20 * pose.physics_position.y - 160},
+        {1, 1}};
+    bool compound_draw =
+        ab_classic_scene_draw_object(scene, 0, camera, 480, 320, &list, NULL) &&
+        list.count > 0;
+    list.count = list.capacity = 0;
+    compound_draw =
+        compound_draw &&
+        !ab_classic_scene_draw_object(scene, 0, camera, 480, 320, &list, NULL) &&
+        list.count == 0;
+    free(commands);
+    CHECK(compound_draw && ab_classic_visuals_set_sprite(visuals, 0, original, NULL) &&
           ab_classic_scene_sync_visuals(scene, visuals, NULL));
     *notices = (VisualNotices){0};
     CHECK(visual_action_checks(scene, visuals, notices));
@@ -393,7 +410,8 @@ static bool resource_scene_checks(const AbZip *archive, AbClassicLevel *level,
         goto release;
     }
     puts("Resource-group scene bindings match all 22 native selections and ordinary "
-         "geometry; cached missing names, texture loss and composite rejection pass.");
+         "geometry; cached missing names, texture loss, composite drawing and "
+         "partial-command rollback pass.");
     okay = true;
 
 release:

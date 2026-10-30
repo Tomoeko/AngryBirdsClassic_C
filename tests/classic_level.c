@@ -1,5 +1,6 @@
 #include "ab/classic_level.h"
 #include "ab/classic_forces.h"
+#include "ab/classic_post_physics.h"
 #include "ab/game_update_tail.h"
 
 #include <math.h>
@@ -39,6 +40,24 @@ typedef struct {
     AbForceQueue *queue;
     size_t applied, cleared;
 } ClassicQueueCheck;
+
+typedef struct {
+    uint64_t expected_random;
+    size_t calls;
+} InitialBirdCheck;
+
+static bool initial_bird(void *context, AbClassicLevel *owner, size_t object,
+                         AbRandom48 *random, AbError *error) {
+    (void)error;
+    InitialBirdCheck *check = context;
+    AbClassicLevelView level = ab_classic_level_view(owner);
+    CHECK(check->calls++ == 0 && object == 0 &&
+          random->value == check->expected_random && !level.timers_initialized &&
+          level.timers[object].present == AB_STARTUP_BIRD_TIMERS &&
+          level.character_objects[object].animation_enabled);
+    uint32_t draw;
+    return ab_random48_next(random, &draw);
+}
 
 static bool classic_queue_hook(void *context, AbGamePhysicsStage stage,
                                AbPhysicsWorld *world, float seconds, AbError *error) {
@@ -566,6 +585,42 @@ static bool world_cursor_checks(const AbLevelBodySource *source,
     return true;
 }
 
+static bool live_resize_checks(AbClassicLevel *level) {
+    AbClassicLevelView view = ab_classic_level_view(level);
+    const AbLevelObject *object = view.bodies->objects;
+    size_t body = object->physics.body;
+    float cached = object->initial_mass;
+    AbDataTable *physical = &view.properties->objects[0].physical;
+    CHECK(ab_world_set_body_type(view.world, body, AB_BODY_DYNAMIC, NULL));
+    float prior_mass = view.world->storage.bodies[body].motion.mass.mass;
+    AbClassicPostPhysics *post = NULL;
+    CHECK(ab_classic_post_physics_open(
+        level, (AbClassicPostConfig){.storage_bytes = 65536}, &post, NULL));
+    AbClassicPostView projected = ab_classic_post_physics_view(post);
+    projected.objects[0].pink_timer = number(17);
+    CHECK(ab_classic_level_resize_circle(level, 0, 1, NULL) &&
+          ab_classic_post_physics_resize_circle(post, 0, NULL) &&
+          object->physics.body == body && object->physics.dimensions.radius == 1 &&
+          object->initial_mass == cached &&
+          view.world->storage.bodies[body].motion.mass.mass == prior_mass * 4 &&
+          &view.properties->objects[0].physical == physical &&
+          projected.objects == ab_classic_post_physics_view(post).objects &&
+          projected.objects[0].pink_timer.bits == number(17).bits &&
+          !projected.activity->initialized);
+    AbDataValue mass, radius;
+    CHECK(
+        ab_level_property_get(view.properties, 0, string("mass").string, &mass, NULL) &&
+        mass.bits == number(prior_mass * 4).bits &&
+        ab_level_property_get(view.properties, 0, string("radius").string, &radius,
+                              NULL) &&
+        radius.bits == number(1).bits &&
+        !ab_classic_level_resize_circle(level, 1, 1, NULL) &&
+        !ab_classic_post_physics_resize_circle(post, 1, NULL) &&
+        ab_classic_post_physics_update(post, true, NULL));
+    ab_classic_post_physics_close(post);
+    return true;
+}
+
 static bool owner_checks(void) {
     AbZip archive = {0};
     AbSpriteSet *sprites = NULL;
@@ -748,6 +803,7 @@ static bool owner_checks(void) {
         const AbDataValue *defence = ab_data_get(ground, string("defence"));
         CHECK(strength && strength->bits == number(30).bits && defence &&
               defence->bits == number(1000000).bits &&
+              view.character_objects[1].goal.strength == 30 &&
               !ab_data_get(ground, string("controllable")));
         if (pass == 0) {
             queued_mass = view.bodies->objects[0].initial_mass;
@@ -838,7 +894,14 @@ static bool owner_checks(void) {
         view.frame->clock.time = 1;
         CHECK(!ab_classic_level_initialize_objects(owner, &random, true, &error));
         view.frame->clock.time = 0;
-        CHECK(ab_classic_level_initialize_objects(owner, &random, pass == 0, &error));
+        InitialBirdCheck initial = {.expected_random = expected.value};
+        if (pass) {
+            CHECK(ab_classic_level_initialize_birds(
+                owner, &random, false,
+                (AbClassicInitialBirdHost){&initial, initial_bird}, &error));
+            CHECK(initial.calls == 1 && ab_random48_next(&expected, &ignored));
+        } else
+            CHECK(ab_classic_level_initialize_objects(owner, &random, true, &error));
         view = ab_classic_level_view(owner);
         CHECK(random.value == expected.value && view.timers_initialized &&
               view.timers[0].present == AB_STARTUP_BIRD_TIMERS &&
@@ -900,6 +963,10 @@ static bool owner_checks(void) {
     owner = NULL;
     CHECK(ab_classic_level_open(&source, physics, limits, true, &owner, &error));
     CHECK(dynamic_box_checks(owner));
+    ab_classic_level_close(owner);
+    owner = NULL;
+    CHECK(ab_classic_level_open(&source, physics, limits, true, &owner, &error) &&
+          live_resize_checks(owner));
     ab_classic_level_close(owner);
     ab_classic_level_close(NULL);
     ab_classic_forces_close(NULL);

@@ -14,7 +14,7 @@ struct AbClassicGoals {
     AbStringMap *map;
     AbDataValue *values;
     GoalNotification *notifications;
-    size_t notification_count, bytes;
+    size_t notification_count, bytes, capacity;
     bool calling;
 };
 
@@ -47,15 +47,17 @@ bool ab_classic_goals_open(AbClassicGoalConfig config, AbClassicGoals **output,
     *output = NULL;
     AbClassicLevelView level = ab_classic_level_view(config.level);
     size_t count = level.bodies ? level.bodies->count : 0;
+    size_t capacity = config.object_capacity ? config.object_capacity : count;
     if (!count || !level.properties || !config.disable_check ||
         !config.notification_sent || !config.time || !config.score ||
         !config.last_score_time || !config.old_score ||
-        config.storage_bytes < sizeof(AbClassicGoals))
+        config.storage_bytes < sizeof(AbClassicGoals) || capacity < count ||
+        capacity > level.bodies->capacity)
         return ab_fail(error, "Invalid classic goals source/globals");
     size_t remaining = config.storage_bytes - sizeof(AbClassicGoals);
-    if (count > remaining / sizeof(AbDataValue))
+    if (capacity > remaining / sizeof(AbDataValue))
         return ab_fail(error, "Classic goal values exceed storage bound");
-    remaining -= count * sizeof(AbDataValue);
+    remaining -= capacity * sizeof(AbDataValue);
     if (config.notifications > remaining / sizeof(GoalNotification))
         return ab_fail(error, "Classic goal notifications exceed storage bound");
     remaining -= config.notifications * sizeof(GoalNotification);
@@ -65,15 +67,16 @@ bool ab_classic_goals_open(AbClassicGoalConfig config, AbClassicGoals **output,
     owner->config = config;
     owner->level = level;
     owner->bytes = config.storage_bytes - remaining;
-    owner->values = calloc(count, sizeof(*owner->values));
+    owner->capacity = capacity;
+    owner->values = calloc(capacity, sizeof(*owner->values));
     if (config.notifications)
         owner->notifications =
             calloc(config.notifications, sizeof(*owner->notifications));
     size_t maximum = 1;
-    while (maximum < count && maximum <= SIZE_MAX / 2)
+    while (maximum < capacity && maximum <= SIZE_MAX / 2)
         maximum *= 2;
     if (!owner->values || (config.notifications && !owner->notifications) ||
-        maximum < count ||
+        maximum < capacity ||
         !ab_string_map_open(0, maximum, remaining, &owner->map, error))
         goto release_owner;
     owner->bytes += ab_string_map_bytes(owner->map);
@@ -113,6 +116,19 @@ size_t ab_classic_goals_bytes(const AbClassicGoals *owner) {
 
 AbStringMap *ab_classic_goals_map(AbClassicGoals *owner) {
     return owner ? owner->map : NULL;
+}
+
+bool ab_classic_goals_set(AbClassicGoals *owner, size_t object, bool present,
+                          AbError *error) {
+    if (!owner || owner->calling || object >= owner->capacity ||
+        object >= owner->level.bodies->count || owner->level.world->failed ||
+        owner->level.world->locked || owner->level.removed_objects[object])
+        return ab_fail(error, "Invalid dynamic canonical goal assignment");
+    owner->values[object] =
+        (AbDataValue){.kind = AB_DATA_TABLE,
+                      .table = &owner->level.properties->objects[object].physical};
+    return ab_string_map_set(owner->map, owner->level.bodies->objects[object].name,
+                             (uintptr_t)(owner->values + object), present, error);
 }
 
 static bool check(AbClassicGoals *owner, bool *cleared, AbError *error) {

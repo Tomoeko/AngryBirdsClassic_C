@@ -72,6 +72,10 @@ const AbObjectVisual *ab_classic_visuals_object(const AbClassicVisuals *visuals,
                                                 size_t object);
 bool ab_classic_visuals_binding(const AbClassicVisuals *visuals, size_t object,
                                 AbSpriteAtlasBinding *output);
+/* Same cached-selection contract for the currently attached composite asset.
+ * Part bindings and source metadata remain borrowed from their resource owner. */
+bool ab_classic_visuals_composite(const AbClassicVisuals *visuals, size_t object,
+                                  AbResolvedComposite *output);
 
 /* Remove the currently attached ordinary renderer while retaining its stable
  * metadata and interned names until close. Physical-removal lifetime ownership

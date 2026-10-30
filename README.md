@@ -44,8 +44,10 @@ Danger Above and Mine and Dine include their hidden-egg menu rewards.
 Red's Mighty Feathers and Bad Piggies have their specialized selection screens.
 Ham 'Em High includes its three additional levels on the fourth page.
 Golden Eggs includes its unlocks, silhouettes, stars and second page.
+Birdday! 5 includes its gift opening and both level pages.
+Golden Egg Soundboard, Radio, Keyboard, Sequencer and Accordion puzzles work.
 Blue splitting, yellow boost, white egg drops, green boomerang flight and black-bird
-explosions work.
+explosions work. Short Fuse's shockwave includes lightning, damage and pig electrocution.
 The power-up slider, counters, King Sling, Super Seeds, Sling Scope and Birdquake work
 in gameplay.
 Mighty Eagle includes sardine aiming, the flight and destruction effects, and separate
@@ -58,11 +60,18 @@ F toggles fullscreen. Escape pauses/resumes the game or leaves a result screen;
 outside gameplay it leaves fullscreen. Close the window to quit.
 Drag to aim or move the camera; use the scroll wheel to zoom within each level's
 camera limits. The pointer stays visible.
-Options go before the APK path. `--window-size 1280x720` sets the initial window
-size. `--inf` or `--infinite` gives unlimited power-up inventory and Mighty Eagle
+Options may go before or after the APK path. `--window-size 1280x720` sets the
+initial window size. `--inf` or `--infinite` gives unlimited power-up inventory and Mighty Eagle
 access without a purchase or cooldown, while preserving per-level activation rules.
 `--frames N` limits the run;
 `--capture Files/frame.ppm` saves a frame.
+`--record` records video and game audio to a new MP4 under `Files/` until exit.
+Use `--record half` for half-size video, or add `--audio web` for AAC audio where
+supported. Close the window or press Ctrl+C to finish the recording.
+
+```sh
+Files/build/angrybirds-preview --inf Files/com.rovio.angrybirds_5.2.0-12200520.apk --record half
+```
 
 Initialize an existing checkout with `git submodule update --init --recursive`.
 [Console_Common](https://github.com/Tomoeko/Console_Common) supplies shared

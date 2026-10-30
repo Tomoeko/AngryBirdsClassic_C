@@ -75,6 +75,11 @@ bool ab_classic_characters_special_expression(AbClassicCharacters *characters,
 
 bool ab_classic_characters_register_objects(AbClassicCharacters *characters,
                                             AbError *error);
+/* Borrow current levelGoals so animation traversal follows insertion/removal
+ * and native hash order after dynamic factories. Rebuild only the existing
+ * fixed index projection before each update; no frame allocation occurs. */
+bool ab_classic_characters_bind_goals(AbClassicCharacters *characters,
+                                      AbStringMap *goals, AbError *error);
 size_t ab_classic_characters_bytes(const AbClassicCharacters *characters);
 
 /* Borrow stable views. Update numeric state, special names, controller
@@ -91,5 +96,15 @@ AbClassicCharacterView ab_classic_characters_view(AbClassicCharacters *character
  * RNG, sprite and body changes remain after a later failure. */
 bool ab_classic_characters_update(AbClassicCharacters *characters, float seconds,
                                   AbError *error);
+
+/* Script writes from specialty/vial callbacks must update both the physical
+ * table and its cached goal-animation projection. Strength, blink/oink timers,
+ * blinkOn, disableSmiling and special-expression fields have live projections;
+ * other keys retain ordinary property assignment. Numeric used fields require
+ * finite numbers. The write has no RNG, sprite selection or animation tick.
+ * Caller-owned character state remains borrowed. */
+bool ab_classic_characters_set_goal_property(AbClassicCharacters *characters,
+                                             size_t object, AbSpan key,
+                                             AbDataValue value, AbError *error);
 
 #endif

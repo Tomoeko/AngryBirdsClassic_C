@@ -1,4 +1,5 @@
 #include "ab/classic_level.h"
+#include "ab/classic_goals.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -92,6 +93,92 @@ static bool construct(AbClassicLevel *level, const AbDataTable *hats, AbError *e
            ab_fail(error, "Defined box construction changed native bird membership");
 }
 
+static bool construct_circle(AbClassicLevel *level, AbError *error) {
+    size_t object = SIZE_MAX;
+    AbSpan name = text("Spawning_cake_1_generated_1").string;
+    AbSpan definition = text("CakeCream").string;
+    if (!ab_classic_level_create_defined_circle(level, name, definition,
+                                                (AbVec2){2, -8}, 0.1f, &object, error))
+        return false;
+    AbClassicLevelView view = ab_classic_level_view(level);
+    const AbLevelObject *created = view.bodies->objects + object;
+    const AbWorldFixture *fixture =
+        view.world->storage.fixtures + created->physics.fixture;
+    const AbDataTable *physical = &view.properties->objects[object].physical;
+    const AbDataValue *published =
+        ab_data_get(&view.properties->dynamic, text("Spawning_cake_1_generated_1"));
+    if (object != 6 || !published || published->table != physical ||
+        view.bodies->count != 7 || view.world->body_count != 7 || view.bird_count ||
+        view.goal_count || created->physics.controllable ||
+        !created->defined_constructor || fixture->shape.kind != AB_SHAPE_CIRCLE ||
+        fixture->density != 0.1f || fixture->friction != 1 ||
+        fixture->restitution != 0 || fixture->user_data != (uintptr_t)created ||
+        !numeric(field(physical, "radius"), 1.3f) ||
+        !numeric(field(physical, "strength"), 10) ||
+        !numeric(field(physical, "defence"), 1) ||
+        !same(field(physical, "definition"), text("CakeCream")) ||
+        !same(field(physical, "materialName"), text("extras")) ||
+        !same(view.initial_sprites[object].sprite, text("BLOCK_CAKECREAM")))
+        return ab_fail(error, "Actual cake cream lost its defined circle state");
+    size_t unchanged = 99;
+    return (!ab_classic_level_create_defined_circle(
+                level, name, definition, (AbVec2){0}, 0.1f, &unchanged, NULL) &&
+            unchanged == 99 && view.bodies->count == 7) ||
+           ab_fail(error, "Defined circle duplicate changed the canonical world");
+}
+
+static bool construct_goal(AbClassicLevel *level, AbError *error) {
+    AbDataValue disabled = {.kind = AB_DATA_BOOLEAN}, absent = {0};
+    AbClassicGoals *goals = NULL;
+    bool okay =
+        ab_classic_goals_open((AbClassicGoalConfig){.level = level,
+                                                    .disable_check = &disabled,
+                                                    .notification_sent = &absent,
+                                                    .time = &absent,
+                                                    .score = &absent,
+                                                    .last_score_time = &absent,
+                                                    .old_score = &absent,
+                                                    .object_capacity = 8,
+                                                    .storage_bytes = 65536},
+                              &goals, error);
+    size_t object = SIZE_MAX;
+    if (okay)
+        okay = ab_classic_level_create_defined_goal_circle(
+            level, text("SmallPiglette_1").string, text("SmallPiglette").string,
+            (AbVec2){10, -10}, 1, &object, error);
+    AbClassicLevelView view = ab_classic_level_view(level);
+    if (okay && (object != 7 || view.bodies->count != 8 ||
+                 !view.bodies->objects[object].level_goal ||
+                 !view.bodies->objects[object].defined_constructor ||
+                 view.character_objects[object].goal.strength != 4 || view.goal_count))
+        okay = ab_fail(error, "Defined goal circle lost its raw character state");
+    uintptr_t identity = 0, same_identity = 0;
+    bool present = false;
+    AbStringMap *map = ab_classic_goals_map(goals);
+    if (okay)
+        okay = ab_classic_goals_set(goals, object, true, error) &&
+               ab_string_map_get(map, text("SmallPiglette_1").string, &identity,
+                                 &present, error) &&
+               present && identity &&
+               ab_classic_level_sync_goal_order(level, map, error);
+    view = ab_classic_level_view(level);
+    if (okay && (view.goal_count != 1 || view.goal_order[0] != object ||
+                 ((const AbDataValue *)identity)->table !=
+                     &view.properties->objects[object].physical))
+        okay = ab_fail(error, "Dynamic goal lost its canonical traversal identity");
+    if (okay)
+        okay = ab_classic_goals_set(goals, object, false, error) &&
+               ab_classic_level_sync_goal_order(level, map, error) &&
+               ab_classic_level_view(level).goal_count == 0 &&
+               ab_classic_goals_set(goals, object, true, error) &&
+               ab_string_map_get(map, text("SmallPiglette_1").string, &same_identity,
+                                 &present, error) &&
+               present && same_identity == identity &&
+               ab_classic_level_sync_goal_order(level, map, error);
+    ab_classic_goals_close(goals);
+    return okay;
+}
+
 int main(int argc, char **argv) {
     if (argc != 2)
         return 2;
@@ -117,6 +204,7 @@ int main(int argc, char **argv) {
         okay = ab_classic_level_open(
             &(AbLevelBodySource){.level = &data,
                                  .catalog = catalog.catalog->globals,
+                                 .catalog_data = catalog.catalog,
                                  .placement_scale = 1,
                                  .physics_scale = 0.05f,
                                  .ground_position = {0, 10}},
@@ -130,9 +218,11 @@ int main(int argc, char **argv) {
             false, &level, &error);
     AbDataValue hats =
         okay ? field(catalog.catalog->globals, "hats") : (AbDataValue){0};
-    okay = okay && hats.kind == AB_DATA_TABLE && construct(level, hats.table, &error);
+    okay = okay && hats.kind == AB_DATA_TABLE && construct(level, hats.table, &error) &&
+           construct_circle(level, &error) && construct_goal(level, &error);
     if (okay)
-        puts("All five actual hat definitions create real canonical box bodies");
+        puts("Actual hats, cake cream and dynamic goals retain canonical body/table "
+             "state and live native goal order");
     else
         fprintf(stderr, "%s\n", error.message);
     ab_classic_level_close(level);

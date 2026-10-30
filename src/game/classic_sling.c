@@ -159,6 +159,32 @@ bool ab_classic_sling_reload_after(AbClassicSling *sling, float index, float del
     return true;
 }
 
+bool ab_classic_sling_allow_camera_reset(AbClassicSling *sling, bool allowed,
+                                         AbError *error) {
+    if (!healthy(sling, error))
+        return false;
+    sling->state.allow_reset_to_bird_camera = allowed;
+    return true;
+}
+
+bool ab_classic_sling_bind_hats(AbClassicSling *sling, AbClassicSlingHatHost host,
+                                AbError *error) {
+    if (!healthy(sling, error) || sling->busy || sling->config.hats.call || !host.call)
+        return ab_fail(error, "Invalid or repeated sling hat binding");
+    sling->config.hats = host;
+    return true;
+}
+
+static bool update_hat(AbClassicSling *sling, size_t bird, AbClassicSlingHatPhase phase,
+                       AbError *error) {
+    if (!sling->level.character_objects[bird].has_hat)
+        return true;
+    AbClassicSlingHatHost host = sling->config.hats;
+    return host.call
+               ? host.call(host.context, bird, phase, sling->state.transfer.time, error)
+               : ab_fail(error, "Missing source sling hat service");
+}
+
 bool ab_classic_sling_open(AbClassicSlingConfig config, AbClassicSling **output,
                            AbError *error) {
     if (!output)
@@ -710,9 +736,7 @@ static bool hold(AbClassicSling *sling, AbError *error) {
         !ab_classic_level_set_rotation(sling->config.level, object, 0, error) ||
         !ab_body_angular_velocity_set(body, 0))
         return ab_fail(error, "Could not hold the current sling bird");
-    if (sling->level.character_objects[object].has_hat)
-        return ab_fail(error, "Sling-held hat motion is not recovered");
-    return true;
+    return update_hat(sling, object, AB_SLING_HAT_HOLD, error);
 }
 
 static bool begin_transfer(AbClassicSling *sling, float next_index, AbError *error) {
@@ -766,10 +790,8 @@ static bool complete_transfer(AbClassicSling *sling, AbError *error) {
         !sling->config.camera_distances(sling->config.context, &range, &distance,
                                         error))
         return ab_fail(error, "Missing or failed sling reload camera distances");
-    float gain = 1 - distance / range;
-    gain = gain < 0.25f ? 0.25f : gain;
-    gain = 1 < gain ? 1 : gain;
-    if (!isfinite(range) || !isfinite(distance) || range == 0 || !isfinite(gain))
+    float gain;
+    if (!ab_slingshot_reload_gain(range, distance, &gain))
         return ab_fail(error, "Unsupported sling reload camera geometry");
     if (!sling->config.reload_sound ||
         !sling->config.reload_sound(sling->config.context, gain, error))
@@ -780,8 +802,8 @@ static bool complete_transfer(AbClassicSling *sling, AbError *error) {
     if (!ab_world_set_body_type(sling->level.world, body, AB_BODY_DYNAMIC, error) ||
         !ab_classic_level_set_rotation(sling->config.level, object, 0, error))
         return false;
-    if (sling->level.character_objects[object].has_hat)
-        return ab_fail(error, "Sling reload hat activation is not recovered");
+    if (!update_hat(sling, object, AB_SLING_HAT_ACTIVATE, error))
+        return false;
     if (!movement_event(sling, object, "onEndToSlingshotMove", error))
         return false;
     if (sling->ready_count == sling->capacity)
@@ -833,8 +855,8 @@ static bool reload(AbClassicSling *sling, float seconds, AbError *error) {
         !ab_classic_level_set_rotation(sling->config.level, object, frame.rotation,
                                        error))
         return false;
-    if (sling->level.character_objects[object].has_hat)
-        return ab_fail(error, "Sling transfer hat motion is not recovered");
+    if (!update_hat(sling, object, AB_SLING_HAT_TRANSFER, error))
+        return false;
     return !frame.complete || complete_transfer(sling, error);
 }
 

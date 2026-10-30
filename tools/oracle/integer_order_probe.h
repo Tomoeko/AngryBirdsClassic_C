@@ -87,7 +87,15 @@ static void integer_keys(int32_t keys[64], uint32_t count, size_t item,
     }
 }
 
+#if defined(AB_ORACLE_INTEGER_MAP_ONLY)
+#include "integer_map_probe.h"
+#endif
+
 static void probe_integer_order(void) {
+#if defined(AB_ORACLE_INTEGER_MAP_ONLY)
+    probe_integer_map();
+    return;
+#endif
     initialize_damage_lua();
     integer_push_value =
         (void (*)(void *, int))find_function("_Z13lua_pushvalueP9lua_Statei");

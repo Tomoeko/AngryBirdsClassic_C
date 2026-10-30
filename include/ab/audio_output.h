@@ -21,6 +21,16 @@ typedef struct {
  * Queue underruns output silence and are observable in the view. */
 bool ab_audio_output_open(AbAudioMixer *mixer, AbAudioOutput **output, AbError *error);
 bool ab_audio_output_pump(AbAudioOutput *output, AbError *error);
+/* Pause joins device callbacks without discarding the application's mixer queue.
+ * The recording tee receives the exact stereo callback output, including silence.
+ * Begin requires paused output; end also pauses before releasing its queue. */
+bool ab_audio_output_pause(AbAudioOutput *output, AbError *error);
+bool ab_audio_output_resume(AbAudioOutput *output, AbError *error);
+bool ab_audio_output_capture_begin(AbAudioOutput *output, size_t capacity_frames);
+size_t ab_audio_output_capture_read(AbAudioOutput *output, float *stereo,
+                                    size_t capacity_frames);
+bool ab_audio_output_capture_failed(const AbAudioOutput *output);
+void ab_audio_output_capture_end(AbAudioOutput *output);
 AbAudioOutputView ab_audio_output_view(const AbAudioOutput *output);
 void ab_audio_output_close(AbAudioOutput *output);
 

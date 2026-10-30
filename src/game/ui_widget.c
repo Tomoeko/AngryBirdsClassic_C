@@ -352,38 +352,60 @@ static bool geometry(AbUiWidget *widget, size_t depth, AbError *error) {
     return true;
 }
 
+static bool query_geometry(AbUiWidget *widget, size_t depth, bool positions,
+                           AbError *error);
+
 static bool hit(void *context, AbVec2 point, bool *output, AbError *error) {
     AbUiWidget *widget = context;
-    if (!geometry(widget, 0, error))
+    if (!query_geometry(widget, 0, false, error))
         return false;
     AbUiImageState *image = &widget->state.image;
     AbUiImageHit query = {.frame = &widget->geometry,
                           .image_present = truthy(image->image)};
-    if (!query.image_present) {
+    AbVec2 scale;
+    if (!ab_ui_frame_cumulative_scale(&widget->geometry, widget->context->maximum_depth,
+                                      &scale))
+        return ab_fail(error, "Invalid image hit-test scale chain");
+    if (!query.image_present || scale.x == 0 || scale.y == 0) {
         *output = false;
         return true;
     }
+    if (!geometry(widget, 0, error))
+        return false;
     float padding[4] = {0};
-    if (widget->state.padding.kind != AB_UI_POINTER_OBJECT ||
-        widget->state.padding.object != (uintptr_t)widget->padding)
-        return ab_fail(error, "Foreign concrete UI padding object");
-    for (size_t index = 0; index < 4; ++index)
-        if (truthy(widget->padding[index]) &&
-            !numeric(widget->padding[index], padding + index, error))
-            return false;
+    if (truthy(widget->state.padding)) {
+        if (widget->state.padding.kind != AB_UI_POINTER_OBJECT ||
+            widget->state.padding.object != (uintptr_t)widget->padding)
+            return ab_fail(error, "Foreign concrete UI padding object");
+        for (size_t index = 0; index < 4; ++index)
+            if (truthy(widget->padding[index]) &&
+                !numeric(widget->padding[index], padding + index, error))
+                return false;
+    }
     query.padding_left = padding[0];
     query.padding_right = padding[1];
     query.padding_top = padding[2];
     query.padding_bottom = padding[3];
-    if (!numeric(image->frame.fields.w, &query.sprite_size.x, error) ||
-        !numeric(image->frame.fields.h, &query.sprite_size.y, error) ||
-        !numeric(image->resource_pivot_x, &query.sprite_pivot.x, error) ||
-        !numeric(image->resource_pivot_y, &query.sprite_pivot.y, error) ||
+    AbUiImageResourceBoundaries *resources = &widget->context->images;
+    if (image->image.kind != AB_UI_POINTER_TEXT || !resources->bounds ||
+        !resources->pivot)
+        return ab_fail(error, "Missing image hit-test resource boundaries");
+    if (!resources->bounds(resources->context, image->image.text, &query.sprite_size,
+                           error) ||
+        !resources->pivot(resources->context, image->image.text, &query.sprite_pivot,
+                          error) ||
         !numeric(image->frame.fields.angle, &query.angle_radians, error))
         return false;
     return ab_ui_image_button_hit(&query, widget->context->maximum_depth, point,
                                   output) ||
            ab_fail(error, "Unsupported concrete UI button hit test");
+}
+
+bool ab_ui_widget_image_hit(AbUiWidget *widget, AbVec2 point, bool *output,
+                            AbError *error) {
+    if (!widget || !output || widget->kind == AB_UI_WIDGET_FRAME)
+        return ab_fail(error, "Image hit test requires an Image-derived receiver");
+    return hit(widget, point, output, error);
 }
 
 static bool audio(void *context, AbUiPointerValue sound, float volume, bool loop,

@@ -36,6 +36,12 @@ AbGameTailJoints *ab_classic_joint_updates_tail(AbClassicJointUpdates *updates);
 size_t ab_classic_joint_updates_notifications(const AbClassicJointUpdates *updates);
 /* Callback signatures for Museum collision break requests and tail services. */
 bool ab_classic_joint_updates_defer(void *updates, AbSpan name, AbError *error);
+/* Museum explosion's objects.joints traversal: enqueue every named metadata
+ * record whose end1 or end2 equals object, in source string-map order. Keep
+ * duplicate requests and defer all engine destruction to the normal tail pass.
+ * Refresh the live projection before traversing; no allocation occurs. */
+bool ab_classic_joint_updates_defer_object(AbClassicJointUpdates *updates,
+                                           AbSpan object, AbError *error);
 bool ab_classic_joint_updates_call(AbClassicJointUpdates *updates, AbGameTailCall *call,
                                    AbError *error);
 

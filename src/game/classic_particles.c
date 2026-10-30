@@ -168,6 +168,19 @@ AbClassicLevel *ab_classic_particles_level(const AbClassicParticles *owner) {
     return owner ? owner->config.level : NULL;
 }
 
+const AbDataTable *ab_classic_particles_definition(const AbClassicParticles *owner,
+                                                   AbSpan name) {
+    if (!owner || (name.size && !name.data))
+        return NULL;
+    for (size_t index = 0; index < owner->config.definition_count; ++index) {
+        AbSpan selected = owner->sources[index].name;
+        if (name.size == selected.size &&
+            (!name.size || !memcmp(name.data, selected.data, name.size)))
+            return owner->sources[index].table;
+    }
+    return NULL;
+}
+
 bool ab_classic_particles_bind_copies(AbClassicParticles *owner,
                                       const AbLuaData *copies, AbError *error) {
     if (!owner || owner->calling || (copies && owner->copies))
@@ -240,19 +253,24 @@ static bool geometry(AbClassicParticles *owner, size_t object,
     return true;
 }
 
-static bool body_angle(AbClassicParticles *owner, size_t object, AbDataValue cached,
-                       float *output, AbError *error) {
+static bool object_angle(AbClassicParticles *owner, size_t object, AbDataValue cached,
+                         float *output, AbError *error) {
     AbSpan name = owner->level.bodies->objects[object].name;
     AbDataValue current_name = field(cached.table, "name");
     if (current_name.kind != AB_DATA_STRING || current_name.string.size != name.size ||
         (name.size && (!current_name.string.data ||
                        memcmp(current_name.string.data, name.data, name.size))))
         return ab_fail(error, "Unsupported renamed classic particle angle object");
-    size_t body = owner->level.bodies->objects[object].physics.body;
-    if (!ab_world_has_body(owner->level.world, body))
-        return ab_fail(error, "Missing classic particle angle body");
-    *output = owner->level.world->storage.bodies[body].motion.mass.angle;
-    return true;
+    /* getAngle161583 reads objects.world[name].angle. A level removal hook can
+     * already have removed the native body while the canonical Lua table is
+     * still live for subsequent destruction particles. It also retains the
+     * published/interpolated pose instead of sampling a newer physics angle. */
+    AbDataValue current;
+    return ab_object_world_lookup(&owner->level.properties->lookup, text(name),
+                                  &current, error) &&
+           (current.kind == AB_DATA_TABLE ||
+            ab_fail(error, "Missing live classic particle angle table")) &&
+           numeric(field(current.table, "angle"), output, error);
 }
 
 static bool new_particles(AbClassicParticles *owner, const AbParticleEmission *emission,
@@ -300,7 +318,7 @@ static bool contact(AbClassicParticles *owner, size_t object, AbDataValue descri
         if (definition.kind != AB_DATA_STRING)
             return ab_fail(error, "Invalid classic particle burst definition");
         emission.definition = definition.string;
-        if (!body_angle(owner, object, current, &emission.angle, error))
+        if (!object_angle(owner, object, current, &emission.angle, error))
             return false;
         if (!new_particles(owner, &emission, error))
             return false;
@@ -362,7 +380,7 @@ static AbDataValue item(const AbDataTable *table, size_t index) {
 static bool legacy_emit(AbClassicParticles *owner, size_t object, AbDataValue cached,
                         AbDataValue definition, AbDataValue amount_value,
                         AbParticleEmission *emission, AbError *error) {
-    if (!body_angle(owner, object, cached, &emission->angle, error))
+    if (!object_angle(owner, object, cached, &emission->angle, error))
         return false;
     if (definition.kind != AB_DATA_STRING)
         return ab_fail(error, "Unsupported legacy particle definition value");

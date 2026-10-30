@@ -242,6 +242,41 @@ static bool character_owner_checks(AbClassicLevel *level, AbClassicVisuals *visu
               loaded.world->storage.bodies[loaded.frame->objects[bird].body]
                   .motion.mass.transform.position.y);
     CHECK(character_damage_faces(loaded, visuals, characters, &test));
+    const char *const live_keys[] = {"blinkTimer", "oinkTimer", "blinkOn",
+                                     "disableSmiling", "specialExpression"};
+    AbGoalAnimation *live = &loaded.character_objects[goal].goal;
+    AbGoalAnimation saved_goal = *live;
+    AbGoalAnimationControls saved_controls = view.bindings[goal].goal;
+    AbDataValue saved_values[5];
+    for (size_t index = 0; index < 5; ++index)
+        CHECK(ab_level_property_get(loaded.properties, goal, string(live_keys[index]),
+                                    saved_values + index, NULL));
+    CHECK(ab_classic_characters_set_goal_property(
+              characters, goal, string("blinkTimer"),
+              (AbDataValue){.kind = AB_DATA_NUMBER, .bits = bits(10000)}, NULL) &&
+          ab_classic_characters_set_goal_property(
+              characters, goal, string("oinkTimer"),
+              (AbDataValue){.kind = AB_DATA_NUMBER, .bits = bits(10000)}, NULL) &&
+          ab_classic_characters_set_goal_property(
+              characters, goal, string("disableSmiling"),
+              (AbDataValue){.kind = AB_DATA_BOOLEAN, .bits = 1}, NULL) &&
+          ab_classic_characters_set_goal_property(
+              characters, goal, string("specialExpression"), (AbDataValue){0}, NULL) &&
+          live->blink_timer == 10000 && live->oink_timer == 10000 &&
+          !live->special_expression && view.bindings[goal].goal.disable_smiling &&
+          !ab_classic_characters_set_goal_property(
+              characters, goal, string("blinkTimer"), (AbDataValue){0}, NULL) &&
+          ab_classic_characters_update(characters, .25f, NULL) &&
+          live->blink_timer == 9999.75f && live->oink_timer == 9999.75f);
+    AbDataValue published;
+    CHECK(ab_level_property_get(loaded.properties, goal, string("blinkTimer"),
+                                &published, NULL) &&
+          published.kind == AB_DATA_NUMBER && published.bits == bits(9999.75f));
+    for (size_t index = 0; index < 5; ++index)
+        CHECK(ab_level_property_set(loaded.properties, goal, string(live_keys[index]),
+                                    saved_values[index], NULL));
+    *live = saved_goal;
+    view.bindings[goal].goal = saved_controls;
     /* The host is test-local; release before it or the borrowed RNG expires. */
     ab_classic_characters_close(characters);
     *output = NULL;

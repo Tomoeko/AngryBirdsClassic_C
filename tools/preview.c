@@ -3,112 +3,24 @@
 #include "scene_preview_assets.h"
 #include "classic_preview_assets.h"
 #include "menu_preview_assets.h"
+#include "preview_recording.h"
 
 #include "console_common/platform/window_controls.h"
 #include "console_common/support/host.h"
 
 #include <errno.h>
 #include <limits.h>
+#include <signal.h>
 
-typedef struct {
-    const char *apk;
-    const char *font;
-    const char *text;
-    const char *capture;
-    const char *scene;
-    unsigned frames;
-    int window_width, window_height;
-    bool fullscreen;
-    bool level_one;
-    bool main_menu;
-    bool fixed_step;
-    bool infinite_powerups;
-} PreviewOptions;
+/* Signal handlers only publish an exit request; the main thread closes MP4/audio. */
+static volatile sig_atomic_t preview_exit_requested;
 
-static void usage(FILE *file) {
-    fputs("Usage: angrybirds-preview [--frames N] [--fullscreen] [--window-size WxH] "
-          "[--infinite] [--capture NEW_PPM] "
-          "APK\n"
-          "       angrybirds-preview [OPTIONS] APK FONT_DAT_ENTRY UTF8_TEXT\n"
-          "       angrybirds-preview [OPTIONS] --scene SCENE_FILE APK\n"
-          "       angrybirds-preview [OPTIONS] [--fixed-step] --level-one APK\n"
-          "       angrybirds-preview [OPTIONS] --main-menu APK\n"
-          "F toggles fullscreen. Escape pauses/resumes gameplay or returns from "
-          "results; otherwise it leaves fullscreen. Close the window to quit.\n",
-          file);
+static void preview_request_exit(int signal_number) {
+    (void)signal_number;
+    preview_exit_requested = 1;
 }
 
-static bool options_read(int argc, char **argv, PreviewOptions *output) {
-    PreviewOptions options = {0};
-    int index = 1;
-    while (index < argc && argv[index][0] == '-') {
-        const char *option = argv[index++];
-        if (strcmp(option, "--fullscreen") == 0) {
-            options.fullscreen = true;
-        } else if (strcmp(option, "--window-size") == 0 && index < argc) {
-            const char *value = argv[index++];
-            char *end;
-            errno = 0;
-            unsigned long width = strtoul(value, &end, 10);
-            if (errno || value[0] < '0' || value[0] > '9' || *end != 'x' || !width ||
-                width > 16384)
-                return false;
-            value = end + 1;
-            errno = 0;
-            unsigned long height = strtoul(value, &end, 10);
-            if (errno || value[0] < '0' || value[0] > '9' || *end || !height ||
-                height > 16384)
-                return false;
-            options.window_width = (int)width;
-            options.window_height = (int)height;
-        } else if (strcmp(option, "--main-menu") == 0) {
-            options.main_menu = true;
-        } else if (strcmp(option, "--inf") == 0 || strcmp(option, "--infinite") == 0) {
-            options.infinite_powerups = true;
-        } else if (strcmp(option, "--level-one") == 0) {
-            options.level_one = true;
-        } else if (strcmp(option, "--fixed-step") == 0) {
-            options.fixed_step = true;
-        } else if (strcmp(option, "--capture") == 0 && index < argc) {
-            options.capture = argv[index++];
-        } else if (strcmp(option, "--scene") == 0 && index < argc) {
-            options.scene = argv[index++];
-        } else if (strcmp(option, "--frames") == 0 && index < argc) {
-            const char *value = argv[index++];
-            char *end;
-            errno = 0;
-            unsigned long count = strtoul(value, &end, 10);
-            if (errno || !value[0] || value[0] == '-' || *end || !count ||
-                count > UINT_MAX) {
-                return false;
-            }
-            options.frames = (unsigned)count;
-        } else {
-            return false;
-        }
-    }
-    unsigned modes = (options.scene ? 1u : 0u) + (options.level_one ? 1u : 0u) +
-                     (options.main_menu ? 1u : 0u);
-    if (!modes && argc - index == 1) {
-        options.main_menu = true;
-        modes = 1;
-    }
-    if (modes > 1 || (options.infinite_powerups && !options.main_menu) ||
-        (options.fixed_step && !options.level_one) || argc - index != (modes ? 1 : 3)) {
-        return false;
-    }
-    if (!options.window_width) {
-        options.window_width = options.main_menu ? 1024 : PREVIEW_WIDTH;
-        options.window_height = options.main_menu ? 768 : PREVIEW_HEIGHT;
-    }
-    options.apk = argv[index];
-    if (!modes) {
-        options.font = argv[index + 1];
-        options.text = argv[index + 2];
-    }
-    *output = options;
-    return true;
-}
+#include "preview_options.h"
 
 static bool menu_upload(void *context, uint32_t texture, AbSpriteAtlasImage image,
                         AbError *error) {
@@ -151,7 +63,8 @@ static bool capture_frame(CcPlatform *platform, const char *path, AbError *error
 
 static bool present_preview(CcPlatform *platform, AbCommonRenderer *renderer,
                             AbDrawList *list, PreviewLevel *level, PreviewMenu *menu,
-                            PreviewOptions options, AbError *error) {
+                            PreviewOptions options, PreviewRecording *recording,
+                            AbError *error) {
     CcWindowControls controls = {0};
     bool quit = false;
     bool pointer_down = false;
@@ -169,10 +82,10 @@ static bool present_preview(CcPlatform *platform, AbCommonRenderer *renderer,
     if ((menu || (level && !options.fixed_step)) && !cc_host_time(&previous)) {
         return ab_fail(error, "Cannot read camera preview clock");
     }
-    if (options.fullscreen && !cc_platform_set_fullscreen(platform, true)) {
-        return ab_fail(error, "Cannot enter native fullscreen");
-    }
-    while (!quit && (!options.frames || frame < options.frames)) {
+    while (!quit && !preview_exit_requested &&
+           (!options.frames || frame < options.frames)) {
+        if (!preview_recording_pump(recording, error))
+            return false;
         CcEvent event;
         while (cc_platform_poll(platform, &event)) {
             if (cc_window_controls_event(&controls, platform, &event, false)) {
@@ -241,6 +154,9 @@ static bool present_preview(CcPlatform *platform, AbCommonRenderer *renderer,
                 if (menu && menu->game) {
                     if (!game_session_escape(menu, error))
                         return false;
+                } else if (menu && menu->minigame) {
+                    if (!menu_minigame_leave(menu, error))
+                        return false;
                 } else if (cc_platform_is_fullscreen(platform) &&
                            !cc_platform_set_fullscreen(platform, false)) {
                     return ab_fail(error, "Cannot leave native fullscreen");
@@ -260,7 +176,7 @@ static bool present_preview(CcPlatform *platform, AbCommonRenderer *renderer,
                     menu, (AbVec2){(float)native_width, (float)native_height}, error))
                 return false;
         }
-        if (options.capture) {
+        if (options.capture && !recording->writer) {
             int width, height;
             if (!cc_platform_drawable_size(platform, &width, &height)) {
                 cc_host_sleep(10);
@@ -313,13 +229,16 @@ static bool present_preview(CcPlatform *platform, AbCommonRenderer *renderer,
                  : ab_common_render(renderer, list, clear, error);
         if (!rendered)
             return false;
+        if (!preview_recording_frame(recording, error))
+            return false;
         ++frame;
         if (options.capture && (!options.frames || frame == options.frames)) {
             if (!capture_frame(platform, options.capture, error)) {
                 return false;
             }
             options.capture = NULL;
-            cc_platform_capture_end(platform);
+            if (!recording->writer)
+                cc_platform_capture_end(platform);
         }
         cc_host_sleep(1);
     }
@@ -346,7 +265,7 @@ int main(int argc, char **argv) {
         return 2;
     }
     int result = 1;
-    AbError error = {0};
+    AbError error = {0}, closing = {0};
     AbBuffer apk = {0}, font_bytes = {0}, encoded = {0};
     AbZip zip = {0};
     AbBitmapFont font = {0};
@@ -357,6 +276,13 @@ int main(int argc, char **argv) {
     PreviewMenu menu = {0};
     CcPlatform *platform = NULL;
     AbCommonRenderer *renderer = NULL;
+    PreviewRecording recording = {0};
+    void (*previous_interrupt)(int) = signal(SIGINT, preview_request_exit);
+    void (*previous_terminate)(int) = signal(SIGTERM, preview_request_exit);
+    if (previous_interrupt == SIG_ERR || previous_terminate == SIG_ERR) {
+        ab_fail(&error, "Cannot install application exit handlers");
+        goto release_preview;
+    }
     if (!pinned_archive(options.apk, &apk, &zip, &error)) {
         goto release_preview;
     }
@@ -435,8 +361,17 @@ int main(int argc, char **argv) {
     if (options.main_menu &&
         !ab_audio_output_open(menu.mixer, &menu.audio_output, &error))
         goto release_preview;
+    if (options.fullscreen && !cc_platform_set_fullscreen(platform, true)) {
+        ab_fail(&error, "Cannot enter native fullscreen");
+        goto release_preview;
+    }
+    if (options.record &&
+        !preview_recording_open(platform, menu.audio_output, options.record_half,
+                                options.record_audio, &recording, &error))
+        goto release_preview;
     if (!present_preview(platform, renderer, &list, options.level_one ? &level : NULL,
-                         options.main_menu ? &menu : NULL, options, &error)) {
+                         options.main_menu ? &menu : NULL, options, &recording,
+                         &error)) {
         goto release_preview;
     }
     if (options.main_menu && !menu_preview_flush(&menu, &error))
@@ -444,6 +379,15 @@ int main(int argc, char **argv) {
     result = 0;
 
 release_preview:
+    if (!preview_recording_close(&recording, &closing)) {
+        if (!result)
+            error = closing;
+        result = 1;
+    }
+    if (previous_interrupt != SIG_ERR)
+        (void)signal(SIGINT, previous_interrupt);
+    if (previous_terminate != SIG_ERR)
+        (void)signal(SIGTERM, previous_terminate);
     if (result) {
         fprintf(stderr, "%s\n", error.message);
     }

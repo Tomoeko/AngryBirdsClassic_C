@@ -1,4 +1,5 @@
 #include "ab/classic_scene.h"
+#include "ab/ui_image_render.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -9,6 +10,7 @@ struct AbClassicScene {
     const AbSpriteAtlas *atlas;
     const AbSpriteProvider *provider;
     AbSceneSprite *items;
+    AbResolvedComposite *composites;
     size_t *order;
     size_t count, capacity;
     size_t bytes;
@@ -51,6 +53,53 @@ static bool find_sprite(const AbClassicScene *scene, AbSpan name,
                : ab_sprite_atlas_find(scene->atlas, name, binding);
 }
 
+typedef struct {
+    const AbClassicScene *scene;
+    const AbResolvedComposite *composite;
+} ClassicCompositeSelection;
+
+static bool composite_part(void *context, const AbSpriteBinding *sprite,
+                           AbUiImageRenderBinding *output, AbError *error) {
+    const ClassicCompositeSelection *selection = context;
+    const AbSpriteProvider *provider = selection->scene->provider;
+    AbSpriteAtlasBinding binding;
+    uint32_t texture;
+    if (!provider || !provider->binding ||
+        !provider->binding(provider->context, *sprite, &binding) || !binding.image ||
+        !binding.sprite.region || binding.alpha == AB_SPRITE_ALPHA_UNKNOWN ||
+        !provider->texture(provider->context, binding.image, &texture) || !texture)
+        return ab_fail(error, "Missing cached object composite part binding");
+    *output = (AbUiImageRenderBinding){.region = binding.sprite.region,
+                                       .texture = texture,
+                                       .texture_width = binding.image->width,
+                                       .texture_height = binding.image->height,
+                                       .alpha = binding.alpha};
+    return true;
+}
+
+static bool composite_lookup(void *context, AbSpan name, AbUiImageRenderBinding *output,
+                             AbError *error) {
+    (void)name;
+    (void)error;
+    const ClassicCompositeSelection *selection = context;
+    *output = (AbUiImageRenderBinding){.composite = *selection->composite};
+    return true;
+}
+
+static bool validate_composite(const AbClassicScene *scene,
+                               const AbResolvedComposite *composite, AbError *error) {
+    if (!composite->source || (composite->source->part_count &&
+                               (!composite->source->parts || !composite->parts)))
+        return ab_fail(error, "Invalid cached object composite");
+    ClassicCompositeSelection selection = {scene, composite};
+    for (size_t part = 0; part < composite->source->part_count; ++part) {
+        AbUiImageRenderBinding binding;
+        if (!composite_part(&selection, composite->parts + part, &binding, error))
+            return false;
+    }
+    return true;
+}
+
 static bool sprite_binding(AbClassicScene *scene, AbSpan name, AbSceneSprite *item,
                            AbError *error) {
     AbSpriteAtlasBinding binding;
@@ -64,7 +113,8 @@ static bool sprite_binding(AbClassicScene *scene, AbSpan name, AbSceneSprite *it
 }
 
 static bool initial_binding(AbClassicScene *scene, AbDataValue name,
-                            AbSceneSprite *item, AbError *error) {
+                            AbSceneSprite *item, AbResolvedComposite *selected,
+                            AbError *error) {
     if (name.kind != AB_DATA_STRING || (name.string.size && !name.string.data)) {
         return ab_fail(error, "Invalid initial classic sprite name");
     }
@@ -83,7 +133,10 @@ static bool initial_binding(AbClassicScene *scene, AbDataValue name,
     AbResolvedComposite composite;
     if (name.string.size && scene->provider->composite &&
         scene->provider->composite(scene->provider->context, name.string, &composite)) {
-        return ab_fail(error, "Composite assets require a separate scene renderer");
+        if (!validate_composite(scene, &composite, error))
+            return false;
+        *selected = composite;
+        return true;
     }
     item->unbound = true;
     return true;
@@ -131,7 +184,7 @@ static bool initial_items(AbClassicScene *scene, AbClassicLevelView view, AbBlen
             continue;
         }
         AbDataValue name = view.initial_sprites[index].sprite;
-        if (!initial_binding(scene, name, item, error) ||
+        if (!initial_binding(scene, name, item, scene->composites + index, error) ||
             !object_layer(view, view.bodies->objects + index, &item->layer, error)) {
             return ab_fail(error, "Cannot initialize ordinary classic renderer");
         }
@@ -162,7 +215,8 @@ static bool open_scene(AbClassicLevel *level, const AbSpriteAtlas *atlas,
         (unsigned)blend > AB_BLEND_MULTIPLY ||
         allocation_limit < sizeof(AbClassicScene) || count > capacity ||
         capacity > (allocation_limit - sizeof(AbClassicScene)) /
-                       (sizeof(AbSceneSprite) + sizeof(size_t))) {
+                       (sizeof(AbSceneSprite) + sizeof(AbResolvedComposite) +
+                        sizeof(size_t))) {
         return ab_fail(error, "Invalid classic scene input or allocation limit");
     }
     AbClassicScene *scene = calloc(1, sizeof(*scene));
@@ -176,11 +230,14 @@ static bool open_scene(AbClassicLevel *level, const AbSpriteAtlas *atlas,
     scene->capacity = capacity;
     scene->blend = blend;
     scene->first_texture = first_texture;
-    scene->bytes = sizeof(*scene) + capacity * (sizeof(AbSceneSprite) + sizeof(size_t));
+    scene->bytes =
+        sizeof(*scene) + capacity * (sizeof(AbSceneSprite) +
+                                     sizeof(AbResolvedComposite) + sizeof(size_t));
     if (capacity) {
         scene->items = calloc(capacity, sizeof(*scene->items));
         scene->order = calloc(capacity, sizeof(*scene->order));
-        if (!scene->items || !scene->order) {
+        scene->composites = calloc(capacity, sizeof(*scene->composites));
+        if (!scene->items || !scene->order || !scene->composites) {
             ab_fail(error, "Cannot allocate classic scene entries");
             goto release_scene;
         }
@@ -215,6 +272,7 @@ void ab_classic_scene_close(AbClassicScene *scene) {
     if (scene) {
         free(scene->items);
         free(scene->order);
+        free(scene->composites);
         free(scene);
     }
 }
@@ -238,6 +296,7 @@ static bool construct_object(AbClassicScene *scene, size_t object, float layer,
         layer < -2147483648.0f || layer >= 2147483648.0f)
         return ab_fail(error, "Invalid dynamic ordinary renderer slot");
     AbGameFrameObject *frame = level.frame->objects + object;
+    scene->composites[object] = (AbResolvedComposite){0};
     scene->items[object] = (AbSceneSprite){
         .pose = {frame->rendered.position, frame->rendered.angle, {1, 1}},
         .layer = (int32_t)layer,
@@ -275,7 +334,10 @@ bool ab_classic_scene_set_sprite(AbClassicScene *scene, size_t object, AbSpan na
         (!scene->items[object].region && !scene->provider)) {
         return ab_fail(error, "Invalid classic sprite object");
     }
-    return sprite_binding(scene, name, scene->items + object, error);
+    if (!sprite_binding(scene, name, scene->items + object, error))
+        return false;
+    scene->composites[object] = (AbResolvedComposite){0};
+    return true;
 }
 
 bool ab_classic_scene_set_scale(AbClassicScene *scene, size_t object, AbVec2 scale,
@@ -292,7 +354,7 @@ bool ab_classic_scene_set_visible(AbClassicScene *scene, size_t object, bool vis
                                   AbError *error) {
     if (!scene || object >= scene->count ||
         (visible && ab_classic_level_view(scene->level).removed_objects[object]) ||
-        (visible && !scene->items[object].region &&
+        (visible && !scene->items[object].region && !scene->composites[object].source &&
          !(scene->provider && ordinary_object(scene, object) &&
            scene->items[object].unbound))) {
         return ab_fail(error, "Invalid classic visibility object");
@@ -342,7 +404,10 @@ bool ab_classic_scene_sync_visuals(AbClassicScene *scene,
         }
         const AbObjectVisual *object = ab_classic_visuals_object(visuals, index);
         if (object->attached && object->attached->composite) {
-            return ab_fail(error, "Composite assets require a separate scene renderer");
+            AbResolvedComposite composite;
+            if (!ab_classic_visuals_composite(visuals, index, &composite) ||
+                !validate_composite(scene, &composite, error))
+                return ab_fail(error, "Invalid cached classic composite binding");
         }
         if (object->attached && object->attached->sprite) {
             AbSpriteAtlasBinding binding;
@@ -360,8 +425,12 @@ bool ab_classic_scene_sync_visuals(AbClassicScene *scene,
             item->visible = false;
             continue;
         }
-        item->unbound = !ab_classic_visuals_binding(visuals, index, &binding);
-        if (!item->unbound) {
+        bool ordinary = ab_classic_visuals_binding(visuals, index, &binding);
+        AbResolvedComposite composite = {0};
+        bool compound = ab_classic_visuals_composite(visuals, index, &composite);
+        scene->composites[index] = composite;
+        item->unbound = !ordinary && !compound;
+        if (ordinary) {
             uint32_t texture;
             if (!binding_texture(scene, &binding, &texture)) {
                 return ab_fail(error, "Classic visual texture changed during sync");
@@ -375,9 +444,72 @@ bool ab_classic_scene_sync_visuals(AbClassicScene *scene,
 bool ab_classic_scene_draw(AbClassicScene *scene, AbCoordinateCamera camera,
                            uint32_t viewport_width, uint32_t viewport_height,
                            AbDrawList *list, AbError *error) {
-    return scene ? ab_classic_scene_sync_poses(scene, error) &&
-                       ab_sprite_scene_draw(scene->items, scene->count, scene->order,
-                                            camera, viewport_width, viewport_height,
-                                            list, error)
-                 : ab_fail(error, "Missing classic scene");
+    if (!scene || !list || !viewport_width || !viewport_height ||
+        list->count > list->capacity || (list->capacity && !list->commands))
+        return ab_fail(error, "Invalid classic scene/list/viewport");
+    if (!ab_classic_scene_sync_poses(scene, error))
+        return false;
+    size_t original_count = list->count;
+    for (size_t rank = 0; rank < scene->count; ++rank)
+        if (!ab_classic_scene_draw_object(scene, scene->order[rank], camera,
+                                          viewport_width, viewport_height, list,
+                                          error)) {
+            list->count = original_count;
+            return false;
+        }
+    return true;
+}
+
+bool ab_classic_scene_draw_object(const AbClassicScene *scene, size_t object,
+                                  AbCoordinateCamera camera, uint32_t viewport_width,
+                                  uint32_t viewport_height, AbDrawList *list,
+                                  AbError *error) {
+    if (!scene || object >= scene->count || !list || !viewport_width ||
+        !viewport_height || list->count > list->capacity ||
+        (list->capacity && !list->commands))
+        return ab_fail(error, "Invalid object scene draw");
+    const AbSceneSprite *item = scene->items + object;
+    const AbResolvedComposite *composite = scene->composites + object;
+    const size_t first = 0;
+    if (!composite->source)
+        return ab_sprite_scene_draw(item, 1, &first, camera, viewport_width,
+                                    viewport_height, list, error);
+    if (!item->visible || item->unbound || item->collider == 7)
+        return true;
+    if (item->special_animation)
+        return ab_fail(error, "Scene animation wrapper is not recovered yet");
+    AbObjectSpritePose pose = item->pose;
+    if (!isfinite(pose.scale.x) || !isfinite(pose.scale.y) || pose.scale.x == 0 ||
+        pose.scale.y == 0)
+        return ab_fail(error, "Invalid object composite scale");
+    /* GameObjectRenderer 0x2ce1ec applies this same context to SpriteAsset's
+     * ordinary/composite dispatch (0x2d4be0). CompoSprite uses pivot anchors
+     * and ignores the context rotation origin in its point-image overload. */
+    float x = -camera.top_left.x;
+    float y = -camera.top_left.y;
+    x += 20 * pose.physics_position.x;
+    y += 20 * pose.physics_position.y;
+    AbUiImageRenderState state = {.geometry = {.translation_x = x / pose.scale.x,
+                                               .translation_y = y / pose.scale.y,
+                                               .scale_x = camera.zoom.x * pose.scale.x,
+                                               .scale_y = camera.zoom.y * pose.scale.y,
+                                               .angle_radians = pose.angle_radians},
+                                  .alpha = 1};
+    ClassicCompositeSelection selection = {scene, composite};
+    AbUiImageRenderBoundaries boundaries = {.context = &selection,
+                                            .lookup = composite_lookup,
+                                            .part = composite_part,
+                                            .viewport_width = viewport_width,
+                                            .viewport_height = viewport_height,
+                                            .blend = scene->blend,
+                                            .color = {1, 1, 1, 1}};
+    AbUiSpriteRender sprite = {.image = composite->source->name,
+                               .vertical = AB_ANCHOR_VPIVOT,
+                               .horizontal = AB_ANCHOR_HPIVOT};
+    size_t original_count = list->count;
+    if (!ab_ui_sprite_render(&sprite, &state, &boundaries, list, error)) {
+        list->count = original_count;
+        return false;
+    }
+    return true;
 }

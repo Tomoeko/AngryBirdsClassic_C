@@ -379,7 +379,6 @@ bool ab_classic_render_scene_draw_layers(const AbClassicRenderScene *scene,
         return ab_fail(error, "Invalid classic render scene draw bindings");
     AbClassicSceneView objects = ab_classic_scene_view(scene->objects);
     size_t original_count = list->count;
-    const size_t first = 0;
     for (size_t index = 0; index < scene->membership.count; ++index) {
         int32_t layer = scene->membership.items[index].layer;
         if (host.before_layer &&
@@ -389,8 +388,9 @@ bool ab_classic_render_scene_draw_layers(const AbClassicRenderScene *scene,
             goto restore_list;
         AbClassicRenderRoute route = scene->routes[index];
         if (route.kind == AB_CLASSIC_RENDER_OBJECT) {
-            if (!ab_sprite_scene_draw(objects.items + route.index, 1, &first, camera,
-                                      viewport_width, viewport_height, list, error))
+            if (!ab_classic_scene_draw_object(scene->objects, route.index, camera,
+                                              viewport_width, viewport_height, list,
+                                              error))
                 goto restore_list;
         } else if (route.kind == AB_CLASSIC_RENDER_MASK) {
             if (!draw_mask(scene, objects.items + route.index, camera, viewport_width,

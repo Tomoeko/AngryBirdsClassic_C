@@ -14,6 +14,26 @@ static AbDataValue menu_event(PreviewMenu *menu, const char *name) {
     return value ? *value : (AbDataValue){0};
 }
 
+static bool menu_episode_open_gift(void *context, AbUiPointerValue *sound,
+                                   AbError *error) {
+    PreviewMenu *menu = context;
+    AbSpan path = menu_span("UGCEpisodeCardGiftBoxOpened");
+    if (!ab_settings_statistics_write(menu->settings, &path, 1,
+                                      (AbDataValue){.kind = AB_DATA_BOOLEAN, .bits = 1},
+                                      error) ||
+        (menu->state_directory &&
+         (!menu->settings_file ||
+          !ab_settings_file_save(menu->settings_file, menu->settings, error))))
+        return false;
+    AbDataValue selected;
+    if (!ab_audio_bank_name_value(menu->audio, menu_data("piglette"), &selected,
+                                  error) ||
+        selected.kind != AB_DATA_STRING)
+        return ab_fail(error, "Missing actual UGC gift audio selection");
+    *sound = (AbUiPointerValue){.kind = AB_UI_POINTER_TEXT, .text = selected.string};
+    return true;
+}
+
 static bool menu_episode_event(void *context, AbDataTable *event, AbError *error) {
     PreviewMenu *menu = context;
     const AbDataValue *target = ab_data_get(event, menu_data("target"));
@@ -54,9 +74,11 @@ static void menu_episode_free(PreviewMenu *menu) {
                                       menu_event(menu, "EID_CHANGE_SCENE"),
                                       &menu->navigation, &error);
     const char *const observed[] = {
-        "EID_DO_LOADING",          "EID_LOAD_INTRO_CUTSCENE", "EID_PLAY_INTRO_CUTSCENE",
-        "EID_CHANGE_LEVEL",        "EID_SHOW_LOADING_PAGE",   "EID_HIDE_LOADING_PAGE",
-        "EID_GOLDEN_EGG_FROM_MENU"};
+        "EID_DO_LOADING",           "EID_LOAD_INTRO_CUTSCENE",
+        "EID_PLAY_INTRO_CUTSCENE",  "EID_CHANGE_LEVEL",
+        "EID_SHOW_LOADING_PAGE",    "EID_HIDE_LOADING_PAGE",
+        "EID_GOLDEN_EGG_FROM_MENU", "EID_BOOMERANG_BIRD_POPUP",
+        "EID_REWARD_POPUP",         "EID_STAR_POPUP"};
     for (size_t index = 0; index < sizeof(observed) / sizeof(observed[0]); ++index)
         if (menu->navigation.event_triggered)
             (void)ab_event_manager_remove(menu->events,
@@ -161,7 +183,10 @@ static bool menu_episode_open(PreviewMenu *menu, AbError *error) {
     buttons.fonts = &menu->fonts;
     buttons.scaling = &menu->scaling;
     buttons.random = &menu->random;
+    if (!menu_gift_open(menu, error))
+        return false;
     buttons.ugc_class = &menu->ugc;
+    buttons.particles = menu->gift_particles;
     buttons.settings = ab_settings_statistics_root(menu->settings);
     menu->episodes = calloc(1, sizeof(*menu->episodes));
     if (!menu->episodes)
@@ -183,15 +208,23 @@ static bool menu_episode_open(PreviewMenu *menu, AbError *error) {
                                        .preferences = &menu->preferences,
                                        .event_ids = menu->event_data.data.globals,
                                        .context = menu,
-                                       .load_theme = menu_load_theme},
+                                       .load_theme = menu_load_theme,
+                                       .open_gift = menu_episode_open_gift},
             error))
         return false;
     menu->navigation =
         (AbEventListener){.context = menu, .event_triggered = menu_episode_event};
-    const char *const observed[] = {
-        "EID_CHANGE_SCENE",      "EID_DO_LOADING",          "EID_LOAD_INTRO_CUTSCENE",
-        "EID_CHANGE_LEVEL",      "EID_PLAY_INTRO_CUTSCENE", "EID_SHOW_LOADING_PAGE",
-        "EID_HIDE_LOADING_PAGE", "EID_GOLDEN_EGG_FROM_MENU"};
+    const char *const observed[] = {"EID_CHANGE_SCENE",
+                                    "EID_DO_LOADING",
+                                    "EID_LOAD_INTRO_CUTSCENE",
+                                    "EID_CHANGE_LEVEL",
+                                    "EID_PLAY_INTRO_CUTSCENE",
+                                    "EID_SHOW_LOADING_PAGE",
+                                    "EID_HIDE_LOADING_PAGE",
+                                    "EID_GOLDEN_EGG_FROM_MENU",
+                                    "EID_BOOMERANG_BIRD_POPUP",
+                                    "EID_REWARD_POPUP",
+                                    "EID_STAR_POPUP"};
     for (size_t index = 0; index < sizeof(observed) / sizeof(observed[0]); ++index)
         if (!ab_event_manager_add(menu->events, menu_event(menu, observed[index]),
                                   &menu->navigation, error))

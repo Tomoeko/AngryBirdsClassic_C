@@ -201,7 +201,16 @@ bool ab_event_manager_add(AbEventManager *manager, AbDataValue id,
             if (!diagnostic(manager, AB_EVENT_DIAGNOSTIC_DUPLICATE, id, listener, NULL,
                             error))
                 return false;
-            return ab_fail(error, "Duplicate event listener");
+            AbSpan name = listener->name;
+            int name_size = (int)(name.data ? (name.size < 64 ? name.size : 64) : 0);
+            if (id.kind == AB_DATA_STRING)
+                return ab_fail(error, "Duplicate event listener for %.*s (%.*s)",
+                               (int)(id.string.size < 96 ? id.string.size : 96),
+                               id.string.data, name_size,
+                               name.data ? (const char *)name.data : "");
+            return ab_fail(error, "Duplicate event listener for ID %08x (%.*s)",
+                           id.bits, name_size,
+                           name.data ? (const char *)name.data : "");
         }
     }
     if (group->count == manager->limits.listeners_per_type)

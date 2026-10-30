@@ -302,6 +302,12 @@ bool ab_classic_block_scripts_register_circle(AbClassicBlockScripts *scripts,
                              .scripts = scripts->attachments + object * SCRIPT_CLASSES,
                              .capacity = SCRIPT_CLASSES};
     ++scripts->count;
+    if (source->defined_constructor &&
+        !ab_block_scripts_apply(&scripts->manager, scripts->objects + object,
+                                scripts->update.host, error)) {
+        scripts->failed = true;
+        return false;
+    }
     return true;
 }
 
@@ -309,6 +315,8 @@ bool ab_classic_block_scripts_register_box(AbClassicBlockScripts *scripts,
                                            size_t object, AbError *error) {
     if (!ab_classic_block_scripts_register_circle(scripts, object, error))
         return false;
+    if (scripts->level.bodies->objects[object].defined_constructor)
+        return true;
     if (!ab_block_scripts_apply(&scripts->manager, scripts->objects + object,
                                 scripts->update.host, error)) {
         scripts->failed = true;

@@ -52,4 +52,17 @@ static void reference_create_circle(unsigned sample, uint32_t output[9]) {
     output[8] = sample & 2 ? 1u : 0u;
 }
 
+/* Independent fixture-recreation inputs; these are not expected results. */
+#if defined(AB_ORACLE_RESIZE_CIRCLE_ONLY) || defined(AB_TEST_RESIZE_CIRCLE)
+static uint32_t reference_resize_circle(unsigned sample) {
+    union {
+        float number;
+        uint32_t bits;
+    } radius = {.number = (float)(sample * 29 % 61) / 8.0f};
+    if (sample < 4)
+        radius.number = sample & 1 ? -0.0f : 0;
+    return radius.bits;
+}
+#endif
+
 #endif

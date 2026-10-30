@@ -118,6 +118,24 @@ static bool level_joint_owners(const AbLevelBodySource *original,
         ab_classic_level_close(owner);
         owner = NULL;
     }
+    /* onLoad reward pruning keeps original constructor entries/layout while
+     * reducing live joint requirements, including an entirely pruned table. */
+    entries[0].value = (AbDataValue){0};
+    entries[3].value = (AbDataValue){0};
+    entries[4].value = (AbDataValue){0};
+    CHECK(ab_classic_level_open(&source, physics, limits, false, &owner, NULL));
+    AbClassicLevelView pruned = ab_classic_level_view(owner);
+    CHECK(pruned.joints->joint_count == 2 && !pruned.joints->glue_count &&
+          pruned.world->joint_count == 2);
+    ab_classic_level_close(owner);
+    owner = NULL;
+    entries[1].value = (AbDataValue){0};
+    entries[2].value = (AbDataValue){0};
+    CHECK(ab_classic_level_open(&source, physics, limits, false, &owner, NULL));
+    pruned = ab_classic_level_view(owner);
+    CHECK(!pruned.joints->joint_count && !pruned.joints->glue_count &&
+          !pruned.world->joint_count);
+    ab_classic_level_close(owner);
     return true;
 }
 

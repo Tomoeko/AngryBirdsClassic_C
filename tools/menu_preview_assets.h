@@ -44,6 +44,7 @@
 typedef struct PreviewGame PreviewGame;
 typedef struct PreviewReward PreviewReward;
 typedef struct PreviewPigs PreviewPigs;
+typedef struct PreviewMinigame PreviewMinigame;
 
 typedef struct {
     AbAndroidAssets *planning;
@@ -77,7 +78,7 @@ typedef struct {
     AbUiPointerChild root_pointer[4], slider_pointer[AB_UI_OPTION_COUNT],
         button_pointer[1];
     uint8_t key[32];
-    float time;
+    float time, tap_radius;
     AbVec2 screen;
     bool highest_resources;
     bool free_version;
@@ -99,6 +100,7 @@ typedef struct {
     AbUiEpisodeUgcClass ugc;
     AbUiEpisodeSelection *episodes;
     AbUiLevelSelection *levels;
+    PreviewMinigame *minigame;
     AbUiLevelHiddenEggs *hidden_eggs;
     AbUiLevelServices level_services;
     AbLevelProgress level_progress;
@@ -158,6 +160,9 @@ typedef struct {
     AbUiLevelEggs *egg_levels;
     PreviewPigs *pigs;
     PreviewReward *reward;
+    AbTargetData gift_definition;
+    AbParticleSource gift_source;
+    AbParticles *gift_particles;
 } PreviewMenu;
 
 static AbSpan menu_span(const char *name) {
@@ -204,7 +209,18 @@ static bool menu_environment(void *context, AbUiScalingEnvironment *output,
     return true;
 }
 
+static AbUiWidget *menu_minigame_root(PreviewMenu *menu);
+static bool menu_minigame_open(PreviewMenu *menu, AbError *error);
+static bool menu_minigame_close(PreviewMenu *menu, AbError *error);
+static bool menu_minigame_leave(PreviewMenu *menu, AbError *error);
+static bool menu_minigame_is_loading(PreviewMenu *menu, AbDataTable *event);
+static bool menu_minigame_start_loader(PreviewMenu *menu, AbError *error);
+static bool menu_minigame_is_target(PreviewMenu *menu, AbDataValue target);
+static bool menu_minigame_enter(PreviewMenu *menu, AbError *error);
+
 static AbUiWidget *menu_active_root(PreviewMenu *menu) {
+    if (menu->minigame && menu_minigame_root(menu))
+        return menu_minigame_root(menu);
     if (menu->cutscene_active)
         return &menu->cutscene->widget;
     if (menu->level_active)
@@ -234,9 +250,13 @@ static bool menu_audio_enabled(PreviewMenu *menu, bool *output, AbError *error);
 static bool menu_audio_toggle(PreviewMenu *menu, AbError *error);
 static bool menu_reward_reveal(PreviewMenu *menu, AbDataTable *event, AbError *error);
 static bool menu_reward_show(PreviewMenu *menu, AbError *error);
+static bool menu_reward_show_image(PreviewMenu *menu, AbDataValue image,
+                                   AbDataValue sound, AbError *error);
+static bool menu_reward_show_star(PreviewMenu *menu, bool first, AbError *error);
 static bool menu_reward_draw(PreviewMenu *menu, AbError *error);
 
 #include "menu_settings_preview.h"
+#include "menu_gift_preview.h"
 #include "menu_episode_preview.h"
 #include "menu_background_preview.h"
 #include "menu_pigs_preview.h"
@@ -244,6 +264,7 @@ static bool menu_reward_draw(PreviewMenu *menu, AbError *error);
 #include "game_session.h"
 #include "menu_audio_preview.h"
 #include "menu_rewards_preview.h"
+#include "menu_minigame.h"
 
 /* MainMenu.layout 31235, non-template Android branch, words 13..128.
  * The component feature profile supplies zero g_layoutMargin. */
@@ -301,7 +322,9 @@ static bool menu_preview_resize(PreviewMenu *menu, AbVec2 screen, AbError *error
         (menu->level_active &&
          !ab_ui_widget_lifecycle(&menu->levels->widget, AB_UI_FRAME_LAYOUT, error)) ||
         (menu->cutscene_active &&
-         !ab_ui_widget_lifecycle(&menu->cutscene->widget, AB_UI_FRAME_LAYOUT, error)))
+         !ab_ui_widget_lifecycle(&menu->cutscene->widget, AB_UI_FRAME_LAYOUT, error)) ||
+        (menu->minigame && menu_minigame_root(menu) &&
+         !ab_ui_widget_lifecycle(menu_minigame_root(menu), AB_UI_FRAME_LAYOUT, error)))
         return false;
     return game_session_resize(menu, screen, error) &&
            (!menu->background_enabled || menu_background_layout(menu, error));
@@ -385,8 +408,11 @@ static void menu_preview_free(PreviewMenu *menu) {
     menu_reward_free(menu);
     if (menu->entered && !menu->context.failed)
         (void)ab_ui_widget_lifecycle(menu_active_root(menu), AB_UI_FRAME_EXIT, &error);
+    (void)menu_minigame_close(menu, &error);
     menu_route_free(menu);
     menu_episode_free(menu);
+    ab_particles_close(menu->gift_particles);
+    ab_target_data_close(&menu->gift_definition);
     ab_powerup_catalog_close(menu->powerup_catalog);
     menu_background_free(menu);
     (void)ab_ui_scaling_detach(&menu->scaling, &error);
@@ -413,6 +439,7 @@ static bool menu_preview_open(const AbZip *zip, AbAssetTextureHost textures,
         menu->screen = (AbVec2){480, 320};
     if (!menu_dimensions(menu->screen))
         return ab_fail(error, "Invalid initial menu display size");
+    menu->tap_radius = (15 * menu->screen.x) / 480;
     AbVec2 profile = menu->highest_resources ? (AbVec2){1024, 768} : (AbVec2){480, 320};
     if (!ab_target_resource_key(zip, 16 * 1024 * 1024, menu->key, error) ||
         !ab_android_assets_open(zip, (AbSpan){menu->key, sizeof(menu->key)},
@@ -525,6 +552,8 @@ static bool menu_pointer_dispatch(PreviewMenu *menu, AbSpan event, AbVec2 point,
     AbUiWidget *root = menu_active_root(menu);
     if (!ab_ui_widget_pointer(root, event, point, reply, error))
         return false;
+    if (menu->minigame)
+        return menu_route_apply(menu, error);
     if (menu->navigation_enabled && menu_equal(reply->values[0], "PLAY")) {
         if ((!menu->episodes && !menu_episode_open(menu, error)) ||
             !menu_episode_change(menu, true, error))
@@ -567,10 +596,15 @@ static bool menu_preview_draw(PreviewMenu *menu, float seconds, AbError *error) 
         return false;
     if (!game_results_route(menu, error))
         return false;
-    if (menu->level_request_ready && !game_session_open(menu, error))
-        return false;
+    if (menu->level_request_ready) {
+        bool soundboard = menu_minigame_name(menu->level_request.name);
+        if (!(soundboard ? menu_minigame_open(menu, error)
+                         : game_session_open(menu, error)))
+            return false;
+    }
     if (menu->game)
-        return game_session_draw(menu, seconds, error);
+        return game_session_draw(menu, seconds, error) &&
+               menu_gift_tail(menu, seconds, error);
     menu->time += seconds;
     menu->input_seconds = seconds;
     if (!menu_route_update(menu, error))
@@ -585,14 +619,14 @@ static bool menu_preview_draw(PreviewMenu *menu, float seconds, AbError *error) 
     if ((menu->level_active || menu->episode_active) &&
         !ab_ui_level_selection_background(&menu->context, menu->screen, false, error))
         return false;
-    if (menu->background_enabled && !menu->cutscene_active &&
+    if (menu->background_enabled && !menu->cutscene_active && !menu->minigame &&
         !menu_background_draw(menu, seconds, error))
         return false;
     AbUiDrawInput input = {0};
     return (!menu->level_active || !menu->rmf_levels ||
             ab_ui_level_rmf_background(menu->rmf_levels, error)) &&
            ab_ui_widget_draw(root, &input, error) && menu_reward_draw(menu, error) &&
-           menu_pigs_tail(menu, seconds, error);
+           menu_pigs_tail(menu, seconds, error) && menu_gift_tail(menu, seconds, error);
 }
 
 #endif

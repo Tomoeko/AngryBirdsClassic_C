@@ -17,6 +17,11 @@ void ab_classic_object_hooks_close(AbClassicObjectHooks *hooks);
 size_t ab_classic_object_hooks_bytes(const AbClassicObjectHooks *hooks);
 bool ab_classic_object_hooks_register(AbClassicObjectHooks *hooks, size_t object,
                                       AbObjectUpdates *updates, AbError *error);
+/* Borrow the current property's stable callback storage so another recovered
+ * producer can append/remove its function without replacing existing hooks.
+ * NULL denotes a genuinely absent registration. No mutation or allocation. */
+bool ab_classic_object_hooks_updates(AbClassicObjectHooks *hooks, size_t object,
+                                     AbObjectUpdates **output, AbError *error);
 bool ab_classic_object_hooks_bind(AbClassicObjectHooks *hooks,
                                   AbClassicController *controller,
                                   AbGameTailHooks **output, AbError *error);

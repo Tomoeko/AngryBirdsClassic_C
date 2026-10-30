@@ -7,6 +7,7 @@ typedef struct {
     AbObjectVisual object;
     AbSpriteAssetState asset;
     AbSpriteAtlasBinding binding;
+    AbResolvedComposite composite;
     AbClassicVisuals *owner;
     size_t index;
 } VisualEntry;
@@ -54,6 +55,7 @@ static bool composite(void *context, AbSpan name, const AbComposite **output,
             : resources.composites &&
                   ab_composite_resources_find(resources.composites, name, &binding);
     if (found) {
+        entry->composite = binding;
         *output = binding.source;
     }
     return true;
@@ -221,6 +223,18 @@ bool ab_classic_visuals_binding(const AbClassicVisuals *visuals, size_t object,
         return false;
     }
     *output = entry->binding;
+    return true;
+}
+
+bool ab_classic_visuals_composite(const AbClassicVisuals *visuals, size_t object,
+                                  AbResolvedComposite *output) {
+    if (!visuals || object >= visuals->count || !output)
+        return false;
+    const VisualEntry *entry = visuals->entries + object;
+    if (entry->object.attached != &entry->asset || !entry->asset.composite ||
+        entry->asset.composite != entry->composite.source)
+        return false;
+    *output = entry->composite;
     return true;
 }
 

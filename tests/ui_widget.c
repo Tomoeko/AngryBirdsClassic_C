@@ -41,7 +41,7 @@ static bool named(AbUiPointerValue field, const char *name) {
 typedef struct {
     AbSpriteRegion sprite;
     unsigned sounds;
-    bool mutate;
+    bool mutate, fail_bounds;
 } Fixture;
 
 /* Explicit resource/audio controls exercise the production tree composition;
@@ -54,9 +54,9 @@ static bool localize(void *context, AbSpan name, AbSpan *output, AbError *error)
 }
 
 static bool bounds(void *context, AbSpan name, AbVec2 *output, AbError *error) {
-    (void)context;
     (void)name;
-    (void)error;
+    if (((Fixture *)context)->fail_bounds)
+        return ab_fail(error, "Prepared hit-test resource failure");
     *output = (AbVec2){32, 16};
     return true;
 }
@@ -213,6 +213,37 @@ static bool tree_checks(void) {
     return true;
 }
 
+static bool image_hit_checks(void) {
+    Fixture fixture = {0};
+    AbUiWidgetContext context = {.images = {&fixture, localize, bounds, pivot},
+                                 .maximum_depth = 16};
+    AbUiWidget image = {0};
+    AbUiImageArguments arguments = {.frame = {.x = number(10),
+                                              .y = number(20),
+                                              .scale_x = number(2),
+                                              .scale_y = number(-1)},
+                                    .image = text("image")};
+    CHECK(ab_ui_widget_init(&image, &context, AB_UI_WIDGET_IMAGE,
+                            (AbUiWidgetChildren){0}, NULL, &arguments, NULL, NULL));
+    image.frame->fields.w = image.frame->fields.h = number(0);
+    image.state.image.resource_pivot_x = image.state.image.resource_pivot_y =
+        number(999);
+    bool hit = false;
+    CHECK(ab_ui_widget_image_hit(&image, (AbVec2){10, 20}, &hit, NULL) && hit);
+    CHECK(ab_ui_widget_image_hit(&image, (AbVec2){42, 20}, &hit, NULL) && !hit);
+    image.state.padding = (AbUiPointerValue){.kind = AB_UI_POINTER_BOOLEAN};
+    CHECK(ab_ui_widget_image_hit(&image, (AbVec2){10, 20}, &hit, NULL) && hit);
+    image.state.padding = (AbUiPointerValue){.kind = AB_UI_POINTER_OBJECT, .object = 1};
+    CHECK(!ab_ui_widget_image_hit(&image, (AbVec2){10, 20}, &hit, NULL));
+    fixture.fail_bounds = true;
+    image.frame->fields.scale_x = number(0);
+    image.frame->fields.angle = number(NAN);
+    CHECK(ab_ui_widget_image_hit(&image, (AbVec2){10, 20}, &hit, NULL) && !hit);
+    puts("Image-derived hit tests: actual resources, absent/false padding, strict "
+         "edges and zero-scale early return.");
+    return true;
+}
+
 int main(void) {
-    return tree_checks() ? 0 : 1;
+    return tree_checks() && image_hit_checks() ? 0 : 1;
 }

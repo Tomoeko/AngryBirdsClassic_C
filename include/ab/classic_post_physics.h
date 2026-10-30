@@ -74,8 +74,9 @@ typedef struct {
  *
  * Fixed circle/box slots and rolling names remain borrowed. Level-forgotten
  * rows skip publication/activity/rolling updates. Portal collider 5, joints,
- * general insertion/reinsertion, changed shape/radius/name and custom property
- * callbacks require separate recovery. No effects, RNG or world changes run
+ * general insertion/reinsertion, changed shape/name and custom property
+ * callbacks require separate recovery. Live circle radius refresh is explicit
+ * below. No effects, RNG or world changes run
  * during open. storage_bytes bounds all allocations. Output starts NULL.
  */
 bool ab_classic_post_physics_open(AbClassicLevel *level, AbClassicPostConfig config,
@@ -93,6 +94,10 @@ bool ab_classic_post_physics_set_limits(AbClassicPostPhysics *post, int32_t mini
  * newly constructed native metadata. */
 bool ab_classic_post_physics_recreate_circle(AbClassicPostPhysics *post, size_t object,
                                              AbError *error);
+/* Refresh only the live circle's rolling radius after fixture recreation.
+ * Preserve its rolling history, logical activity and all other cached fields. */
+bool ab_classic_post_physics_resize_circle(AbClassicPostPhysics *post, size_t object,
+                                           AbError *error);
 
 /* Register the next canonical direct circle between updates. object_capacity
  * must have reserved its stable specialty row and sorted index storage at open

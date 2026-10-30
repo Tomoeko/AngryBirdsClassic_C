@@ -43,6 +43,9 @@ int main(void) {
     CHECK(answer && answer->kind == AB_DATA_NUMBER &&
           answer->bits == constants[0].bits);
     ab_lua_data_close(&data);
+    chunk.root.parameter_count = chunk.root.upvalue_count = 1;
+    CHECK(ab_lua_data_literal_table_range(&chunk, 2, 3, 1, 4096, &data, NULL));
+    ab_lua_data_close(&data);
     CHECK(!ab_lua_data_literal_table(&chunk, 5, 1, 4096, &data, NULL) && !data.owned);
     CHECK(!ab_lua_data_literal_table_range(&chunk, 1, 4, 1, 4096, &data, NULL) &&
           !data.owned);
@@ -52,6 +55,10 @@ int main(void) {
     CHECK(!ab_lua_data_literal_table_range(&chunk, 2, SIZE_MAX, 1, 4096, &data, NULL));
     /* A selected read cannot import a register from before the window. */
     word(bytes + 12, 0 | (2u << 6));
+    CHECK(!ab_lua_data_literal_table_range(&chunk, 2, 3, 1, 4096, &data, NULL) &&
+          !data.owned);
+    /* Declaring r0 as a parameter or upvalue never imports it into the window. */
+    word(bytes + 12, 4 | (2u << 6));
     CHECK(!ab_lua_data_literal_table_range(&chunk, 2, 3, 1, 4096, &data, NULL) &&
           !data.owned);
     puts("Literal data windows reject behavioral words, external registers and "

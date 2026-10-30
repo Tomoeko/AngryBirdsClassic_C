@@ -6,13 +6,15 @@
 #include "ab/object_property_access.h"
 #include "ab/object_properties.h"
 
-enum { AB_LEVEL_PHYSICAL_PROPERTY_CAPACITY = 96 };
+enum { AB_LEVEL_PHYSICAL_PROPERTY_CAPACITY = 96, AB_LEVEL_EXTRA_SPRITE_CAPACITY = 16 };
 
 typedef struct {
     AbDataTable physical, script, behaviors, launch_velocity;
     AbDataEntry physical_entries[AB_LEVEL_PHYSICAL_PROPERTY_CAPACITY];
     AbDataEntry script_entries[3];
     AbDataEntry launch_entries[2];
+    AbDataTable extra_sprites;
+    AbDataEntry extra_sprite_entries[AB_LEVEL_EXTRA_SPRITE_CAPACITY];
     bool launch_published;
 } AbLevelPropertyObject;
 

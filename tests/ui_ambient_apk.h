@@ -2,21 +2,7 @@
 #define AB_UI_AMBIENT_APK_TEST_H
 
 static bool ambient_camera(PreviewMenu *menu, size_t object, AbError *error) {
-    PreviewGame *game = menu->game;
-    AbClassicLevelView level = ab_classic_level_view(game->playfield.level);
-    const AbDataTable *physical = &level.properties->objects[object].physical;
-    AbDataValue x = menu_route_field(physical, "x");
-    AbDataValue y = menu_route_field(physical, "y");
-    if (x.kind != AB_DATA_NUMBER || y.kind != AB_DATA_NUMBER)
-        return ab_fail(error, "Ambient fixture has no actual script pose");
-    AbCameraSystem *camera = ab_classic_camera_system(game->playfield.camera);
-    AbCameraValues values = {
-        .position = {20 * menu_real(x.bits), 20 * menu_real(y.bits)}, .present = 3};
-    AbCameraMove move = {.duration_present = true};
-    return ab_camera_system_cancel_sequence(camera, error) &&
-           ab_camera_system_stop_movement(camera) &&
-           ab_camera_system_goto_position(camera, &values, &move, error) &&
-           menu_preview_draw(menu, 0, error);
+    return physics_replay_focus(menu, object, error);
 }
 
 static bool ambient_capture(PreviewMenu *menu, AbMetal *renderer, const char *variable,

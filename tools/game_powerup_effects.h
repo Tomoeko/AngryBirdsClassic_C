@@ -275,6 +275,8 @@ static bool game_powerup_bird_update(void *context, AbClassicBirdUpdate kind,
                                      size_t object, float seconds, bool *alive,
                                      AbError *error) {
     PreviewGame *game = context;
+    if (kind == AB_CLASSIC_BIRD_PINK_TIMER)
+        return game_bubble_timed(game, object, seconds, alive, error);
     if (kind != AB_CLASSIC_BIRD_SUPERSEED || !game->powerups)
         return ab_fail(error, "Missing actual timed bird specialty continuation");
     return ab_classic_superseed_update(&game->powerups->seed, object, seconds, alive,

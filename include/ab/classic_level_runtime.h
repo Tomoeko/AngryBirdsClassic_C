@@ -17,6 +17,13 @@ typedef struct {
      * bodies still use level_limits.objects; zero retains initial-only rows. */
     size_t dynamic_objects_per_bird;
     size_t additional_dynamic_objects;
+    /* Derive further stable slots from the loaded definitions, before adapters
+     * borrow any arrays. This result is added to the reservations above and must
+     * fit level_limits.objects. No world mutation or simulation runs here. */
+    bool (*reserve_objects)(void *context, AbClassicLevelView level, size_t *additional,
+                            AbError *error);
+    void *reserve_context;
+    AbClassicInitialBirdHost initial_birds;
     AbClassicPlayfieldConfig playfield;
     void *prepare_context;
     bool (*prepare)(void *context, const AbLuaData *level, const AbLuaData *catalog,

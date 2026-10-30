@@ -99,6 +99,9 @@ build_android_probe(ab_android_reload_geometry arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1 -DAB_ORACLE_RELOAD_GEOMETRY_ONLY=1)
 build_android_probe(ab_android_create_circle arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1 -DAB_ORACLE_CREATE_CIRCLE_ONLY=1)
+build_android_probe(ab_android_resize_circle arm.c oracle_main
+    -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
+    -DAB_ORACLE_CREATE_CIRCLE_ONLY=1 -DAB_ORACLE_RESIZE_CIRCLE_ONLY=1)
 build_android_probe(ab_android_create_box arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1 -DAB_ORACLE_CREATE_BOX_ONLY=1)
 build_android_probe(ab_android_blues_child arm.c oracle_main
@@ -436,6 +439,9 @@ build_android_probe(ab_android_menu_pointer arm.c oracle_main
 build_android_probe(ab_android_integer_order arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
     -DAB_ORACLE_INTEGER_ORDER_ONLY=1)
+build_android_probe(ab_android_integer_map arm.c oracle_main
+    -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
+    -DAB_ORACLE_INTEGER_ORDER_ONLY=1 -DAB_ORACLE_INTEGER_MAP_ONLY=1)
 build_android_probe(ab_android_ui_frame_geometry arm.c oracle_main
     -DAB_ORACLE_ANDROID=1 -DAB_ORACLE_BLOCK_DAMAGE_ONLY=1
     -DAB_ORACLE_UI_FRAME_GEOMETRY_ONLY=1)

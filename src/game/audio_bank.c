@@ -27,6 +27,10 @@ struct AbAudioBank {
     size_t count, capacity, bytes;
 };
 
+const AbDataTable *ab_audio_bank_groups(const AbAudioBank *bank) {
+    return bank ? bank->catalog.groups : NULL;
+}
+
 static AbSpan span(const char *value) {
     return (AbSpan){(const uint8_t *)value, strlen(value)};
 }

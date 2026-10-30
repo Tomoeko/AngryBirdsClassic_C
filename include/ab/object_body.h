@@ -48,6 +48,15 @@ bool ab_object_body_create_circle(AbPhysicsWorld *world, AbVec2 position, float 
                                   uintptr_t fixture_user_data, AbObjectBody *output,
                                   AbError *error);
 
+/* GameObject.setRadius/recreate: replace its single circle fixture, retaining
+ * the body, joints, pose and velocity. Rebuild the fixture with its current
+ * material/user identity, the default filter and no sensor. Native recreation
+ * destroys contacts/proxies and recomputes mass. It is not a body replacement
+ * or an in-place shape edit. Finite nonnegative radius; allocation is bounded
+ * by existing world storage. A late failure requires discarding the session. */
+bool ab_object_body_resize_circle(AbPhysicsWorld *world, AbObjectBody *object,
+                                  float radius, AbError *error);
+
 /* Museum-mode ground uses explicit 2000-by-10 physics units, zero density,
  * friction 0.8, zero restitution, and the basic collider. The caller supplies
  * the recovered ground position; deriving level bounds is a separate task.

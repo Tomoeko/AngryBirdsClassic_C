@@ -59,6 +59,7 @@ target_include_directories(ab_numeric PUBLIC include)
 target_link_libraries(ab_numeric PUBLIC ab_options)
 
 add_library(ab_base STATIC src/core/base.c src/core/utf8.c src/core/string_map.c
+    src/core/integer_map.c
     src/core/identity_map.c src/core/z_order.c)
 target_include_directories(ab_base PUBLIC include)
 target_link_libraries(ab_base PUBLIC ab_options)
@@ -286,6 +287,7 @@ add_library(ab_game STATIC src/game/object_definition.c src/game/object_physics.
     src/game/hero_screen_tinter.c
     src/game/classic_game_globals.c
     src/game/classic_game_updates.c
+    src/game/delayed_callbacks.c
     src/game/classic_goals.c
     src/game/floating_scores.c
     src/game/particles.c
@@ -325,6 +327,9 @@ add_library(ab_game STATIC src/game/object_definition.c src/game/object_physics.
     src/game/bird_collision_notify.c
     src/game/bird_collision_prelude.c
     src/game/bird_hat.c
+    src/game/bird_shockwave.c
+    src/game/bird_bubbles.c
+    src/game/electric_shockwave.c
     src/game/game_behavior.c
     src/game/object_property_access.c
     src/game/object_definition_lookup.c
@@ -520,6 +525,7 @@ add_library(ab_scene STATIC src/render/classic_scene.c src/render/classic_visual
     src/game/ui_animated_image.c
     src/game/ui_toggle_indicator.c
     src/game/ui_toggle_button.c
+    src/game/ui_tiled_image.c
     src/game/ui_main_menu_options.c
     src/game/ui_scroll_frame.c
     src/game/classic_character_services.c
@@ -560,7 +566,7 @@ add_library(ab_audio_output STATIC src/platform/audio_output.c)
 target_include_directories(ab_audio_output PUBLIC include)
 target_link_libraries(ab_audio_output PUBLIC ab_game console_common_audio)
 target_link_libraries(ab_preview PRIVATE ab_scene ab_asset_resources ab_settings_file
-    ab_audio_output)
+    ab_audio_output console_common_capture)
 add_executable(ab_theme_gpu_data tools/theme_gpu_data.c)
 target_link_libraries(ab_theme_gpu_data PRIVATE ab_scene)
 add_executable(ab_level_audit tools/level_audit.c)
@@ -586,6 +592,9 @@ if(BUILD_TESTING)
     add_executable(ab_audio_output_tests tests/audio_output.c src/platform/audio_output.c)
     target_link_libraries(ab_audio_output_tests PRIVATE ab_game console_common)
     add_test(NAME game_audio_output_queue COMMAND ab_audio_output_tests)
+    add_executable(ab_preview_options_tests tests/preview_options.c)
+    target_link_libraries(ab_preview_options_tests PRIVATE console_common)
+    add_test(NAME preview_recording_options COMMAND ab_preview_options_tests)
     add_subdirectory(Common/tests common-tests)
     add_test(NAME preview_cli_help COMMAND ab_preview --help)
     add_executable(ab_string_map_tests tests/string_map.c)
@@ -1691,6 +1700,19 @@ if(BUILD_TESTING)
     add_executable(ab_classic_game_updates_tests tests/classic_game_updates.c)
     target_link_libraries(ab_classic_game_updates_tests PRIVATE ab_game)
     add_test(NAME classic_game_updates_edges COMMAND ab_classic_game_updates_tests)
+    add_executable(ab_integer_map_tests tests/integer_map.c)
+    target_link_libraries(ab_integer_map_tests PRIVATE ab_base)
+    add_test(NAME integer_map_edges COMMAND ab_integer_map_tests)
+    set(AB_REFERENCE_INTEGER_MAP "" CACHE FILEPATH "Private native integer mutation trace")
+    if(AB_REFERENCE_INTEGER_MAP)
+        add_test(NAME integer_map_android COMMAND ${CMAKE_COMMAND}
+            "-DREFERENCE=${AB_REFERENCE_INTEGER_MAP}"
+            "-DCHECKER=$<TARGET_FILE:ab_integer_map_tests>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_integer_map_reference.cmake")
+    endif()
+    add_executable(ab_delayed_callbacks_tests tests/delayed_callbacks.c)
+    target_link_libraries(ab_delayed_callbacks_tests PRIVATE ab_game)
+    add_test(NAME delayed_callbacks_edges COMMAND ab_delayed_callbacks_tests)
     set(AB_REFERENCE_BURN_MANAGER "" CACHE FILEPATH
         "Optional original complete BurnManager module state trace")
     if(AB_REFERENCE_BURN_MANAGER)
@@ -2013,6 +2035,9 @@ if(BUILD_TESTING)
     add_executable(ab_ui_toggle_controls_tests tests/ui_toggle_controls.c)
     target_link_libraries(ab_ui_toggle_controls_tests PRIVATE ab_scene)
     add_test(NAME ui_toggle_controls_integration COMMAND ab_ui_toggle_controls_tests)
+    add_executable(ab_ui_tiled_image_tests tests/ui_tiled_image.c)
+    target_link_libraries(ab_ui_tiled_image_tests PRIVATE ab_scene)
+    add_test(NAME ui_tiled_image_integration COMMAND ab_ui_tiled_image_tests)
     if(APPLE)
         add_executable(ab_ui_widget_apk_tests tests/ui_widget_apk.c)
         target_link_libraries(ab_ui_widget_apk_tests PRIVATE ab_scene ab_asset_resources
@@ -2024,9 +2049,94 @@ if(BUILD_TESTING)
                 COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
             add_test(NAME ui_widget_apk_skip_metal
                 COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            add_test(NAME ui_shockwave_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            add_test(NAME ui_birthday_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            add_test(NAME ui_level_rewards_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            add_test(NAME ui_puffer_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            add_test(NAME ui_vial_effects_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            add_test(NAME ui_vial_contact_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            set_tests_properties(ui_vial_contact_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_VIAL_CONTACT_ONLY=1")
+            add_test(NAME ui_spawn_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            set_tests_properties(ui_spawn_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_SPAWN_ONLY=1")
+            add_test(NAME ui_goal_factory_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            set_tests_properties(ui_goal_factory_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_GOAL_FACTORY_ONLY=1")
+            add_test(NAME ui_blue_vial_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            set_tests_properties(ui_blue_vial_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_BLUE_VIAL_ONLY=1")
+            add_test(NAME ui_pink_vial_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            set_tests_properties(ui_pink_vial_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_PINK_VIAL_ONLY=1")
+            add_test(NAME ui_vial_chain_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            set_tests_properties(ui_vial_chain_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_VIAL_CHAIN_ONLY=1")
+            add_test(NAME ui_soundboard_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            set_tests_properties(ui_soundboard_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_SOUNDBOARD_ONLY=1")
+            add_test(NAME ui_keyboard_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            set_tests_properties(ui_keyboard_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_KEYBOARD_ONLY=1")
+            add_test(NAME ui_sequencer_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            set_tests_properties(ui_sequencer_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_SEQUENCER_ONLY=1")
+            add_test(NAME ui_radio_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            set_tests_properties(ui_radio_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_RADIO_ONLY=1")
+            add_test(NAME ui_accordion_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            set_tests_properties(ui_accordion_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_ACCORDION_ONLY=1")
+            add_test(NAME ui_rocket_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            set_tests_properties(ui_rocket_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_ROCKET_ONLY=1")
+            add_test(NAME ui_mode_egg_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            add_test(NAME ui_physics_replay_apk_metal
+                COMMAND ab_ui_widget_apk_tests "${AB_REFERENCE_APK}")
+            set_tests_properties(ui_physics_replay_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_PHYSICS_REPLAY_ONLY=1")
+            set_tests_properties(ui_mode_egg_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_MODE_EGG_ONLY=1")
+            set_tests_properties(ui_vial_effects_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_VIAL_EFFECTS_ONLY=1")
+            set_tests_properties(ui_puffer_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_PUFFER_ONLY=1")
+            set_tests_properties(ui_level_rewards_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_LEVEL_REWARDS_ONLY=1")
+            set_tests_properties(ui_birthday_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_BIRTHDAY_ONLY=1")
+            set_tests_properties(ui_shockwave_apk_metal PROPERTIES
+                ENVIRONMENT "AB_TEST_SHOCKWAVE_ONLY=1")
             set_tests_properties(ui_widget_apk_skip_metal PROPERTIES
                 ENVIRONMENT "AB_TEST_SKIP_END=1")
-            set_tests_properties(ui_widget_apk_metal ui_widget_apk_skip_metal PROPERTIES
+            set_tests_properties(ui_widget_apk_metal ui_widget_apk_skip_metal
+                ui_shockwave_apk_metal ui_birthday_apk_metal
+                ui_level_rewards_apk_metal ui_puffer_apk_metal
+                ui_vial_effects_apk_metal ui_mode_egg_apk_metal
+                ui_vial_contact_apk_metal ui_spawn_apk_metal ui_goal_factory_apk_metal
+                ui_blue_vial_apk_metal ui_pink_vial_apk_metal ui_vial_chain_apk_metal
+                ui_soundboard_apk_metal ui_keyboard_apk_metal ui_sequencer_apk_metal
+                ui_radio_apk_metal ui_accordion_apk_metal
+                ui_rocket_apk_metal
+                ui_physics_replay_apk_metal PROPERTIES
                 SKIP_RETURN_CODE 77 RESOURCE_LOCK ab_ui_intro_profile)
             set(AB_REFERENCE_OBJECT_ANIMATION "" CACHE FILEPATH
                 "Private original Android object-animation corpus")
@@ -4371,6 +4481,15 @@ if(BUILD_TESTING)
     add_executable(ab_bird_hat_tests tests/bird_hat.c)
     target_link_libraries(ab_bird_hat_tests PRIVATE ab_game)
     add_test(NAME bird_hat_edges COMMAND ab_bird_hat_tests)
+    add_executable(ab_bird_shockwave_tests tests/bird_shockwave.c)
+    target_link_libraries(ab_bird_shockwave_tests PRIVATE ab_game)
+    add_test(NAME bird_shockwave_edges COMMAND ab_bird_shockwave_tests)
+    add_executable(ab_bird_bubbles_tests tests/bird_bubbles.c)
+    target_link_libraries(ab_bird_bubbles_tests PRIVATE ab_game)
+    add_test(NAME bird_bubbles_edges COMMAND ab_bird_bubbles_tests)
+    add_executable(ab_electric_shockwave_tests tests/electric_shockwave.c)
+    target_link_libraries(ab_electric_shockwave_tests PRIVATE ab_game)
+    add_test(NAME electric_shockwave_edges COMMAND ab_electric_shockwave_tests)
     set(AB_REFERENCE_BIRD_HAT "" CACHE FILEPATH "Private pinned native hat lifecycle trace")
     if(AB_REFERENCE_BIRD_HAT)
         file(SHA256 "${AB_REFERENCE_BIRD_HAT}" bird_hat_hash)
@@ -4418,6 +4537,17 @@ if(BUILD_TESTING)
     add_test(NAME game_object_visual_edges COMMAND ab_object_visual_tests)
     add_executable(ab_object_transform_tests tests/object_transform.c)
     add_executable(ab_game_circle_tests tests/game_circle.c)
+    add_executable(ab_game_circle_resize_tests tests/game_circle.c)
+    target_compile_definitions(ab_game_circle_resize_tests PRIVATE AB_TEST_RESIZE_CIRCLE=1)
+    target_link_libraries(ab_game_circle_resize_tests PRIVATE ab_game)
+    add_test(NAME game_circle_resize_edges COMMAND ab_game_circle_resize_tests)
+    set(AB_REFERENCE_RESIZE_CIRCLE "" CACHE FILEPATH "Private pinned native circle-resize trace")
+    if(AB_REFERENCE_RESIZE_CIRCLE)
+        add_test(NAME game_circle_resize_android
+            COMMAND "${CMAKE_COMMAND}" "-DREFERENCE=${AB_REFERENCE_RESIZE_CIRCLE}"
+                "-DCHECKER=$<TARGET_FILE:ab_game_circle_resize_tests>"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_resize_circle_reference.cmake")
+    endif()
     add_executable(ab_game_box_tests tests/game_box.c)
     target_link_libraries(ab_game_box_tests PRIVATE ab_game)
     add_test(NAME game_box_edges COMMAND ab_game_box_tests)

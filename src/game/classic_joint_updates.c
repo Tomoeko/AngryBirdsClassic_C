@@ -257,6 +257,33 @@ bool ab_classic_joint_updates_defer(void *context, AbSpan name, AbError *error) 
     return ab_game_joint_defer(&updates->queue, name, error);
 }
 
+bool ab_classic_joint_updates_defer_object(AbClassicJointUpdates *updates,
+                                           AbSpan object, AbError *error) {
+    if (object.size && !object.data)
+        return ab_fail(error, "Invalid explosion joint object name");
+    if (!ab_classic_joint_updates_refresh(updates, error))
+        return false;
+    size_t cursor = 0;
+    for (;;) {
+        AbStringMapEntry entry;
+        if (!ab_string_map_next(updates->metadata, &cursor, &entry, error))
+            return false;
+        if (!entry.present)
+            return true;
+        const JointMetadata *metadata = (const JointMetadata *)entry.value;
+        const AbDataValue *ends[] = {ab_data_get(&metadata->table, text("end1")),
+                                     ab_data_get(&metadata->table, text("end2"))};
+        bool connected = false;
+        for (size_t index = 0; index < 2; ++index)
+            connected |= ends[index] && ends[index]->kind == AB_DATA_STRING &&
+                         ends[index]->string.size == object.size &&
+                         (!object.size ||
+                          !memcmp(ends[index]->string.data, object.data, object.size));
+        if (connected && !ab_classic_joint_updates_defer(updates, entry.key, error))
+            return false;
+    }
+}
+
 static bool destroy(AbClassicJointUpdates *updates, AbSpan name, AbError *error) {
     AbClassicJointUpdateConfig *config = &updates->config;
     if (!config->print_destroy(config->context, name, error))

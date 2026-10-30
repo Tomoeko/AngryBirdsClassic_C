@@ -26,6 +26,10 @@ bool cc_audio_output_start(CcAudioOutput *output) {
     return output && !fail_start;
 }
 
+bool cc_audio_output_stop(CcAudioOutput *output) {
+    return output != NULL;
+}
+
 bool cc_audio_output_failed(const CcAudioOutput *output) {
     (void)output;
     return false;
@@ -89,6 +93,23 @@ int main(void) {
         CHECK(stereo[index] == 0);
     CHECK(ab_audio_output_view(output).underrun_frames == 4096 - before.queued_frames &&
           ab_audio_output_pump(output, &error));
+    CHECK(!ab_audio_output_capture_begin(output, 1024) &&
+          ab_audio_output_pause(output, &error) &&
+          !ab_audio_output_capture_begin(output, 0) &&
+          ab_audio_output_capture_begin(output, 1024) &&
+          !ab_audio_output_capture_begin(output, 1024) &&
+          ab_audio_output_resume(output, &error));
+    float captured[2048];
+    device->options.render(device->options.context, stereo, 257);
+    CHECK(ab_audio_output_capture_read(output, captured, 1024) == 257);
+    for (size_t index = 0; index < 257 * 2; ++index)
+        CHECK(captured[index] == stereo[index]);
+    CHECK(!ab_audio_output_capture_failed(output) &&
+          !ab_audio_output_capture_read(output, captured, 1024));
+    device->options.render(device->options.context, stereo, 4096);
+    CHECK(ab_audio_output_capture_failed(output));
+    ab_audio_output_capture_end(output);
+    CHECK(ab_audio_output_resume(output, &error));
     ab_audio_output_close(output);
     CHECK(!device && !ab_audio_mixer_view(mixer).started);
     ab_audio_mixer_close(mixer);

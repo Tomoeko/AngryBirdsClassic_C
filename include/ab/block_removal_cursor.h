@@ -15,6 +15,8 @@ typedef struct {
     const AbStringMap *iteration;
     size_t cursor;
     bool finished;
+    AbSpan resume_key;
+    bool resume_pending;
 } AbBlockRemovalCursor;
 
 typedef struct {
@@ -48,9 +50,12 @@ bool ab_block_removal_open(const AbBlockRemovalState *state,
  * again; this component does not invoke it or remove a selected entry. Normal
  * exhaustion sets found=false and preserves entry output. Plain tables, numeric
  * strength bits, stable values/keys/maps and original physical hash order only.
- * Hosts may delete/replace existing values and switch map/world bindings, while
- * the captured iteration table stays alive. Do not insert/rehash that iteration
- * table. Nil writes to a different current binding use its bounded map storage.
+ * Hosts may delete/replace values, insert/rehash and switch map/world bindings,
+ * while the captured iteration table stays alive. Resume native next after the
+ * last retained key in its current hash slot; do not continue from a stale slot,
+ * restart, deduplicate visits or replace the captured table. A discarded resume
+ * key fails as native next does. Nil writes to a different current binding use
+ * its bounded map storage.
  * No metatables, custom pairs or GC scheduling. Abandon the cursor after failure:
  * preceding map writes and callback changes survive. Do not reenter or release borrowed
  * data.

@@ -53,6 +53,10 @@ size_t ab_classic_particles_bytes(const AbClassicParticles *particles);
 size_t ab_classic_particles_resource_bytes(const AbClassicParticles *particles);
 AbParticles *ab_classic_particles_engine(AbClassicParticles *particles);
 AbClassicLevel *ab_classic_particles_level(const AbClassicParticles *particles);
+/* Borrow the preloaded particle definition; missing names return NULL. No I/O,
+ * decoding or mutation. The returned table lives until this owner closes. */
+const AbDataTable *ab_classic_particles_definition(const AbClassicParticles *particles,
+                                                   AbSpan name);
 
 /* Borrow metadata for runtime deep-copied descriptors. Their entries retain
  * source pairs insertion order and grow from an empty table; hash_capacity is
@@ -64,9 +68,9 @@ bool ab_classic_particles_bind_copies(AbClassicParticles *particles,
 /* Actual addParticlesNew(object.name, descriptor, false, false), suitable for
  * the owned bird-contact service. Resolve live Lua-world membership/pose/size,
  * traverse the immutable catalog descriptor in retained constructor hash order,
- * choose explicit amount or the shared Lua random interval, then query the real
- * body angle and emit into the native-engine RNG/list owner. Cached coordinates
- * use the measured x20 conversion. Unknown/rebound descriptors or body identities
+ * choose explicit amount or the shared Lua random interval, then read the live
+ * world's published angle and emit into the native-engine RNG/list owner. Coordinates
+ * use the measured x20 conversion. Unknown/rebound descriptors or world identities
  * reject when reached. Earlier random/emission effects survive later failure.
  * No allocation, implicit descriptors, skipped required emissions or drawing. */
 bool ab_classic_particles_contact(void *context, size_t object, AbDataValue descriptor,

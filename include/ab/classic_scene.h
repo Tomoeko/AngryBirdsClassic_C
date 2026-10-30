@@ -23,8 +23,9 @@ typedef struct {
  * explicit caller work. Constructor scale is one and visibility is true.
  * The reserved ground has an invisible, unbound placeholder at its object index;
  * it has no ordinary renderer. Collider 7 is excluded before sprite/catalog
- * access. Composite, mask, special
- * animation and extra renderers are outside this adapter. Reserve the level's
+ * access. Resource-provider composites use the same object pose and their
+ * retained part bindings. Mask, special animation and extra renderers remain
+ * separate. Reserve the level's
  * full object capacity for explicit later ordinary append operations. Scene IDs
  * and membership registration remain in the enclosing render-scene owner.
  * allocation_limit bounds this owner and both arrays. Output starts NULL;
@@ -35,7 +36,7 @@ bool ab_classic_scene_open(AbClassicLevel *level, const AbSpriteAtlas *atlas,
                            AbError *error);
 /* Bind ordinary sprites through a stable borrowed provider and its synchronized
  * texture cache. Texture IDs need not be consecutive. Missing/empty initial
- * names create empty assets; initial composites reject explicitly. Cached
+ * names create empty assets; composites retain their resolved selection. Cached
  * bindings are not automatically retargeted on resource-group changes: discard
  * or rebind them before source release, then sync visuals before drawing.
  * Other membership, storage and rendering limits above still apply. */
@@ -75,7 +76,7 @@ bool ab_classic_scene_set_visible(AbClassicScene *scene, size_t object, bool vis
 /* Bind canonical visual state from the same level and atlas/provider without name
  * search, resource loading or allocation. Empty/absent assets suppress draw submission
  * while preserving requested visibility, so a later valid sprite can return.
- * Composite assets reject before writes; their renderer remains separate.
+ * Composite assets retain their source/parts; validate textures before writes.
  * Fixed slots and no concurrent visual mutation are required. Level-forgotten
  * rows become invisible and skip visual/pose reads, including live orphan bodies.
  */
@@ -88,6 +89,13 @@ bool ab_classic_scene_sync_visuals(AbClassicScene *scene,
 bool ab_classic_scene_draw(AbClassicScene *scene, AbCoordinateCamera camera,
                            uint32_t viewport_width, uint32_t viewport_height,
                            AbDrawList *list, AbError *error);
+/* Draw one cached ordinary/composite object in enclosing membership order.
+ * Caller synchronizes poses first. No allocation or name lookup; a failure
+ * restores list.count, including a partially submitted composite. */
+bool ab_classic_scene_draw_object(const AbClassicScene *scene, size_t object,
+                                  AbCoordinateCamera camera, uint32_t viewport_width,
+                                  uint32_t viewport_height, AbDrawList *list,
+                                  AbError *error);
 
 /* Synchronize ordinary rendered poses without drawing. This separates pose
  * publication from traversal when another owner interleaves renderer classes.

@@ -18,6 +18,7 @@ struct AbClassicCharacters {
     AbCharacterAnimations animations;
     AbCharacterAnimationBindings *bindings;
     AbClassicCharacterSprites *sprites;
+    AbStringMap *goals;
     CharacterEntry *entries;
     size_t capacity, bytes;
 };
@@ -185,12 +186,17 @@ static bool bind_entries(AbClassicCharacters *characters, AbClassicLevelView lev
                          .camera_distance = goal_distance,
                          .play_oink = goal_sound}};
             if (!finite_number(field(entry->definition.source, "strength"),
-                               &binding->goal.base_strength) ||
-                !finite_number(
-                    field(first.kind == AB_DATA_TABLE ? first.table : NULL, "min"),
-                    &binding->goal.damage1_min)) {
+                               &binding->goal.base_strength)) {
                 return ab_fail(error, "Unsupported classic goal expression definition");
             }
+            /* Floating pigs have no damageSprites. The original indexes that
+             * descriptor only when specialExpression is truthy. Preserve the
+             * reached failure with an invalid sentinel, rather than rejecting
+             * their ordinary blink/oink controller during construction. */
+            if (!finite_number(
+                    field(first.kind == AB_DATA_TABLE ? first.table : NULL, "min"),
+                    &binding->goal.damage1_min))
+                binding->goal.damage1_min = NAN;
         }
         if (object->physics.controllable) {
             binding->bird = (AbBirdAnimationControls){
@@ -341,6 +347,45 @@ static bool truthy(AbDataValue value) {
     return value.kind != AB_DATA_NIL && (value.kind != AB_DATA_BOOLEAN || value.bits);
 }
 
+static bool key_is(AbSpan key, const char *name) {
+    size_t size = strlen(name);
+    return key.size == size && (!size || memcmp(key.data, name, size) == 0);
+}
+
+bool ab_classic_characters_set_goal_property(AbClassicCharacters *characters,
+                                             size_t object, AbSpan key,
+                                             AbDataValue value, AbError *error) {
+    if (!characters || object >= characters->animations.count ||
+        (key.size && !key.data))
+        return ab_fail(error, "Invalid live character property assignment");
+    AbGoalAnimation *goal = &characters->animations.objects[object].goal;
+    float *numeric = NULL, number_value = 0;
+    if (key_is(key, "strength"))
+        numeric = &goal->strength;
+    else if (key_is(key, "blinkTimer"))
+        numeric = &goal->blink_timer;
+    else if (key_is(key, "oinkTimer"))
+        numeric = &goal->oink_timer;
+    else if (key_is(key, "specialExpressionTimer") && truthy(value))
+        numeric = &goal->special_timer;
+    if (numeric && !finite_number(value, &number_value))
+        return ab_fail(error, "Nonfinite numeric character property assignment");
+    AbClassicLevelView level = ab_classic_level_view(characters->level);
+    if (!ab_level_property_set(level.properties, object, key, value, error))
+        return false;
+    if (numeric)
+        *numeric = number_value;
+    else if (key_is(key, "blinkOn"))
+        goal->blink_on = truthy(value);
+    else if (key_is(key, "disableSmiling"))
+        characters->bindings[object].goal.disable_smiling = truthy(value);
+    else if (key_is(key, "specialExpression")) {
+        goal->special_expression = truthy(value);
+        characters->sprites[object].special_expression = value;
+    }
+    return true;
+}
+
 bool ab_classic_characters_special_expression(AbClassicCharacters *characters,
                                               size_t object, AbSpan key, float seconds,
                                               AbError *error) {
@@ -377,16 +422,35 @@ bool ab_classic_characters_update(AbClassicCharacters *characters, float seconds
                                   AbError *error) {
     if (!characters)
         return ab_fail(error, "Missing classic character owner");
+    if (characters->goals) {
+        if (!ab_classic_level_sync_goal_order(characters->level, characters->goals,
+                                              error))
+            return false;
+        characters->animations.goal_count =
+            ab_classic_level_view(characters->level).goal_count;
+    }
     if (!ab_character_animations_update(&characters->animations, seconds, error))
         return false;
     AbClassicLevelView level = ab_classic_level_view(characters->level);
     for (size_t rank = 0; rank < level.goal_count; ++rank) {
         size_t object = level.goal_order[rank];
         AbDataTable *physical = &level.properties->objects[object].physical;
-        if (level.removed_objects[object] ||
-            field(physical, "specialExpressionTimer").kind == AB_DATA_NIL)
+        if (level.removed_objects[object])
             continue;
         AbGoalAnimation *goal = &level.character_objects[object].goal;
+        const char *const names[] = {"blinkTimer", "oinkTimer", "blinkOn"};
+        AbDataValue values[] = {number(goal->blink_timer),
+                                number(goal->oink_timer),
+                                {.kind = AB_DATA_BOOLEAN, .bits = goal->blink_on}};
+        for (size_t index = 0; index < 3; ++index)
+            if (field(physical, names[index]).kind != AB_DATA_NIL &&
+                !ab_level_property_set(
+                    level.properties, object,
+                    (AbSpan){(const uint8_t *)names[index], strlen(names[index])},
+                    values[index], error))
+                return false;
+        if (field(physical, "specialExpressionTimer").kind == AB_DATA_NIL)
+            continue;
         if (!ab_level_property_set(
                 level.properties, object,
                 (AbSpan){(const uint8_t *)"specialExpressionTimer", 22},
@@ -399,5 +463,13 @@ bool ab_classic_characters_update(AbClassicCharacters *characters, float seconds
                                    error))
             return false;
     }
+    return true;
+}
+
+bool ab_classic_characters_bind_goals(AbClassicCharacters *characters,
+                                      AbStringMap *goals, AbError *error) {
+    if (!characters || !goals || characters->goals)
+        return ab_fail(error, "Invalid character live-goal binding");
+    characters->goals = goals;
     return true;
 }

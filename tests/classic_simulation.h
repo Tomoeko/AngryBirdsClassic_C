@@ -283,8 +283,10 @@ static bool simulation_glue_checks(AbClassicLevel *level,
 typedef struct {
     AudioTest audio;
     AbClassicSimulation *simulation;
+    AbClassicLevel *level;
     size_t phases;
-    bool checked_reentry;
+    size_t *spawned;
+    bool checked_reentry, spawn;
 } DynamicSimulationTest;
 
 static bool dynamic_simulation_phase(void *context, const AbClassicSimulationCall *call,
@@ -301,6 +303,28 @@ static bool dynamic_simulation_phase(void *context, const AbClassicSimulationCal
         CHECK(!ab_classic_simulation_register_circle(test->simulation, 0, NULL) &&
               !ab_classic_simulation_advance(test->simulation, &timing, &plan, NULL));
         test->checked_reentry = true;
+    }
+    if (test->spawn && call->stage == AB_CLASSIC_SIMULATION_AFTER_STEP) {
+        AbGameCircleInput input = {.name = string("replacement").string,
+                                   .position = {60, -10},
+                                   .radius = 1,
+                                   .density = 1};
+        CHECK(ab_classic_level_create_circle(test->level, input, test->spawned, NULL));
+        AbClassicLevelView level = ab_classic_level_view(test->level);
+        AbObjectPropertyAccess access = {
+            .physics_object = {
+                .kind = AB_DATA_TABLE,
+                .table = &level.properties->objects[*test->spawned].physical}};
+        CHECK(ab_object_property_set(&access, string("definition").string,
+                                     string("AlphaCircle"), NULL) &&
+              ab_body_velocity_set(
+                  &level.world->storage
+                       .bodies[level.bodies->objects[*test->spawned].physics.body]
+                       .motion,
+                  (AbVec2){6, -2}) &&
+              ab_classic_simulation_register_circle(test->simulation, *test->spawned,
+                                                    NULL));
+        test->spawn = false;
     }
     ++test->phases;
     return true;
@@ -348,7 +372,7 @@ static bool simulation_dynamic_checks(AbClassicLevel *level,
             .motion.awake = false;
         CHECK(ab_classic_level_finish_object(level, index, NULL));
     }
-    DynamicSimulationTest test = {0};
+    DynamicSimulationTest test = {.level = level};
     AbClassicSimulationConfig config = {
         .minimum_x = -100,
         .maximum_x = 100,
@@ -398,18 +422,16 @@ static bool simulation_dynamic_checks(AbClassicLevel *level,
                   ab_level_properties_forget(loaded.properties, created[0], NULL));
             removed_frame = loaded.frame->objects[created[0]];
             removed_properties = loaded.motion_properties[created[0]];
-            AbGameCircleInput replacement = {.name = string("replacement").string,
-                                             .position = {60, -10},
-                                             .radius = 1,
-                                             .density = 1};
-            CHECK(dynamic_simulation_circle(level, *output, replacement,
-                                            (AbVec2){6, -2}, created + 3) &&
-                  loaded.bodies->objects[created[3]].physics.body == body);
+            test.spawn = true;
+            test.spawned = created + 3;
         }
         CHECK(ab_classic_simulation_advance(*output, &timing, &plan, NULL) &&
               plan.steps == 1 && test.phases == (frame + 1) * 3 && !test.audio.count &&
               view.post.activity->has_awake && !view.post.activity->moving &&
               view.post.activity->above_tolerance);
+        if (frame == 6)
+            CHECK(!test.spawn && loaded.bodies->objects[created[3]].physics.body ==
+                                     loaded.bodies->objects[created[0]].physics.body);
     }
     for (size_t index = 1; index < 4; ++index) {
         size_t object = created[index];

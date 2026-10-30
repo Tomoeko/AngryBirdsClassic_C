@@ -1,5 +1,6 @@
 #include "ab/audio_output.h"
 #include "console_common/audio/output.h"
+#include "console_common/capture/audio_buffer.h"
 
 #include <stdatomic.h>
 #include <stdlib.h>
@@ -9,10 +10,11 @@ enum { QUEUE_FRAMES = 8192, TARGET_FRAMES = 1024, MIX_FRAMES = 512 };
 struct AbAudioOutput {
     AbAudioMixer *mixer;
     CcAudioOutput *device;
+    CcAudioBuffer *capture;
     float samples[QUEUE_FRAMES];
     atomic_uint read_position, write_position;
     atomic_uint_fast64_t rendered, nonzero, underrun;
-    bool failed;
+    bool failed, running;
 };
 
 static void render(void *context, float *stereo, size_t frames) {
@@ -35,6 +37,7 @@ static void render(void *context, float *stereo, size_t frames) {
     atomic_fetch_add_explicit(&output->rendered, frames, memory_order_relaxed);
     atomic_fetch_add_explicit(&output->nonzero, nonzero, memory_order_relaxed);
     atomic_fetch_add_explicit(&output->underrun, frames - count, memory_order_relaxed);
+    cc_audio_buffer_write(output->capture, stereo, frames);
 }
 
 bool ab_audio_output_pump(AbAudioOutput *output, AbError *error) {
@@ -96,7 +99,7 @@ bool ab_audio_output_open(AbAudioMixer *mixer, AbAudioOutput **output, AbError *
                                                      .context = owner,
                                                      .mode = CC_AUDIO_OUTPUT_DIRECT});
     okay = owner->device && ab_audio_mixer_start(mixer, true, error) &&
-           ab_audio_output_pump(owner, error) && cc_audio_output_start(owner->device);
+           ab_audio_output_pump(owner, error) && ab_audio_output_resume(owner, error);
     if (!okay) {
         ab_audio_output_close(owner);
         return error && error->message[0]
@@ -105,6 +108,49 @@ bool ab_audio_output_open(AbAudioMixer *mixer, AbAudioOutput **output, AbError *
     }
     *output = owner;
     return true;
+}
+
+bool ab_audio_output_pause(AbAudioOutput *output, AbError *error) {
+    if (!output || !output->device)
+        return ab_fail(error, "Missing native audio device to pause");
+    bool okay = !output->running || cc_audio_output_stop(output->device);
+    output->running = false;
+    return okay || ab_fail(error, "Cannot pause native audio output");
+}
+
+bool ab_audio_output_resume(AbAudioOutput *output, AbError *error) {
+    if (!output || !output->device || output->failed)
+        return ab_fail(error, "Missing or failed native audio device to resume");
+    if (output->running)
+        return true;
+    output->running = cc_audio_output_start(output->device);
+    return output->running || ab_fail(error, "Cannot resume native audio output");
+}
+
+bool ab_audio_output_capture_begin(AbAudioOutput *output, size_t capacity_frames) {
+    if (!output || output->running || output->capture)
+        return false;
+    output->capture = cc_audio_buffer_create(capacity_frames);
+    return output->capture != NULL;
+}
+
+size_t ab_audio_output_capture_read(AbAudioOutput *output, float *stereo,
+                                    size_t capacity_frames) {
+    return output ? cc_audio_buffer_read(output->capture, stereo, capacity_frames, NULL)
+                  : 0;
+}
+
+bool ab_audio_output_capture_failed(const AbAudioOutput *output) {
+    return output && cc_audio_buffer_failed(output->capture);
+}
+
+void ab_audio_output_capture_end(AbAudioOutput *output) {
+    if (!output)
+        return;
+    AbError ignored = {0};
+    (void)ab_audio_output_pause(output, &ignored);
+    cc_audio_buffer_destroy(output->capture);
+    output->capture = NULL;
 }
 
 AbAudioOutputView ab_audio_output_view(const AbAudioOutput *output) {
@@ -126,6 +172,7 @@ void ab_audio_output_close(AbAudioOutput *output) {
     if (!output)
         return;
     cc_audio_output_close(output->device);
+    cc_audio_buffer_destroy(output->capture);
     AbError error = {0};
     (void)ab_audio_mixer_start(output->mixer, false, &error);
     free(output);

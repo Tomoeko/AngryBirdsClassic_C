@@ -304,7 +304,7 @@ static bool register_object(AbClassicForces *forces, size_t object, bool box,
         .name = source->name, .source = object, .rank = rank, .owner = forces};
     entry->data.forces.gravity_enabled = source->physics.gravity_enabled;
     entry->data.forces.object_mass = source->initial_mass;
-    if (box) {
+    if (box || source->defined_constructor) {
         AbObjectDefinition definition;
         if (!ab_object_definition_open(level.catalog, source->definition_name, NULL,
                                        &definition, error) ||

@@ -610,7 +610,8 @@ bool ab_classic_birds_update(AbClassicBirds *owner, size_t object, float seconds
     if (field(physical, "bombTimer").kind != AB_DATA_NIL &&
         !truthy(field(physical, "disableTimedSpecialty")))
         kind = AB_CLASSIC_BIRD_BOMB_TIMER;
-    else if (field(physical, "pinkTimer").kind != AB_DATA_NIL)
+    else if (field(physical, "pinkTimer").kind != AB_DATA_NIL &&
+             !truthy(field(physical, "disableTimedSpecialty")))
         kind = AB_CLASSIC_BIRD_PINK_TIMER;
     else if (truthy(field(physical, "superseed_timer")))
         kind = AB_CLASSIC_BIRD_SUPERSEED;

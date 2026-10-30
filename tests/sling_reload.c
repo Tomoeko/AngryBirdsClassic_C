@@ -26,6 +26,20 @@ static float from_bits(uint32_t value) {
 }
 
 static bool edge_checks(void) {
+    const float gains[][3] = {{10, 0, 1},         {10, 5, 0.5f},    {10, 7.5f, 0.25f},
+                              {10, 20, 0.25f},    {10, -5, 1},      {0, 0, 0.25f},
+                              {0, 1, 0.25f},      {-0.0f, 1, 1},    {0, -1, 1},
+                              {-0.0f, -1, 0.25f}, {-0.0f, 0, 0.25f}};
+    for (size_t index = 0; index < sizeof(gains) / sizeof(*gains); ++index) {
+        float gain = -1;
+        CHECK(ab_slingshot_reload_gain(gains[index][0], gains[index][1], &gain) &&
+              gain == gains[index][2]);
+    }
+    float gain = -1;
+    CHECK(ab_slingshot_reload_gain(0x1p-149f, 0x1.fffffep127f, &gain) && gain == 0.25f);
+    CHECK(!ab_slingshot_reload_gain(INFINITY, 0, &gain) && gain == 0.25f);
+    CHECK(!ab_slingshot_reload_gain(0, NAN, &gain) && gain == 0.25f);
+    CHECK(!ab_slingshot_reload_gain(1, 1, NULL));
     AbSlingReloadState state = {.timer = 1};
     AbSlingReloadGate output = {0}, before = output;
     CHECK(!ab_slingshot_reload_gate(NULL, 0, true, &output));

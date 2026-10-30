@@ -90,6 +90,15 @@ bool ab_block_removal_next(AbBlockRemovalState *state, AbBlockRemovalCursor *cur
         return ab_fail(error, "Invalid block removal cursor state");
     }
     for (;;) {
+        /* Explosions enqueue additional deaths inside the ordinary removal
+         * pipeline. Rehash can move the retained key or shrink the hash part.
+         * Lua pairs resumes next(table, key), not a saved physical slot. */
+        if (cursor->resume_pending) {
+            if (!ab_string_map_resume(cursor->iteration, cursor->resume_key,
+                                      &cursor->cursor, error))
+                return false;
+            cursor->resume_pending = false;
+        }
         AbStringMapEntry entry = {0};
         if (!ab_string_map_next(cursor->iteration, &cursor->cursor, &entry, error)) {
             return false;
@@ -99,6 +108,8 @@ bool ab_block_removal_next(AbBlockRemovalState *state, AbBlockRemovalCursor *cur
             *found = false;
             return true;
         }
+        cursor->resume_key = entry.key;
+        cursor->resume_pending = true;
         AbDataValue object =
             entry.value ? *(const AbDataValue *)entry.value : (AbDataValue){0};
         AbDataValue world = {0}, current = {0};

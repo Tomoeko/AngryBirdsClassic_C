@@ -51,6 +51,9 @@ typedef struct {
                  AbError *error);
 } AbClassicRemovalConfig;
 
+/* Append the next reserved stable identity, including a destruction spawn from
+ * the active removal pass. Existing normalized tables and row identities survive.
+ * Locked worlds and recursive removal calls remain prohibited. */
 bool ab_classic_removals_register_object(AbClassicRemovals *owner, size_t object,
                                          AbError *error);
 

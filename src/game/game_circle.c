@@ -1,4 +1,5 @@
 #include "ab/game_circle.h"
+#include "ab/object_property_access.h"
 
 #include <math.h>
 #include <string.h>
@@ -61,4 +62,20 @@ bool ab_game_circle_create(AbPhysicsWorld *world, AbGameCircleInput input,
         (AbDataTable){properties->physical_entries, sizeof(fields) / sizeof(*fields),
                       AB_LEVEL_PHYSICAL_PROPERTY_CAPACITY, NULL};
     return true;
+}
+
+bool ab_game_circle_resize(AbPhysicsWorld *world, AbGameCircle *circle, float radius,
+                           AbError *error) {
+    if (!circle)
+        return ab_fail(error, "Missing circle resize owner");
+    if (!ab_object_body_resize_circle(world, &circle->physics, radius, error))
+        return false;
+    AbObjectPropertyAccess access = {
+        .physics_object = {.kind = AB_DATA_TABLE,
+                           .table = &circle->properties.physical}};
+    circle->initial_mass = world->storage.bodies[circle->physics.body].motion.mass.mass;
+    return ab_object_property_set(&access, text("radius").string, number(radius),
+                                  error) &&
+           ab_object_property_set(&access, text("mass").string,
+                                  number(circle->initial_mass), error);
 }

@@ -146,6 +146,9 @@ static bool button(void) {
         &control.widget.state,
         (AbUiPointerValue){.kind = AB_UI_POINTER_BOOLEAN, .boolean = true},
         &context.images, &error));
+    /* Hit testing now queries the actual current resource. Keep the press on A
+     * so that only the subsequent toggle's B setter exercises this failure. */
+    CHECK(ab_ui_toggle_button_set_state_image(&control, 1, span("A"), &error));
     fixture.fail_b = true;
     reply.values[0] = text("sentinel");
     CHECK(ab_ui_widget_pointer(&control.widget, span("LPRESS"), (AbVec2){0}, &reply,

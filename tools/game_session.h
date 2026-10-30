@@ -28,8 +28,16 @@ typedef struct PreviewResults PreviewResults;
 typedef struct PreviewPause PreviewPause;
 typedef struct PreviewPowerups PreviewPowerups;
 typedef struct PreviewEagle PreviewEagle;
+typedef struct PreviewRocketCanisters PreviewRocketCanisters;
 
 #include "game_eagle_state.h"
+#include "game_shockwave_state.h"
+#include "game_bubble_state.h"
+#include "game_puffer_state.h"
+#include "game_vial_state.h"
+#include "game_hat_state.h"
+#include "game_spawn_state.h"
+#include "game_factory_state.h"
 
 /* Application ownership, above the independently verified runtime phases.
  * Resources/settings/events remain owned by the menu application. */
@@ -43,6 +51,10 @@ struct PreviewGame {
     uint8_t blues_names[65536];
     AbDataTable egg_event, egg_data;
     AbDataEntry egg_event_fields[2], egg_count;
+    AbDataTable reward_events[2];
+    AbDataEntry reward_fields[2][3];
+    size_t reward_events_used;
+    bool show_boomerang_popup;
     AbClassicLevelRuntime *level;
     AbClassicWorldRuntime *world;
     AbClassicGameRuntime *game;
@@ -59,11 +71,24 @@ struct PreviewGame {
     PreviewPause *pause;
     PreviewPowerups *powerups;
     PreviewEagle *eagle;
+    PreviewShockwaves *shockwaves;
+    PreviewBubbles *bubbles;
+    PreviewPuffers *puffers;
+    PreviewVials *vials;
+    PreviewRocketCanisters *rockets;
+    AbDelayedCallbacks *delayed;
+    size_t vial_count;
+    PreviewHats hats;
+    PreviewSpawns spawns;
+    PreviewFactory factory;
     AbMightyEagleTimer eagle_timer;
     AbDataTable ignored_moving;
     AbDataEntry ignored_moving_entries[256];
     AbUiPointerValue navigation_action;
     AbClassicCollisionHooks hooks;
+    AbClassicCollisionFunction shockwave_collision;
+    AbClassicCollisionFunction puffer_collision;
+    AbClassicCollisionHookBinding collision_bindings[2];
     AbObjectRemovalNotifyHost removal_notifications;
     AbClassicGameUpdates *updates;
     AbClassicBalloons *balloons;
@@ -202,6 +227,23 @@ static bool game_session_scroll(PreviewMenu *menu, float amount, AbVec2 point,
 /* level_scripts.lua root: 35 direct registrations and episode7/page2's
  * onAfterLevelObjectsCreated loop. Reject unresolved active scripts before
  * loading; the remaining names have an actual absent source registry entry. */
+static const AbLevelEggScript *game_level_egg_script(AbSpan name) {
+    const AbLevelEggScript *common = ab_level_egg_script(name);
+    if (common)
+        return common;
+    /* level_scripts6459/6556 and 6657/6755 are mode _extra wrappers around
+     * the same loaded-object/award helpers, with BlackBird_15's additional
+     * current Eagle cleanup retained in game_removal_call. */
+    static const AbLevelEggScript extra[] = {
+        {"EggDefender_classic_8", "BP_BIG_ENGINE_1", "LevelGE_29", false},
+        {"BlackBird_15", "ExtraGoldenEgg_1", "LevelGE_31", false}};
+    for (size_t index = 0; index < 2; ++index)
+        if (menu_route_equal((AbDataValue){.kind = AB_DATA_STRING, .string = name},
+                             game_text(extra[index].level)))
+            return extra + index;
+    return NULL;
+}
+
 static bool game_scripts_available(const AbClassicLevelRequest *level, AbError *error) {
     static const char *const registered[] = {"Level34",
                                              "LevelP2_64",
@@ -237,13 +279,13 @@ static bool game_scripts_available(const AbClassicLevelRequest *level, AbError *
                                              "Level1262",
                                              "Level1263",
                                              "Level_0003_1"};
-    if (menu_route_equal(level->episode_id, menu_route_number(7)) &&
-        menu_route_equal(level->page_number, menu_route_number(2)))
-        return ab_fail(error,
-                       "Selected level requires its registered construction hook");
-    if (level->name.kind == AB_DATA_STRING && ab_level_egg_script(level->name.string))
+    if (level->name.kind == AB_DATA_STRING && game_level_egg_script(level->name.string))
         return true;
     if (menu_route_equal(level->name, game_text("LevelGE_20")))
+        return true;
+    if (menu_route_equal(level->name, game_text("LevelP3_271")) ||
+        menu_route_equal(level->name, game_text("LevelP4_426")) ||
+        menu_route_equal(level->name, game_text("LevelH900")))
         return true;
     for (size_t index = 0; index < sizeof(registered) / sizeof(*registered); ++index)
         if (menu_route_equal(level->name, game_text(registered[index])))
@@ -261,13 +303,15 @@ static bool game_group(PreviewMenu *menu, const char *name, AbError *error) {
 
 static bool game_level_script_prepare(PreviewGame *game, const AbLuaData *level,
                                       AbError *error);
+static bool game_factory_prepare(PreviewGame *game, const AbLuaData *level,
+                                 const AbLuaData *catalog, AbError *error);
 
 static bool game_prepare(void *context, const AbLuaData *level,
                          const AbLuaData *catalog, AbError *error) {
     PreviewGame *game = context;
     PreviewMenu *menu = game->menu;
-    (void)catalog;
-    if (!game_level_script_prepare(game, level, error))
+    if (!game_level_script_prepare(game, level, error) ||
+        !game_factory_prepare(game, level, catalog, error))
         return false;
     AbDataValue theme = menu_route_field(level->globals, "theme");
     if (theme.kind != AB_DATA_STRING || !game_group(menu, "INGAME", error) ||
@@ -499,6 +543,13 @@ static bool game_powerup_bird_update(void *context, AbClassicBirdUpdate kind,
                                      AbError *error);
 static bool game_powerup_trails(void *context, size_t object, bool potion, bool king,
                                 AbError *error);
+static void game_shock_close(PreviewGame *game);
+static void game_bubble_close(PreviewGame *game);
+static void game_puffer_close(PreviewGame *game);
+static void game_vial_close(PreviewGame *game);
+static void game_rocket_close(PreviewGame *game);
+static bool game_factory_created(PreviewGame *game, size_t object, AbError *error);
+static bool game_joint_defer_object(void *context, AbSpan name, AbError *error);
 
 static void game_session_free(PreviewMenu *menu) {
     PreviewGame *game = menu->game;
@@ -521,9 +572,21 @@ static void game_session_free(PreviewMenu *menu) {
     ab_classic_joint_updates_close(game->joint_updates);
     ab_classic_highscores_close(game->highscores);
     ab_classic_balloons_close(game->balloons);
+    ab_delayed_callbacks_close(game->delayed);
     ab_classic_game_updates_close(game->updates);
     ab_extra_draws_close(game->extra_draws);
     (void)ab_classic_world_runtime_close(&game->world, &error);
+    game_shock_close(game);
+    game_bubble_close(game);
+    game_puffer_close(game);
+    game_vial_close(game);
+    game_rocket_close(game);
+    free(game->hats.records);
+    free(game->spawns.names);
+    free(game->factory.names);
+    free(game->factory.entries);
+    free(game->factory.events);
+    free(game->factory.event_fields);
     ab_classic_collision_achievements_close(game->achievements);
     ab_classic_particles_close(game->particles);
     ab_classic_level_runtime_close(game->level);
@@ -533,9 +596,17 @@ static void game_session_free(PreviewMenu *menu) {
     menu->game = NULL;
 }
 
+#include "game_level_rewards.h"
 #include "game_level_scripts.h"
 #include "game_world_limits.h"
 #include "game_eagle_runtime.h"
+#include "game_shockwaves.h"
+#include "game_bubbles.h"
+#include "game_puffers.h"
+#include "game_hats.h"
+#include "game_spawns.h"
+#include "game_factories.h"
+#include "game_rockets.h"
 #include "game_session_runtime.h"
 #include "game_score_hud.h"
 #include "game_results.h"
@@ -616,7 +687,10 @@ static bool game_session_draw(PreviewMenu *menu, float seconds, AbError *error) 
     AbFrameClockPlan plan;
     bool okay = ab_classic_simulation_advance(
         dynamics.simulation,
-        &(AbFrameClockInput){.seconds = seconds, .physics_enabled = game->physics},
+        &(AbFrameClockInput){.seconds = seconds,
+                             .physics_enabled = game->physics,
+                             .speed_factor = game->speed,
+                             .speed_factor_present = true},
         &plan, error);
     if (!okay && error && dynamics.contacts->listener.failed)
         *error = dynamics.contacts->listener.error;

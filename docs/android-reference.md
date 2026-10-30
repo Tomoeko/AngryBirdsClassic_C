@@ -77,6 +77,16 @@ this with `-no-audio`, which breaks the target's `AudioTrack` initialization.
 
 ## Captures and observations
 
+A later display profile uses physical 768 x 1024 at density 160, with orientation
+1 and a logical 1024 x 768 landscape viewport. After a cold guest restart, the
+unmodified pinned APK reaches its splash and main menu at that size. A temporary
+system-not-responding dialog was dismissed with Wait during loading. ADB PNG
+captures retain the raw portrait scanout; a separate native-tool rotation makes
+the inspected menu upright. Android master mute was reapplied and queried true.
+This supplies a higher-resolution native menu reference, without establishing
+whole-scene or timing parity for the C implementation. Earlier captures below
+use the original 480 x 320 logical profile unless stated otherwise.
+
 The unmodified APK has supplied startup, the optional birthdate prompt, the
 main menu, episode/level selection, first-level launch/collisions, a level-clear
 result, retry, and pause. The recorded first shot clears level 1 with 31,480

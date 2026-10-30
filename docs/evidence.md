@@ -9822,3 +9822,9 @@ Metal UI routes. Both strengthened routes also pass under ASan/UBSan (335.93 s
 combined). The macOS application, Windows MinGW application and format check
 pass. These are implementation regression checks; full native visual and
 all-level Eagle comparisons remain open.
+
+
+The 2026-10-29 [runtime crash and catalog audit](runtime-crash-audit.md) records
+shared explosion/block joint queues, coincident camera snaps, vial contact
+identity, Birdday! 5 gift navigation and connected Short Fuse recovery.
+Its longer catalog inventory remains separate from level playthrough coverage.

@@ -125,6 +125,13 @@ typedef struct {
 bool ab_slingshot_reload_gate(const AbSlingReloadState *state, float seconds,
                               bool next_bird_present, AbSlingReloadGate *output);
 
+/* defaultAnimateBirdToSlingShot17173 instructions236..245: retain the argument
+ * order of min(1, max(.25, 1 - distance/range)). Coincident camera snaps are
+ * valid; the inner max retains .25 when its second argument is NaN. Resolve
+ * zero division by its IEEE sign/result before clamping, without raising a
+ * host floating-point exception. Finite inputs only; failure preserves output. */
+bool ab_slingshot_reload_gain(float range, float distance, float *output);
+
 typedef enum {
     AB_SLING_DRAG_QUERY_STRETCH = 1,
     AB_SLING_DRAG_PLAY_STRETCH,
