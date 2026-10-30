@@ -14,11 +14,11 @@ static const char *const lua_write_strings[] = {"",
                                                 "plain",
                                                 "quote\"'\\",
                                                 "\a\b\t\n\v\f\r",
-                                                "\001"
-                                                "9\002a\177"
-                                                "8",
-                                                "\303\251\377"
-                                                "9",
+                                                ("\001"
+                                                 "9\002a\177"
+                                                 "8"),
+                                                ("\303\251\377"
+                                                 "9"),
                                                 "line one\nline two",
                                                 "[]{}=,;"};
 
