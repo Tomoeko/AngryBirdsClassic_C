@@ -310,7 +310,7 @@ static bool compare_native(FILE *file) {
             for (size_t row = 0; row < view.count; ++row)
                 if (view.touches[row].id == (int32_t)number(touch[index][0]))
                     found = view.touches + row;
-            CHECK(member[0] == (found != NULL) &&
+            CHECK(member[0] == (found ? 1u : 0u) &&
                   member[1] == (found ? bits(found->position.x) : 0) &&
                   member[2] == (found ? bits(found->position.y) : 0));
         }

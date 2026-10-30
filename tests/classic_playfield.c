@@ -929,7 +929,8 @@ static bool check_blue(PlayfieldTest *test, AbClassicPlayfieldConfig config,
                        AbError *error) {
     /* Release retained payload views before their playfield. Camera source
      * resources and audio remain reusable across these two level instances. */
-    memset(test->retained, 0, sizeof(test->retained));
+    for (size_t index = 0; index < 4; ++index)
+        test->retained[index] = NULL;
     test->shot_state = (AbShotState){0};
     ab_classic_playfield_close(test->owner);
     test->owner = NULL;

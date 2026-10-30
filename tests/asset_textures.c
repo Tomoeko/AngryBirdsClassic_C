@@ -306,7 +306,8 @@ static bool managed_checks(const AbZip *archive, AbSpan key) {
 #endif
     size_t retained = ab_asset_textures_bytes(textures);
     const AbImage *initial[32];
-    memcpy(initial, host.images, sizeof(initial));
+    for (size_t index = 0; index < 32; ++index)
+        initial[index] = host.images[index];
     uint32_t menu_ids[2];
     for (size_t index = 0; index < 2; ++index) {
         const char *name = index ? "MENU_GRADIENTS" : "MENU_ELEMENTS_1";

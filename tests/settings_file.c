@@ -67,7 +67,8 @@ static bool roundtrip(const char *path) {
     AbSpan visited[] = {span("visitedPages"), span("1")};
     AbSpan page[] = {span("selectedPage"), span("1")};
     AbSpan text = span("escaped");
-    const char *escaped = "quote\" and slash\\ and line\n\0019\303\251";
+    const char *escaped = ("quote\" and slash\\ and line\n\001"
+                           "9\303\251");
 
     /* Reserve only an absent fixture path; never overwrite an unrelated file. */
     fixture = fopen(path, "wbx");
