@@ -219,7 +219,7 @@ static bool initialize(Fixture *fixture, Resources *resources, bool desktop, boo
     AbUiHudPowerupsSource source = {
         .visible = {.kind = AB_UI_POINTER_BOOLEAN, .boolean = true},
         .bird_count = 3,
-        .birds_shot = no_birds ? 3 : 0,
+        .birds_shot = no_birds ? 3.0f : 0.0f,
         .plus_signs = shop,
         .trial = trial};
     CHECK(

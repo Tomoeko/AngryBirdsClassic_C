@@ -26,9 +26,9 @@ static void bird_impact_world_case(uint32_t scene, uint32_t profile,
 #if defined(AB_TEST_BIRD_IMPACT_WORLD_NUMERIC) ||                                      \
     defined(AB_ORACLE_BIRD_IMPACT_WORLD_NUMERIC)
     output[4] = 0;
-    output[5] = world_ray_word(profile == 1 ? -2 : profile == 3 ? -10 : 0);
-    output[6] = world_ray_word(profile == 0 ? 0 : 20);
-    output[7] = world_ray_word(profile == 3 ? 2 : 10);
+    output[5] = world_ray_word(profile == 1 ? -2.0f : profile == 3 ? -10.0f : 0.0f);
+    output[6] = world_ray_word(profile == 0 ? 0.0f : 20.0f);
+    output[7] = world_ray_word(profile == 3 ? 2.0f : 10.0f);
 #endif
 }
 

@@ -710,11 +710,11 @@ static bool compare_state(FILE *file, const Context *context) {
 static bool run_command(Context *context, AbUiMenuBoundaries *boundaries,
                         const uint32_t input[16], const uint32_t input_order[6],
                         AbSpan working_order[6], uint32_t reply[3]) {
-    CHECK(input[0] < (context->extended_keys         ? 27
-                      : context->extended_input      ? 26
-                      : context->extended_navigation ? 24
-                      : context->extended_links      ? 19
-                                                     : 16) &&
+    CHECK(input[0] < (context->extended_keys         ? 27u
+                      : context->extended_input      ? 26u
+                      : context->extended_navigation ? 24u
+                      : context->extended_links      ? 19u
+                                                     : 16u) &&
           input[1] <= 4 && input[2] < 4 && input[3] < 3 && input[10] < 4 &&
           input[11] <= 6);
     CHECK(decode_value(input + 4, &context->requirement_value));

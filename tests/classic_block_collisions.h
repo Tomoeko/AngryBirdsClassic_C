@@ -99,13 +99,13 @@ static bool block_test_event(AbBlockEventScript *script, AbBlockEventObject *obj
           arguments[2].bits == bits(test->input.damage));
     /* Each invocation visits its first side before the negated second side,
      * including the swapped recursive sensor invocation. */
-    float direction = test->event_calls % 2 ? -1 : 1;
+    float direction = test->event_calls % 2 ? -1.0f : 1.0f;
     if (test->actual_contact)
         direction = test->input.first.size == object->name.size &&
                             !memcmp(test->input.first.data, object->name.data,
                                     object->name.size)
-                        ? 1
-                        : -1;
+                        ? 1.0f
+                        : -1.0f;
     CHECK(arguments[3].kind == AB_DATA_NUMBER &&
           arguments[3].bits == bits(direction * test->input.normal.x) &&
           arguments[4].bits == bits(direction * test->input.normal.y));

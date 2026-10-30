@@ -297,8 +297,8 @@ static bool game_vial_blue(PreviewVialRequest *request, AbError *error) {
         !menu_route_truthy(menu_route_field(physical, "isPuffing"))) {
         float acceleration =
             menu_route_truthy(menu_route_field(physical, "blueVialSpinAcceleration"))
-                ? 2
-                : 8;
+                ? 2.0f
+                : 8.0f;
         if (!game_vial_remove_gadgets(row, error) ||
             !game_shock_make_invulnerable(game->shockwaves->objects + row->object, 1.8f,
                                           error) ||

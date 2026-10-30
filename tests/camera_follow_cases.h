@@ -51,11 +51,11 @@ static void camera_follow_case(uint32_t sample, uint32_t output[FOLLOW_INPUT_WOR
     output[1] = flags;
     float values[30] = {(float)(sample % 9u) - 4,
                         (float)(sample % 7u) - 3,
-                        sample % 3u == 0   ? -6
-                        : sample % 3u == 1 ? 0
-                                           : 8,
-                        sample & 8u ? -12 : 4,
-                        sample & 16u ? 20 : 4,
+                        sample % 3u == 0   ? -6.0f
+                        : sample % 3u == 1 ? 0.0f
+                                           : 8.0f,
+                        sample & 8u ? -12.0f : 4.0f,
+                        sample & 16u ? 20.0f : 4.0f,
                         (float)(sample % 11u) - 5,
                         (float)(sample % 13u) - 6,
                         0.5f + (float)(sample % 5u) * 0.25f,
@@ -65,12 +65,12 @@ static void camera_follow_case(uint32_t sample, uint32_t output[FOLLOW_INPUT_WOR
                         0.75f + (float)(sample % 4u) * 0.25f,
                         0,
                         (float)(sample % 17u) - 8,
-                        sample & 4u ? 1 : 2,
+                        sample & 4u ? 1.0f : 2.0f,
                         30,
                         -40,
                         (float)(sample % 3u) * 0.5f - 0.5f,
                         sample & 2u ? 0.25f : -0.25f,
-                        sample & 32u ? 10000 : -10000,
+                        sample & 32u ? 10000.0f : -10000.0f,
                         0.25f + (float)(sample % 3u) * 0.25f,
                         0.5f + (float)(sample % 5u) * 0.25f,
                         20,

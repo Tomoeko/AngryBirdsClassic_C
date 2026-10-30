@@ -113,10 +113,10 @@ static bool observe(void *context, AbDataTable *event, AbError *error) {
     if (!step) {
         size_t index = test->observed / 4;
         if (index >= 4 || test->editing || test->physics ||
-            !equal(field(event, "attempt"), number(index == 2 ? 2 : 1)) ||
+            !equal(field(event, "attempt"), number(index == 2 ? 2.0f : 1.0f)) ||
             !equal(field(event, "firstTime"),
                    (AbDataValue){.kind = AB_DATA_BOOLEAN, .bits = index != 2}) ||
-            !equal(field(event, "previousStars"), number(index == 1 ? 0 : 3)) ||
+            !equal(field(event, "previousStars"), number(index == 1 ? 0.0f : 3.0f)) ||
             (index != 1 && field(event, "from").kind != AB_DATA_NIL) ||
             (index == 1 && !equal(field(event, "from"), text("fixture"))))
             return ab_fail(error, "Started-event attempts/stars/source fields differ");
@@ -241,8 +241,9 @@ static bool check(const char *path) {
     for (size_t index = 0; index < 3; ++index) {
         fields[index][0] = (AbDataEntry){text("episode"), number(1)};
         fields[index][1] = (AbDataEntry){text("page"), number(1)};
-        fields[index][2] = (AbDataEntry){text("level"), number(index == 1 ? 2 : 1)};
-        AbDataValue level = get(levels, number(index == 1 ? 2 : 1));
+        fields[index][2] =
+            (AbDataEntry){text("level"), number(index == 1 ? 2.0f : 1.0f)};
+        AbDataValue level = get(levels, number(index == 1 ? 2.0f : 1.0f));
         fields[index][3] = (AbDataEntry){text("levelName"), field(level.table, "name")};
         metadata[index] = (AbDataTable){fields[index], 4, 6, NULL};
     }

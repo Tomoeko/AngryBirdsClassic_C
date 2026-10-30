@@ -141,7 +141,7 @@ static bool open_world(AbPhysicsWorld *world, WorldStorage *memory, bool masked)
     for (size_t index = 0; index < 2; ++index) {
         AbBodyDefinition definition = {.type = index ? AB_BODY_DYNAMIC : AB_BODY_STATIC,
                                        .position = {(float)index * 2, 0},
-                                       .linear_velocity = {index ? -1 : 0, 0},
+                                       .linear_velocity = {index ? -1.0f : 0.0f, 0},
                                        .active = true,
                                        .awake = true,
                                        .gravity_scale = 1};
@@ -149,7 +149,7 @@ static bool open_world(AbPhysicsWorld *world, WorldStorage *memory, bool masked)
         memory->fixtures[index] = (AbWorldFixture){
             .shape = {.kind = AB_SHAPE_CIRCLE, .data.circle = {1, {0, 0}}},
             .body = index,
-            .density = index ? 1 : 0,
+            .density = index ? 1.0f : 0.0f,
             .filter = {1, masked ? 0 : UINT16_MAX, 0},
             .user_data = index + 1};
     }

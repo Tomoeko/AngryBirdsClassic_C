@@ -305,9 +305,9 @@ static bool game_results_open(PreviewGame *game, AbError *error) {
     results->silver = menu_real(silver.bits);
     results->gold = menu_real(gold.bits);
     float score = menu_real(game->globals.score.bits);
-    results->stars_earned = score >= results->gold     ? 3
-                            : score >= results->silver ? 2
-                                                       : 1;
+    results->stars_earned = score >= results->gold     ? 3.0f
+                            : score >= results->silver ? 2.0f
+                                                       : 1.0f;
     const char *const classes[] = {"LevelEndRoot", "LevelEnd",
                                    results->failed  ? "LevelFailed"
                                    : results->eagle ? "EagleScore"

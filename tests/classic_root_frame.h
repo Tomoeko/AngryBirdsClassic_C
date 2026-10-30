@@ -115,9 +115,9 @@ static bool continuous_frame_checks(void) {
                            "minScaleEnd", "maxScaleEnd",   "lifeTime"};
     AbDataEntry entries[12];
     for (size_t index = 0; index < 9; ++index)
-        entries[index] = (AbDataEntry){text(names[index]), number(index < 4    ? 0
-                                                                  : index == 8 ? 10
-                                                                               : 1)};
+        entries[index] = (AbDataEntry){text(names[index]), number(index < 4    ? 0.0f
+                                                                  : index == 8 ? 10.0f
+                                                                               : 1.0f)};
     entries[9] =
         (AbDataEntry){text("sprites"), {.kind = AB_DATA_TABLE, .table = &sprites}};
     entries[10] =

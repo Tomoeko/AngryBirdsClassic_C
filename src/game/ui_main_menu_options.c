@@ -147,7 +147,7 @@ static bool build(AbUiMainMenuOptions *options, const AbUiMainMenuOptionsSource 
             return false;
         button->widget.state.return_value = text("TOGGLE_PUSH_NOTIFICATIONS");
         if (!ab_ui_toggle_button_set_state(
-                button, source->notifications_enabled ? 1 : 2, error) ||
+                button, source->notifications_enabled ? 1.0f : 2.0f, error) ||
             !add_control(options, &button->widget, error))
             return false;
     }

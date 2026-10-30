@@ -71,9 +71,9 @@ static bool corpus(FILE *reference) {
         CHECK(ab_audio_mixer_open((AbAudioMixerLimits){1, 1, 1, 4096}, &mixer, NULL));
         AbClassicAudioRampState state = {.music_volume = profile(case_id & 7),
                                          .effects_volume = profile(case_id >> 3),
-                                         .music_length = number(case_id & 16  ? 0
-                                                                : case_id & 8 ? -2
-                                                                              : 2),
+                                         .music_length = number(case_id & 16  ? 0.0f
+                                                                : case_id & 8 ? -2.0f
+                                                                              : 2.0f),
                                          .effects_length =
                                              number(case_id & 32  ? 0
                                                     : case_id & 4 ? -0.5f

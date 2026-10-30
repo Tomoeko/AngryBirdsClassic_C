@@ -27,7 +27,7 @@ static bool character_distance(void *context, size_t object,
     CHECK(kind == AB_CLASSIC_CHARACTER_GOAL ? source->level_goal
                                             : source->physics.controllable);
     ++test->distances;
-    *output = kind == AB_CLASSIC_CHARACTER_GOAL ? 0 : 2000;
+    *output = kind == AB_CLASSIC_CHARACTER_GOAL ? 0.0f : 2000.0f;
     return true;
 }
 

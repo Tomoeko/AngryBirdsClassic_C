@@ -185,8 +185,8 @@ static bool compare(FILE *file) {
             (AbClassicShotListenerConfig){settings, events, host, 8, 16384}, &listeners,
             NULL));
         AbClassicShotListenerState *state = ab_classic_shot_listeners_state(listeners);
-        state->current_bird_index = sample & 8 ? 2 : 1;
-        state->score = sample & 4 ? 123 : 0;
+        state->current_bird_index = sample & 8 ? 2.0f : 1.0f;
+        state->score = sample & 4 ? 123.0f : 0.0f;
         state->powerups_enabled =
             (AbDataValue){.kind = AB_DATA_BOOLEAN, .bits = (sample & 16) != 0};
         state->level_name = text("fixture-level-id");
@@ -200,8 +200,8 @@ static bool compare(FILE *file) {
                                    NULL));
         AbDataEntry entries[] = {
             {text("id"), text("EID_BIRD_SHOT")},
-            {text("birdsShooted"), number(sample & 1 ? 5000 : 4999)},
-            {text("backwardsBirdCount"), number(sample & 2 ? 10 : 9)}};
+            {text("birdsShooted"), number(sample & 1 ? 5000.0f : 4999.0f)},
+            {text("backwardsBirdCount"), number(sample & 2 ? 10.0f : 9.0f)}};
         AbDataTable event = {entries, 3, 3, NULL};
         for (uint32_t pass = 0; pass < SHOT_LISTENER_PASSES; ++pass) {
             test.order[0] = test.order[1] = test.order_count = 0;

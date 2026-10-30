@@ -65,9 +65,9 @@ static bool classic_camera_open_level(ClassicCameraLevelInput *input,
         entries[1] = (AbDataEntry){classic_camera_text("definition"),
                                    classic_camera_text("Bird")};
         entries[2] = (AbDataEntry){classic_camera_text("x"),
-                                   classic_camera_number(index ? 5 : 1)};
+                                   classic_camera_number(index ? 5.0f : 1.0f)};
         entries[3] = (AbDataEntry){classic_camera_text("y"),
-                                   classic_camera_number(index ? 3 : 2)};
+                                   classic_camera_number(index ? 3.0f : 2.0f)};
         entries[4] =
             (AbDataEntry){classic_camera_text("angle"), classic_camera_number(0)};
         input->placements[index] = (AbDataTable){entries, 5, 5, NULL};

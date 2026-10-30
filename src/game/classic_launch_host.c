@@ -80,7 +80,7 @@ static bool remaining(AbClassicLaunchHost *host, AbShotCall *call, AbError *erro
             if (!sling || ab_classic_sling_shots(sling) != *config->shots)
                 return ab_fail(error, "Missing reached actual sling launch-cue owner");
             if (ab_classic_sling_view(sling).king) {
-                AbDataValue selected;
+                AbDataValue selected = {0};
                 const char name[] = "super_shot";
                 if (!ab_audio_bank_name_value(
                         config->audio,
@@ -180,7 +180,7 @@ bool ab_classic_launch_host_reload_audio(void *context, float gain, AbError *err
         host->dispatching)
         return ab_fail(error, "Invalid actual reload audio request");
     host->servicing = true;
-    AbDataValue selected;
+    AbDataValue selected = {0};
     const AbDataValue *source = host->config.next_bird_sound;
     bool okay = source &&
                 ab_audio_bank_name_value(host->config.audio, *source, &selected, error);

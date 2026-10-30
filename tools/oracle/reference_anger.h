@@ -4,7 +4,7 @@
 /* Authored inputs only: maximum/level/charges/queued and optional timer dates. */
 static void reference_anger(unsigned profile, unsigned reload, float values[4],
                             unsigned kinds[4], float date[6], unsigned timers[2]) {
-    values[0] = profile == 2 ? 0 : profile == 3 ? 3 : 2;
+    values[0] = profile == 2 ? 0.0f : profile == 3 ? 3.0f : 2.0f;
     values[1] = profile == 2 ? 1 : profile == 3 ? 2.5f : 0;
     values[2] = (float)(profile % 4) * 0.5f;
     values[3] = reload ? 0 : (float)profile - 3;
@@ -22,7 +22,7 @@ static void reference_anger(unsigned profile, unsigned reload, float values[4],
     const float base[] = {2026, 12, 31, 23, 59, 0};
     for (unsigned index = 0; index < 6; ++index)
         date[index] = base[index];
-    date[5] -= reload ? 0 : 600;
+    date[5] -= reload ? 0.0f : 600.0f;
     timers[0] = reload || (profile & 1);
     timers[1] = !reload && (profile & 2);
 }

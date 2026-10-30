@@ -714,7 +714,7 @@ static bool ability_test_repeated_blues(PreviewMenu *menu, AbMetal *renderer,
         if (pan_step ||
             (splits > 0 && splits < wanted && phase == 0 && !sling_visible &&
              game->shot.bird_ready && camera_ready && frame % 30 == 0)) {
-            AbVec2 point = {pan_step ? 800 : 200, 150};
+            AbVec2 point = {pan_step ? 800.0f : 200.0f, 150};
             if (!menu_preview_pointer(menu,
                                       menu_span(pan_step == 0   ? "LPRESS"
                                                 : pan_step == 3 ? "LRELEASE"

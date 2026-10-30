@@ -143,7 +143,7 @@ static void settings_input(Test *test, unsigned reload) {
             .has_start = true,
             .has_duration = true,
             .start = {date[0], date[1], date[2], date[3], date[4], date[5]},
-            .duration = {0, index ? 30 : 5, 0}};
+            .duration = {0, index ? 30.0f : 5.0f, 0}};
     }
     test->settings = !reload && !test->profile ? NULL : &test->input;
 }

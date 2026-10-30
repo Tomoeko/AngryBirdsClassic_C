@@ -27,7 +27,7 @@ static ReferenceUiSlider reference_ui_slider(unsigned index) {
         .extend = index % 7 ? (float)(index * 13 % 180) + 0.125f : 0,
         .adjusted = (float)(index % 11) * 0.5f,
         .disappear = (float)(index % 9 + 1) * 0.125f,
-        .screen_height = index % 2 ? 768 : 800,
+        .screen_height = index % 2 ? 768.0f : 800.0f,
         .scale = index % 3 ? 1.5f : 0.75f,
         .scale_x = index % 2 ? 1.25f : 0.5f,
         .scale_y = index % 3 ? 0.75f : 2,

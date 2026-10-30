@@ -126,7 +126,7 @@ static bool pause_action(AbUiGameHudControls *controls, AbUiGameHudPauseAction a
     bool instant = action == AB_UI_GAME_HUD_INSTANT_SHOW_PAUSE ||
                    action == AB_UI_GAME_HUD_INSTANT_HIDE_PAUSE;
     if (instant) {
-        page->extend_state = show ? 1 : 0;
+        page->extend_state = show ? 1.0f : 0.0f;
         if (!ab_ui_widget_lifecycle(&page->widget, AB_UI_FRAME_LAYOUT, error))
             return false;
     }

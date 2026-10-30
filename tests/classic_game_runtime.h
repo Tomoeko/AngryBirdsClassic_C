@@ -305,7 +305,7 @@ static bool fresh_game_runtime(PlayfieldTest *test, AbClassicPlayfield *playfiel
             held_entry.value.bits = frame < press_frame + 2;
             released_entry.value.bits = frame == press_frame + 2;
         }
-        input.touch_count = fresh_number(held_entry.value.bits ? 1 : 0);
+        input.touch_count = fresh_number(held_entry.value.bits ? 1.0f : 0.0f);
         AbCameraSystemInput camera = {.moving_objects =
                                           globals->has_moving_objects.bits != 0};
         CHECK(ab_classic_game_update(view.update, (AbClassicGameTouchInput){0},

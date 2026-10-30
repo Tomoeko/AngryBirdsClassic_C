@@ -219,7 +219,7 @@ static bool native_world_case(FILE *file, uint32_t sample, size_t *words) {
             .shape = {.kind = AB_SHAPE_CIRCLE,
                       .data.circle = {world_number(host.input[1 + index]), {0, 0}}},
             .body = index,
-            .density = index ? 1 : 0,
+            .density = index ? 1.0f : 0.0f,
             .filter = {1, flags & CONTACT_WORLD_MASKED ? 0 : UINT16_MAX, 0},
             .user_data = flags & ((uint32_t)CONTACT_WORLD_FIRST_OBJECT << index)
                              ? index + 1

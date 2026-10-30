@@ -222,7 +222,7 @@ static bool shop(AbUiHudPowerups *owner, AbError *error) {
 static bool build(AbUiHudPowerups *owner, AbUiWidget *hud, AbUiHudPowerupsSource source,
                   AbError *error) {
     AbUiPointerValue padding[4] = {0};
-    padding[2] = number(named(owner->host.device_model, "android") ? 0 : 50);
+    padding[2] = number(named(owner->host.device_model, "android") ? 0.0f : 50.0f);
     AbUiSlider *slider = &owner->slider;
     if (!ab_ui_slider_init(slider, hud->context,
                            (AbUiWidgetChildren){owner->frames, owner->draw,

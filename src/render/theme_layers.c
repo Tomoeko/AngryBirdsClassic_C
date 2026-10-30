@@ -341,8 +341,8 @@ static bool draw_sprite(BaseDraw *draw, const AbSpriteBinding *sprite, AbVec2 po
          * negative ones toward zero, opening a one-source-pixel cut between
          * authored adjoining parts. Compensate before the common transform;
          * do not round screen coordinates or change atlas UVs/sampling. */
-        position.x += sprite->region->pivot_x < 0 ? 1 : 0;
-        position.y += sprite->region->pivot_y < 0 ? 1 : 0;
+        position.x += sprite->region->pivot_x < 0 ? 1.0f : 0.0f;
+        position.y += sprite->region->pivot_y < 0 ? 1.0f : 0.0f;
     }
     return ab_theme_sprite_vertices(sprite->region, position, scale, vertices, error) &&
            draw->image(draw->context, sprite, vertices, tint, error);

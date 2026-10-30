@@ -206,7 +206,7 @@ static bool rolling_checks(AbClassicLevel **level_output,
         AbBodyMotion *body = &loaded.world->storage.bodies[object->physics.body].motion;
         body->awake = ordered < 3;
         body->mass.mass = ordered == 0 ? 0.25f : ordered == 1 ? 0.5f : 0.375f;
-        body->mass.angular_velocity = ordered == 2 ? 800 : 400;
+        body->mass.angular_velocity = ordered == 2 ? 800.0f : 400.0f;
     }
     CHECK(ab_classic_post_physics_update(post, true, NULL) && test.count == 4 &&
           audio_is(&test, 0, AB_ROLLING_AUDIO_QUERY, "alpha", 0) &&
@@ -223,7 +223,7 @@ static bool rolling_checks(AbClassicLevel **level_output,
         AbBodyMotion *body =
             &loaded.world->storage.bodies[loaded.frame->objects[index].body].motion;
         body->mass.mass = ordered == 1 ? 0.375f : 0.5f;
-        body->mass.angular_velocity = ordered == 1 ? 800 : 400;
+        body->mass.angular_velocity = ordered == 1 ? 800.0f : 400.0f;
     }
     CHECK(ab_classic_post_physics_update(post, true, NULL) && test.count == 3 &&
           audio_is(&test, 0, AB_ROLLING_AUDIO_STOP, "alpha", 0) &&

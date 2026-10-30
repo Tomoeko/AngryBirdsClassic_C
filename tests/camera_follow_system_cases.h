@@ -66,8 +66,8 @@ static void camera_follow_system_config(uint32_t scene, uint32_t output[24]) {
                             scene & 4u ? 4.0f : -12.0f,
                             40,
                             scene < 2   ? -2.5f
-                            : scene < 4 ? -20
-                                        : -5,
+                            : scene < 4 ? -20.0f
+                                        : -5.0f,
                             scene == 2   ? 0.25f
                             : scene == 3 ? 0.6f
                                          : 0.75f + (float)(scene % 4u) * 0.25f,

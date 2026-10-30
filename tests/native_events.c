@@ -126,7 +126,7 @@ static bool corpus(FILE *reference) {
     for (unsigned case_id = 0; case_id < 16; ++case_id) {
         EventTest test;
         CHECK(prepare(&test, case_id) && post(&test, 0, case_id & 4 ? -0.0f : -1) &&
-              post(&test, 1, case_id & 4 ? -1 : 0) &&
+              post(&test, 1, case_id & 4 ? -1.0f : 0.0f) &&
               post(&test, 2, case_id & 2 ? 0.125f : 0.25f) &&
               post(&test, 3, case_id & 2 ? 0.25f : 0.5f) &&
               snapshot(&test, reference, 0, 0));

@@ -275,7 +275,7 @@ static bool audio_state(AbUiPausePage *page, AbError *error) {
     if (!page->host.audio_enabled)
         return ab_fail(error, "Missing actual PausePage audio settings query");
     return page->host.audio_enabled(page->host.context, &enabled, error) &&
-           ab_ui_toggle_button_set_state(&page->sounds, enabled ? 1 : 2, error);
+           ab_ui_toggle_button_set_state(&page->sounds, enabled ? 1.0f : 2.0f, error);
 }
 
 bool ab_ui_pause_page_audio_state(AbUiPausePage *page, AbError *error) {

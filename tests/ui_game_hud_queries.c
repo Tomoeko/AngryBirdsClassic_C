@@ -24,7 +24,7 @@ static AbDataValue input_value(uint32_t code) {
             return (AbDataValue){.kind = AB_DATA_BOOLEAN, .bits = code == 2};
         case 3:
         case 4:
-            return number(code == 3 ? 0 : -1);
+            return number(code == 3 ? 0.0f : -1.0f);
         default:
             return text("");
     }

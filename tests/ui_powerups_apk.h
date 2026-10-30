@@ -24,7 +24,7 @@ static bool powerup_king_widgets(PreviewMenu *menu, AbMetal *renderer, AbError *
             return ab_fail(error, "Live powerup bar has %zu source controls",
                            powers ? powers->bar.slider.count : 0);
         if (!ab_settings_inventory_set(menu->settings, row->name,
-                                       menu_route_number(infinite ? 0 : 3),
+                                       menu_route_number(infinite ? 0.0f : 3.0f),
                                        menu_route_number(0), error) ||
             !powerup_test_tick(menu, 245, error))
             return false;
@@ -156,7 +156,7 @@ static bool powerup_seed_widgets(PreviewMenu *menu, AbMetal *renderer, AbError *
         AbClassicLevelView level = ab_classic_level_view(game->playfield.level);
         size_t count = level.bodies->count;
         if (!ab_settings_inventory_set(menu->settings, row->name,
-                                       menu_route_number(infinite ? 0 : 3),
+                                       menu_route_number(infinite ? 0.0f : 3.0f),
                                        menu_route_number(0), error) ||
             !powerup_test_tick(menu, 245, error))
             return false;
@@ -301,7 +301,7 @@ static bool powerup_quake_widgets(PreviewMenu *menu, AbMetal *renderer,
         PreviewPowerups *powers = game->powerups;
         const AbPowerupMetadata *row = ab_powerup_catalog_at(menu->powerup_catalog, 3);
         if (!ab_settings_inventory_set(menu->settings, row->name,
-                                       menu_route_number(infinite ? 0 : 3),
+                                       menu_route_number(infinite ? 0.0f : 3.0f),
                                        menu_route_number(0), error) ||
             !powerup_test_tick(menu, 245, error))
             return false;
@@ -398,7 +398,7 @@ static bool powerup_scope_widgets(PreviewMenu *menu, AbMetal *renderer,
         PreviewPowerups *powers = game->powerups;
         const AbPowerupMetadata *row = ab_powerup_catalog_at(menu->powerup_catalog, 2);
         if (!ab_settings_inventory_set(menu->settings, row->name,
-                                       menu_route_number(infinite ? 0 : 3),
+                                       menu_route_number(infinite ? 0.0f : 3.0f),
                                        menu_route_number(0), error) ||
             !powerup_test_tick(menu, 245, error))
             return false;
@@ -497,7 +497,7 @@ static bool powerup_overlapping_widgets(PreviewMenu *menu, AbMetal *renderer,
             const AbPowerupMetadata *row =
                 ab_powerup_catalog_at(menu->powerup_catalog, index);
             if (!ab_settings_inventory_set(menu->settings, row->name,
-                                           menu_route_number(infinite ? 0 : 3),
+                                           menu_route_number(infinite ? 0.0f : 3.0f),
                                            menu_route_number(0), error))
                 return false;
         }
