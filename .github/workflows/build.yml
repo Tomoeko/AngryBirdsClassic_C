@@ -62,7 +62,7 @@ jobs:
       - name: Configure
         run: cmake -S . -B Files/build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
       - name: Build preview and tools
-        run: cmake --build Files/build --config Release --parallel 4
+        run: cmake -DAB_BUILD_DIRECTORY=Files/build -P cmake/build_ci.cmake
       - name: Test portable behavior
         run: ctest --test-dir Files/build -C Release -j 1 --timeout 30 --output-on-failure
       - name: Stage app and tools
