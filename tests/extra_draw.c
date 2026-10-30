@@ -83,8 +83,8 @@ static bool compare(FILE *file) {
         AbError error = {0};
         bool okay = prepare(&fixture, extra_draw_case(sample), &error);
         for (uint32_t index = 0; okay && index < 2; ++index) {
-            bool has_z;
-            uint32_t count, active;
+            bool has_z = false;
+            uint32_t count = 0, active = 0;
             okay = frame(&fixture, &has_z, &error) &&
                    fscanf(file, "%" SCNx32 " %" SCNx32, &count, &active) == 2 &&
                    fgetc(file) == '\n' && count == fixture.count && active == has_z;

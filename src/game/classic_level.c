@@ -95,10 +95,19 @@ typedef struct {
     size_t element_size;
 } ArrayLayout;
 
+/* The arena stores ordinary scalar-based objects. Spell out their fundamental
+ * alignment without relying on max_align_t, which MSVC omits in C mode. */
+typedef union {
+    long double floating;
+    long long integer;
+    void *pointer;
+    void (*function)(void);
+} LevelArrayAlignment;
+
 static bool array_offsets(const ArrayLayout layout[ARRAY_COUNT], size_t limit,
                           size_t offsets[ARRAY_COUNT], size_t *total) {
     size_t used = 0;
-    const size_t alignment = _Alignof(max_align_t);
+    const size_t alignment = _Alignof(LevelArrayAlignment);
     for (size_t index = 0; index < ARRAY_COUNT; ++index) {
         size_t padding = (alignment - used % alignment) % alignment;
         if (padding > limit - used) {

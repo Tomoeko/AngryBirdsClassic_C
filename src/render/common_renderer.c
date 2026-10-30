@@ -252,14 +252,15 @@ static bool render_view(AbCommonRenderer *renderer, const AbDrawList *list,
         if (!scissor.width || !scissor.height)
             continue;
         const float viewport[1][4] = {
-            {(float)width, (float)height, command->coordinates == AB_DRAW_CLIP, 0}};
+            {(float)width, (float)height,
+             command->coordinates == AB_DRAW_CLIP ? 1.0f : 0.0f, 0}};
         const float horizontal = 2.0f / (float)width;
         const float vertical = -2.0f / (float)height;
         const float parameters[3][4] = {
             {command->color[0], command->color[1], command->color[2],
              command->color[3]},
-            {command->opacity, command->scissor.enabled ? 1 : 0,
-             command->mask.texture ? 1 : 0, 0},
+            {command->opacity, command->scissor.enabled ? 1.0f : 0.0f,
+             command->mask.texture ? 1.0f : 0.0f, 0},
             {-1.0f + horizontal * (float)scissor.x, 1.0f + vertical * (float)scissor.y,
              -1.0f + horizontal * (float)(scissor.x + scissor.width),
              1.0f + vertical * (float)(scissor.y + scissor.height)}};

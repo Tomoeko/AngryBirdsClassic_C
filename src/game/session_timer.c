@@ -165,8 +165,8 @@ bool ab_session_timer_complete(AbSessionTimer *timer, AbDataValue *output,
 bool ab_session_timer_progress(AbSessionTimer *timer, float *output, AbError *error) {
     if (!begin(timer, error))
         return false;
-    AbDataValue value;
-    float seconds, duration;
+    AbDataValue value = {0};
+    float seconds = 0, duration = 0;
     bool okay = output != NULL;
     if (!output)
         ab_fail(error, "Missing session timer progress output");
