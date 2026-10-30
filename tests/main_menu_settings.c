@@ -56,7 +56,7 @@ static bool edges(void) {
 
 static bool result(const uint32_t input[13], uint32_t output[22]) {
     AbMainMenuSettings state;
-    AbUiPointerValue fallback, new_zoom, new_theme, value;
+    AbUiPointerValue fallback = {0}, new_zoom = {0}, new_theme = {0}, value;
     CHECK(decode(input, &state.zoom) && decode(input + 2, &state.theme) &&
           decode(input + 4, &state.low_quality) && decode(input + 6, &fallback) &&
           decode(input + 8, &new_zoom) && decode(input + 10, &new_theme) &&

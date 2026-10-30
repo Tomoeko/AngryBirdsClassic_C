@@ -89,7 +89,7 @@ static bool compare_native(FILE *file) {
                                           number(values[2])};
         }
         CHECK(words(file, expected, 11));
-        float relative, zoom;
+        float relative, zoom = 0.0f;
         CHECK(ab_camera_relative_zoom(number(input[3]), number(input[4]),
                                       number(input[5]), &relative) &&
               ab_camera_snap_zoom(number(input[3]), number(input[4]), number(input[5]),

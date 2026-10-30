@@ -90,7 +90,7 @@ static bool native_checks(FILE *file) {
               (draw.sprite.size == state.sprite.size &&
                memcmp(draw.sprite.data, state.sprite.data, state.sprite.size) == 0));
         AbRandom48 random;
-        uint32_t next;
+        uint32_t next = 0;
         CHECK(ab_random48_seed(&random, input[10]) && ab_random48_next(&random, &next));
         uint32_t actual[] = {present,
                              present,

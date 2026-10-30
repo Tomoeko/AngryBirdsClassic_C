@@ -289,12 +289,14 @@ static bool services_open(ShotTest *test, const AbZip *archive, AbVec2 impulse,
     for (size_t index = 0; index < 2; ++index) {
         CHECK(ab_settings_statistics_set_local(
             test->statistics, span(counter_names[index]),
-            (AbDataValue){.kind = AB_DATA_NUMBER, .bits = bits(index ? 1 : 8)}, error));
+            (AbDataValue){.kind = AB_DATA_NUMBER, .bits = bits(index ? 1.0f : 8.0f)},
+            error));
         AbSpan path[] = {span(counter_names[index]), span("device_fixture"),
                          span("installationId_previous")};
         CHECK(ab_settings_statistics_write(
             test->statistics, path, 3,
-            (AbDataValue){.kind = AB_DATA_NUMBER, .bits = bits(index ? 2 : 3)}, error));
+            (AbDataValue){.kind = AB_DATA_NUMBER, .bits = bits(index ? 2.0f : 3.0f)},
+            error));
     }
     CHECK(ab_event_manager_open((AbEventManagerLimits){16, 4, 8, 0, 8, 32768},
                                 (AbEventManagerHost){0}, &test->events, error));

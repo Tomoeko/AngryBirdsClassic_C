@@ -77,7 +77,7 @@ static bool native_checks(FILE *file) {
     CHECK(strcmp(marker, "AB_ANDROID_SLING_RELOAD_V1 4096\n") == 0);
     size_t queries = 0, launches = 0, absent = 0;
     for (size_t item = 0; item < 4096; ++item) {
-        uint32_t input[5], expected[7], count;
+        uint32_t input[5], expected[7], count = 0;
         CHECK(read_words(file, input, 5) && input[3] <= 7 && input[4] <= 2);
         CHECK(read_words(file, expected, 7) && read_words(file, &count, 1) &&
               count <= 3);

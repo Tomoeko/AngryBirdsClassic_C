@@ -289,7 +289,7 @@ static bool native_angle_checks(const char *path) {
     }
     for (size_t index = 0; okay && index < 65536; ++index) {
         uint32_t input, expected;
-        float actual;
+        float actual = 0.0f;
         okay = fscanf(file, "%8" SCNx32 " %8" SCNx32, &input, &expected) == 2 &&
                fgetc(file) == '\n' && ab_game_angle_wrap(from_bits(input), &actual);
         if (okay && number(actual).bits != expected) {

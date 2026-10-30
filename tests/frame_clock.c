@@ -96,7 +96,7 @@ static bool edges(void) {
 
 static bool native_clock(const char *path) {
     FILE *file = fopen(path, "rb");
-    unsigned version, count;
+    unsigned version, count = 0;
     bool okay =
         file &&
         fscanf(file, "AB_FRAME_CLOCK_NATIVE %u\nCASES %u\n", &version, &count) == 2 &&

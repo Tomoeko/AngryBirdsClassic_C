@@ -25,7 +25,7 @@ static uint32_t bits(float value) {
 static bool edges(void) {
     AbSymmetric3 matrix = {.xx = 1, .yy = 2, .zz = 4};
     AbVec2 output2;
-    AbVec3 output3;
+    AbVec3 output3 = {0};
     CHECK(ab_symmetric3_solve22(&matrix, (AbVec2){1, 2}, &output2, NULL) &&
           output2.x == 1 && output2.y == 1 &&
           ab_symmetric3_solve(&matrix, (AbVec3){1, 2, 3}, &output3, NULL) &&

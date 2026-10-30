@@ -180,7 +180,7 @@ static bool parameter_case(FILE *file, uint32_t sample, WorldStorage *memory,
     CHECK(ab_classic_joints_open(&joints, world,
                                  (AbClassicJointStorage){records, 2, NULL, 0}, NULL));
     AbClassicJoint definition;
-    size_t first, second = SIZE_MAX;
+    size_t first = 0, second = SIZE_MAX;
     CHECK(ab_classic_joint_read(&source, &definition, NULL) &&
           ab_classic_joints_create(&joints, &definition, &first, NULL) &&
           parameter_definition_check(file, memory->joints + first, sample));

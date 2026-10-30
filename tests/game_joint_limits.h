@@ -49,7 +49,7 @@ static bool limit_edge_case(AbPhysicsWorld *world, WorldStorage *memory) {
                                                          .enable_motor = true,
                                                          .enable_limit = true}}},
         .name = key("joint").string};
-    size_t first, second;
+    size_t first, second = 0;
     CHECK(ab_classic_joints_create(&joints, &definition, &first, NULL) &&
           ab_classic_joints_create(&joints, &definition, &second, NULL));
     CHECK(ab_classic_joints_check_limits(&joints, key("absent").string, NULL) &&
@@ -159,7 +159,7 @@ static bool limit_case(FILE *file, uint32_t sample, WorldStorage *memory,
     CHECK(ab_classic_joints_open(&joints, world,
                                  (AbClassicJointStorage){record, 1, NULL, 0}, NULL));
     AbClassicJoint definition;
-    size_t slot;
+    size_t slot = 0;
     CHECK(ab_classic_joint_read(&source, &definition, NULL) &&
           ab_classic_joints_create(&joints, &definition, &slot, NULL));
     AbWorldSolveJoint *joint = world->storage.joints + slot;

@@ -134,7 +134,7 @@ static bool append_line(const AbUiTextDrawPlan *plan, const AbBitmapFont *font,
     state[18] = raw(plan->angle);
     uint32_t codes[32];
     AbFontGlyphPlacement glyphs[32];
-    size_t length, written;
+    size_t length, written = 0;
     CHECK(ab_utf8_to_codes(plan->text, codes, 32, &length) &&
           ab_font_layout_codes(font, codes, length, 0, length, plan->layout, glyphs, 32,
                                &written) &&
@@ -168,7 +168,7 @@ static bool same_words(const uint32_t *actual, const uint32_t *expected, size_t 
 
 static bool compare_case(FILE *file, const AbBitmapFont *font, size_t test,
                          Counts *totals) {
-    uint32_t input[46], line_count, data[4][15];
+    uint32_t input[46], line_count = 0, data[4][15];
     CHECK(words(file, input, 46) && input[0] < 7 && input[4] >= 2 && input[4] <= 6 &&
           words(file, &line_count, 1) && line_count <= 4);
     for (uint32_t line = 0; line < line_count; ++line) {
@@ -200,7 +200,7 @@ static bool compare_case(FILE *file, const AbBitmapFont *font, size_t test,
                   append_line(&plan, font, state, expected, &count));
         }
     }
-    uint32_t native_leaves, native_count;
+    uint32_t native_leaves, native_count = 0;
     CHECK(words(file, &native_leaves, 1) && words(file, &native_count, 1));
     if (native_leaves != drawn || native_count != count) {
         fprintf(stderr,

@@ -264,7 +264,7 @@ static bool check(const char *path) {
                                      &error) &&
             !test.editing && !test.physics && test.observed == (index + 1) * 4 &&
             !test.phase &&
-            equal(test.state.number_of_attempts, number(index == 1 ? 99 : 1)) &&
+            equal(test.state.number_of_attempts, number(index == 1 ? 99.0f : 1.0f)) &&
             equal(field(ab_settings_statistics_root(test.settings), "lastPlayedLevel"),
                   field(metadata + index, "levelName")));
         for (size_t frame = 0; frame < 8 && test.starts == index; ++frame) {

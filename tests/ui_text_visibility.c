@@ -56,7 +56,7 @@ static bool compare_native(FILE *file) {
           strcmp(header, "AB_ANDROID_UI_TEXT_VISIBILITY_V1 8192\n") == 0);
     size_t accepted = 0, nonfinite = 0;
     for (size_t test = 0; test < 8192; ++test) {
-        uint32_t input[9], expected;
+        uint32_t input[9], expected = 0;
         CHECK(words(file, input, 9) && words(file, &expected, 1) && expected <= 1);
         float y = number(input[3]), sy = number(input[5]);
         bool actual =

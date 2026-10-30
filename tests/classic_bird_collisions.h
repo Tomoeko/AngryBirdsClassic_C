@@ -205,10 +205,11 @@ static bool bird_test_physics(BirdCollisionTest *test, AbError *error) {
                   shot->level.world, shot->level.bodies->objects[index].physics.body,
                   index == test->first ? AB_BODY_DYNAMIC : AB_BODY_STATIC, error));
     }
-    CHECK(ab_level_property_set(shot->level.properties, test->first, span("xVel"),
-                                (AbDataValue){.kind = AB_DATA_NUMBER,
-                                              .bits = bits(test->damaging ? 1000 : 0)},
-                                error) &&
+    CHECK(ab_level_property_set(
+              shot->level.properties, test->first, span("xVel"),
+              (AbDataValue){.kind = AB_DATA_NUMBER,
+                            .bits = bits(test->damaging ? 1000.0f : 0.0f)},
+              error) &&
           ab_level_property_set(shot->level.properties, test->first, span("yVel"),
                                 (AbDataValue){.kind = AB_DATA_NUMBER}, error));
     size_t body = shot->level.bodies->objects[test->first].physics.body;

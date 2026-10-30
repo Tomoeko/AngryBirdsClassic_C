@@ -145,7 +145,7 @@ static bool geometry(void *context, AbWorldManifold *output, AbError *error) {
 
 static bool collision(void *context, AbBubbleCollisionCall *call, AbError *error) {
     BubbleHost *host = context;
-    uint32_t *event;
+    uint32_t *event = NULL;
     CHECK(call->first.size == 4 && memcmp(call->first.data, "bird", 4) == 0 &&
           call->second.size == 6 && memcmp(call->second.data, "bubble", 6) == 0 &&
           !call->response.count && !call->response.entries &&

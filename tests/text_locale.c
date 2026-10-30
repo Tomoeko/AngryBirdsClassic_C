@@ -69,7 +69,7 @@ static bool compare_metadata(FILE *file) {
 
 static bool compare_native(FILE *file) {
     char header[80];
-    uint32_t available_count;
+    uint32_t available_count = 0;
     CHECK(fgets(header, sizeof(header), file) &&
           strcmp(header, "AB_ANDROID_TEXT_LOCALE_V1 4096\n") == 0 &&
           words(file, &available_count, 1) && available_count == 9);
@@ -82,7 +82,7 @@ static bool compare_native(FILE *file) {
     for (size_t test = 0; test < 4096; ++test) {
         uint32_t mask;
         uint8_t preferred_bytes[128], expected_bytes[128];
-        AbSpan preferred, expected, actual, selected[32];
+        AbSpan preferred = {0}, expected = {0}, actual, selected[32];
         size_t count = 0;
         CHECK(words(file, &mask, 1) && read_text(file, preferred_bytes, &preferred) &&
               read_text(file, expected_bytes, &expected));

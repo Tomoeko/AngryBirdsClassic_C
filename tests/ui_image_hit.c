@@ -114,7 +114,7 @@ static bool compare_native(FILE *file) {
             .image_present = setup[1] != 0,
         };
         AbUiHitRectangle rectangle = {0};
-        bool present;
+        bool present = false;
         CHECK(words(file, expected, 8) &&
               ab_ui_image_button_rectangle(&button, 4, &rectangle, &present));
         uint32_t actual[] = {present,
@@ -137,7 +137,7 @@ static bool compare_native(FILE *file) {
         present_count += present;
         for (size_t query = 0; query < 10; ++query) {
             uint32_t point[3];
-            bool hit;
+            bool hit = false;
             CHECK(words(file, point, 3) && point[2] <= 1 &&
                   ab_ui_image_button_hit(
                       &button, 4, (AbVec2){number(point[0]), number(point[1])}, &hit));

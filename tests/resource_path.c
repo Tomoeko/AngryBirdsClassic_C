@@ -21,7 +21,7 @@ static bool native_checks(FILE *file) {
     for (uint32_t sample = 0; sample < 4096; ++sample) {
         char path[256], key[256];
         size_t size = resource_path_case(sample, path), length = 0;
-        uint32_t input[2], count;
+        uint32_t input[2], count = 0;
         CHECK(fscanf(file, "%" SCNx32 " %" SCNx32, input, input + 1) == 2 &&
               fgetc(file) == '\n' && input[0] == size &&
               input[1] == resource_path_hash(path, size) &&

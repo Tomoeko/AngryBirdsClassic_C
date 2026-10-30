@@ -103,8 +103,8 @@ static bool snapshot(AbSessionTimer *timer, Clock *clock, FILE *reference,
         CHECK(ab_session_timer_end(timer, &end, NULL));
         date_words(&end, state + 17);
     }
-    AbDataValue remaining, complete, formatted;
-    float progress;
+    AbDataValue remaining, complete = {0}, formatted;
+    float progress = 0.0f;
     char text[64];
     CHECK(ab_session_timer_remaining(timer, &remaining, NULL) &&
           ab_session_timer_complete(timer, &complete, NULL) &&

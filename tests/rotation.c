@@ -59,7 +59,7 @@ static bool read_word(FILE *file, uint32_t *word) {
 }
 
 static bool native_checks(FILE *file) {
-    uint32_t magic, count;
+    uint32_t magic, count = 0;
     CHECK(read_word(file, &magic) && read_word(file, &count));
     CHECK(magic == UINT32_C(0x314d4241) && (count == 4096 || count == 65536));
     for (uint32_t index = 0; index < count; ++index) {

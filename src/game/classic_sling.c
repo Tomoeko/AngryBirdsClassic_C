@@ -650,7 +650,7 @@ bool ab_classic_sling_position_start(AbClassicSling *sling, size_t object,
         start_number(sling, object, "radius", &input.radius, true, error) &&
         start_number(sling, object, "x", &input.object_position.x, false, error) &&
         start_number(sling, object, "y", &input.object_position.y, false, error);
-    AbSlingshotStartPose pose;
+    AbSlingshotStartPose pose = {0};
     if (okay)
         okay = ab_slingshot_start_pose(&input, &pose, error);
     if (okay) {

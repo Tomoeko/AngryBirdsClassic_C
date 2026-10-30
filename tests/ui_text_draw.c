@@ -232,7 +232,7 @@ static bool compare_case(FILE *file, const AbBitmapFont *font, size_t test,
     const char *const texts[] = {"",     "AB",      "a0 B",
                                  "A\nB", "missing", "\xe4\xb8\x80\xf0\x9f\x98\x80",
                                  "  ",   "A0aB"};
-    uint32_t input[46], native_count;
+    uint32_t input[46], native_count = 0;
     CHECK(words(file, input, 46) && input[0] < 7 && input[1] < 2 && input[2] < 2 &&
           input[3] < 4 && input[4] >= 2 && input[4] <= 6 && input[5] < 4 &&
           input[6] < 5 && input[7] < 8 && input[8] < 3);

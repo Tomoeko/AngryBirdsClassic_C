@@ -100,7 +100,7 @@ static bool compare_sprite(Comparison *comparison, const AbResourceSource *sourc
 
 static bool compare_part(Comparison *comparison, const AbResolvedComposite *composite,
                          size_t index) {
-    AbSpan expected_name, source_key, sprite_name;
+    AbSpan expected_name, source_key = {0}, sprite_name = {0};
     uint32_t expected[8];
     CHECK(read_text(&comparison->reader, &expected_name) &&
           read_text(&comparison->reader, &source_key) &&
@@ -154,7 +154,7 @@ static bool compare_sources(Comparison *comparison, size_t count) {
     CHECK(owners->count == count);
     for (size_t index = 0; index < count; ++index) {
         uint32_t kind, values[2];
-        AbSpan key;
+        AbSpan key = {0};
         CHECK(read_words(&comparison->reader, &kind, 1) && (kind == 1 || kind == 2) &&
               read_text(&comparison->reader, &key) &&
               read_words(&comparison->reader, values, 2));
@@ -181,14 +181,14 @@ static bool compare_registry(Comparison *comparison, size_t count) {
         ab_asset_resources_registry(comparison->resources);
     for (size_t item = 0; item < count; ++item) {
         AbSpan name;
-        uint32_t bindings;
+        uint32_t bindings = 0;
         CHECK(read_text(&comparison->reader, &name) &&
               read_words(&comparison->reader, &bindings, 1) && bindings <= 128);
         size_t cursor = 0;
         AbSpriteRegistryEntry last = {0};
         for (size_t index = 0; index < bindings; ++index) {
             uint32_t kind;
-            AbSpan owner, source_key, member_name;
+            AbSpan owner = {0}, source_key = {0}, member_name = {0};
             CHECK(read_words(&comparison->reader, &kind, 1) &&
                   read_text(&comparison->reader, &owner) &&
                   read_text(&comparison->reader, &source_key) &&

@@ -58,7 +58,7 @@ static bool reference(FILE *file) {
           !strcmp(line, "AB_ANDROID_FLOATING_SCORE_DRAW_V1 1024\n"));
     size_t texts = 0, sprites = 0;
     for (size_t sample = 0; sample < 1024; ++sample) {
-        uint32_t input[8], count;
+        uint32_t input[8], count = 0;
         CHECK(words(file, input, 8) && words(file, &count, 1) && count <= 32 &&
               input[7] <= 3);
         AbFloatingScoreDrawPlan plan;

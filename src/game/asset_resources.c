@@ -148,7 +148,7 @@ bool ab_asset_resources_host(void *context, AbAssetCall *call, AbError *error) {
         return ab_fail(error, "Unsupported asset resource host operation");
     }
     char path[256], key[256];
-    size_t path_size, key_size;
+    size_t path_size, key_size = 0;
     resources->busy = true;
     bool okay = ab_asset_resource_path(call, path, sizeof(path), &path_size, error) &&
                 ab_asset_sheet_key((AbSpan){(const uint8_t *)path, path_size}, key,

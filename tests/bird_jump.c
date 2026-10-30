@@ -101,7 +101,7 @@ static bool native_checks(FILE *file) {
     CHECK(overshoot || strcmp(marker, "AB_ANDROID_BIRD_JUMP_V1 4096\n") == 0);
     size_t draws = 0, positions = 0, rotations = 0;
     for (size_t item = 0; item < 4096; ++item) {
-        uint32_t input[13], expected[13], count;
+        uint32_t input[13], expected[13], count = 0;
         CHECK(read_words(file, input, 13) && input[10] <= 15);
         CHECK(read_words(file, expected, 13) && read_words(file, &count, 1) &&
               count <= 12);

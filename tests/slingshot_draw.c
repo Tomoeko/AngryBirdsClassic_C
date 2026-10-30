@@ -170,7 +170,7 @@ static bool rectangle_reference(FILE *file) {
     const float uv[] = {0, 0, 1, 0, 0, 1, 1, 1};
     size_t rendered = 0, rotated = 0;
     for (size_t item = 0; item < 4096; ++item) {
-        uint32_t input[14], expected_visible;
+        uint32_t input[14], expected_visible = 0;
         CHECK(words(file, input, 14) && words(file, &expected_visible, 1) &&
               expected_visible <= 1);
         AbSpriteRegion region = {.width = (int16_t)(input[0] & 0xffffu),

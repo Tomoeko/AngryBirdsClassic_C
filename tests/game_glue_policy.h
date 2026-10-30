@@ -22,7 +22,7 @@ static bool registry_edge_case(AbPhysicsWorld *world, WorldStorage *memory) {
         .type = AB_CLASSIC_JOINT_WELD,
         .joint = {.first_body = 0, .second_body = 1, .constraint.kind = AB_JOINT_WELD},
         .name = key("same").string};
-    size_t first, second, output = 77;
+    size_t first = 0, second, output = 77;
     CHECK(!ab_classic_joints_create(&joints, NULL, &output, NULL) && output == 77 &&
           !ab_classic_joints_create(&joints, &definition, NULL, NULL) &&
           ab_classic_joints_create(&joints, &definition, &first, NULL));

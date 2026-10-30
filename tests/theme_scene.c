@@ -215,7 +215,7 @@ static bool compare_fill_batch(Comparison *comparison, const AbGameRectanglePlan
     CHECK(marker(comparison->file, "R\n"));
     uint32_t summary[2];
     AbDrawCommand command = {0};
-    bool visible;
+    bool visible = false;
     CHECK(words(comparison->file, summary, 2) &&
           ab_fill_rectangle_reset_command(
               (AbFillRectangle){plan->argb, plan->left, plan->top, plan->width,

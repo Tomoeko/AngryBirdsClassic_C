@@ -51,7 +51,7 @@ static bool compare_native(FILE *file) {
         CHECK(fscanf(file, "%" SCNx32 " %" SCNx32 " %" SCNx32, &input, &sine,
                      &cosine) == 3 &&
               fgetc(file) == '\n');
-        float actual_sine, actual_cosine;
+        float actual_sine, actual_cosine = 0.0f;
         CHECK(ab_script_sine(number(input), &actual_sine) &&
               ab_script_cosine(number(input), &actual_cosine));
         if (bits(actual_sine) != sine || bits(actual_cosine) != cosine) {

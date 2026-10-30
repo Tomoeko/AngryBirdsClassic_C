@@ -167,7 +167,7 @@ static bool start_reference(FILE *file) {
           strcmp(line, "AB_ANDROID_SLING_START_POSE_V1 4096\n") == 0);
     size_t objects = 0, radii = 0;
     for (size_t item = 0; item < 4096; ++item) {
-        uint32_t input[7], retained[6], calls, expected[6];
+        uint32_t input[7], retained[6], calls = 0, expected[6];
         CHECK(words(file, input, 7) && words(file, retained, 6) &&
               words(file, &calls, 1) && words(file, expected, 6) && input[6] <= 3);
         AbSlingshotStartInput state = {

@@ -328,7 +328,7 @@ bool ab_ui_hud_powerups_layout(AbUiHudPowerups *owner, AbUiWidget *pause, AbVec2
     if (!owner || !owner->initialized || !pause || !pause->initialized ||
         owner->slider.box.widget.context != pause->context || pause->context->failed)
         return ab_fail(error, "Invalid HUD powerup layout owner/pause button");
-    float scale, pivot_x, width, height, pause_y;
+    float scale, pivot_x = 0.0f, width = 0.0f, height = 0.0f, pause_y = 0.0f;
     if (!isfinite(margin.x) || !isfinite(margin.y)) {
         ab_fail(error, "Nonfinite HUD layout margin");
         goto failed;

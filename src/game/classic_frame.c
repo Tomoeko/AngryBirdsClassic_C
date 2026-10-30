@@ -45,7 +45,7 @@ bool ab_classic_frame_update(AbClassicFrame *frame, float seconds,
             memcpy(&timing.speed_factor, &speed.bits, sizeof(timing.speed_factor));
     }
     frame->updating = true;
-    AbFrameClockPlan plan;
+    AbFrameClockPlan plan = {0};
     AbDataValue second = {.kind = AB_DATA_NUMBER};
     memcpy(&second.bits, &seconds, sizeof(seconds));
     bool okay =

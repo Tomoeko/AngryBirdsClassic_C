@@ -184,7 +184,7 @@ static bool registrations_match(FILE *file, const AbAudioCatalog *catalog) {
     for (size_t item = 0; item < 340; ++item) {
         const AbDataValue *entry =
             ab_data_get(catalog->registrations, number((float)(item + 1)));
-        uint32_t count;
+        uint32_t count = 0;
         CHECK(entry && entry->kind == AB_DATA_TABLE && entry->table &&
               words(file, &count, 1) && count >= 2 && count <= 6 &&
               entry->table->count == count);

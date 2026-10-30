@@ -98,7 +98,7 @@ bool ab_ui_scaling_init(AbUiScaling *scaling, AbUiScalingHost host, AbError *err
     bool okay = ab_event_manager_add(host.events, host.resolution_event,
                                      &scaling->listener, error);
     scaling->registered = okay;
-    AbUiScalingEnvironment environment;
+    AbUiScalingEnvironment environment = {0};
     if (okay)
         okay = host.environment(host.context, &environment, error);
     if (okay) {

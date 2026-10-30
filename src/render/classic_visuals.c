@@ -43,7 +43,7 @@ static bool ordinary(void *context, AbSpan name, const AbSpriteRegion **output,
 static bool composite(void *context, AbSpan name, const AbComposite **output,
                       AbError *error) {
     VisualEntry *entry = context;
-    AbResolvedComposite binding;
+    AbResolvedComposite binding = {0};
     (void)error;
     *output = NULL;
     AbClassicVisualResources resources = entry->owner->resources;

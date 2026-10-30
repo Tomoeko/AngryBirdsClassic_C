@@ -208,7 +208,7 @@ static bool advance_level_idle(LevelIdle *idle, AbPhysicsWorld *world,
                 CHECK(ab_world_set_transform(world, object->body, call->value,
                                              body->angle, &error));
             } else {
-                float angle;
+                float angle = 0.0f;
                 CHECK(call->kind == AB_BIRD_JUMP_ROTATION &&
                       ab_game_angle_wrap(call->value.x, &angle));
                 CHECK(ab_world_set_transform(world, object->body,

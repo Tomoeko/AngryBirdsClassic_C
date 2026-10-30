@@ -154,7 +154,7 @@ static bool compare_native(FILE *file) {
                     CHECK(ab_camera_mover_update(&mover, number(input[5])));
                     break;
                 case 5: {
-                    float result;
+                    float result = 0.0f;
                     CHECK(input[5] < 4 &&
                           ab_camera_tween((AbCameraTween)input[5], number(input[1]),
                                           number(input[2]), number(input[3]),

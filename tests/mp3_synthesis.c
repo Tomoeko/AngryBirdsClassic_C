@@ -50,7 +50,7 @@ static bool pcm_conversion(void) {
 
 static bool edges(void) {
     AbMp3SynthesisTransform transform;
-    AbMp3SynthesisWindow window, previous_window;
+    AbMp3SynthesisWindow window = {0}, previous_window;
     AbMp3SynthesisHistory history, previous_history;
     CHECK(ab_mp3_synthesis_transform_init(&transform, NULL) &&
           ab_mp3_synthesis_window_init(1.0, &window, NULL) &&

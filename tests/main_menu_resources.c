@@ -134,7 +134,7 @@ static bool words(FILE *file, uint32_t *output, size_t count) {
 }
 
 static bool native_case(FILE *file, const AbDataTable *themes, AbSpriteSet *sprites) {
-    uint32_t input[14], expected[3], actual[3], count;
+    uint32_t input[14], expected[3], actual[3], count = 0;
     CHECK(words(file, input, 14) && words(file, expected, 3) && input[5] < 9);
     AbMainMenuSettings settings = {
         .zoom = {.kind = AB_UI_POINTER_NUMBER, .number_bits = input[1]}};

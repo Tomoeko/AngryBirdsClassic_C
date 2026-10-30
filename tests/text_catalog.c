@@ -78,7 +78,7 @@ static int order_ids(const void *first, const void *second) {
 static bool compare_lookup(Reference *reference, const AbTextResources *resources,
                            AbSpan group, AbSpan identifier, AbSpan expected,
                            uint32_t before, uint32_t after) {
-    AbSpan actual, fallback;
+    AbSpan actual, fallback = {0};
     const AbSpan missing = {(const uint8_t *)"__AB520_GROUP_MISSING__", 23};
     CHECK(ab_text_resources_get(resources, group, identifier, &actual, NULL) &&
           ab_text_resources_get(resources, missing, identifier, &fallback, NULL));
@@ -139,7 +139,7 @@ static bool compare_catalog(Reference *reference, const AbTextCatalog *catalog,
         AbSpan group = {(const uint8_t *)group_name, strlen(group_name)};
         AbTextResourceGroup entry = {group, catalog};
         AbTextResources resources = {&entry, 1, catalog->locales[locale]};
-        uint32_t pair_count;
+        uint32_t pair_count = 0;
         CHECK(string_equal(reference, catalog->locales[locale]) &&
               words(reference->file, &pair_count, 1) &&
               pair_count == catalog->id_count);

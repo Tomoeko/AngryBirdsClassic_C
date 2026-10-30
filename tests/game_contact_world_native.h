@@ -32,7 +32,7 @@ static bool native_world_object(void *context, uintptr_t object,
 
 static bool native_world_event(NativeWorldHost *host, uint32_t kind, AbSpan first,
                                AbSpan second, AbVec2 normal, AbVec2 point) {
-    size_t first_index, second_index;
+    size_t first_index = 0, second_index = 0;
     CHECK(host->event_count < 64 && name_index(first, &first_index) &&
           name_index(second, &second_index));
     uint32_t *event = host->events[host->event_count++];

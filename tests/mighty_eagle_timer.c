@@ -100,7 +100,7 @@ static bool reference(FILE *file) {
           !strcmp(line, "AB_ANDROID_MIGHTY_EAGLE_TIMER_V1 1024\n"));
     size_t calls = 0;
     for (uint32_t sample = 0; sample < AB_MIGHTY_EAGLE_TIMER_CASES; ++sample) {
-        uint32_t input[6], generated[6], output[16], actual[16], count;
+        uint32_t input[6], generated[6], output[16], actual[16], count = 0;
         mighty_timer_case(sample, generated);
         CHECK(words(file, input, 6) && !memcmp(input, generated, sizeof(input)));
         uint32_t flags = input[5];

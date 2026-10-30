@@ -113,7 +113,7 @@ static bool reference(FILE *file) {
           strcmp(line, "AB_ANDROID_GAME_HUD_DRAW_V1 4096\n") == 0);
     size_t calls = 0, texts = 0, worlds = 0;
     for (size_t item = 0; item < 4096; ++item) {
-        uint32_t input[11], count;
+        uint32_t input[11], count = 0;
         CHECK(words(file, input, 11) && words(file, &count, 1) && input[9] <= 127 &&
               count <= AB_GAME_HUD_CALLS);
         AbGameHudInput state = {.screen_width = number(input[0]),

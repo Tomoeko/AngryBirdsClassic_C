@@ -50,7 +50,7 @@ static bool corpus(FILE *reference) {
         AbUiFrameState states[2] = {0};
         CHECK(setup(input, &menu, notifications, states, children));
         AbDataValue ingame;
-        bool pausing;
+        bool pausing = false;
         CHECK(
             ab_classic_level_start_ingame(menu.manager, notifications, &ingame, NULL) &&
             ab_classic_notifications_pausing(notifications, &pausing, NULL));

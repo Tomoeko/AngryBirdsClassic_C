@@ -172,7 +172,7 @@ static bool compare_sample(FILE *file, size_t sample, size_t *events) {
                                       from_bits(materials[3])));
     write_contact(&contact, actual);
     CHECK(compare_words(actual, expected, 20, sample, "constructor"));
-    uint32_t control[8], old[16], evaluation[16], expected_bodies[4], event_count;
+    uint32_t control[8], old[16], evaluation[16], expected_bodies[4], event_count = 0;
     CHECK(read_words(file, control, 8) && read_words(file, old, 16) &&
           read_words(file, evaluation, 16) && read_words(file, expected, 20) &&
           read_words(file, expected_bodies, 4) && read_words(file, &event_count, 1));

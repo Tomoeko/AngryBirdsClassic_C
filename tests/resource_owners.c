@@ -141,7 +141,7 @@ static bool native_case(FILE *file, size_t sample, bool cache) {
                 int size =
                     snprintf(path, sizeof(path), "missing/%s%s.dat",
                              registry_owners[owner], sample & 1u ? ".extra" : "");
-                size_t key_size;
+                size_t key_size = 0;
                 CHECK(size > 0 && (size_t)size < sizeof(path) &&
                       ab_asset_sheet_key((AbSpan){(const uint8_t *)path, (size_t)size},
                                          key_bytes, sizeof(key_bytes), &key_size,
