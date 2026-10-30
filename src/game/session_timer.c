@@ -153,8 +153,8 @@ bool ab_session_timer_complete(AbSessionTimer *timer, AbDataValue *output,
     else if (truthy(timer->state->force_completed))
         *output = timer->state->force_completed;
     else {
-        AbDataValue value;
-        float seconds;
+        AbDataValue value = {0};
+        float seconds = 0;
         okay = remaining(timer, &value, error) && numeric(value, &seconds, error);
         if (okay)
             *output = (AbDataValue){.kind = AB_DATA_BOOLEAN, .bits = seconds <= 0};

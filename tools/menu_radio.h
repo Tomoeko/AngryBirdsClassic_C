@@ -52,7 +52,7 @@ static bool radio_sound(RadioScene *owner, AbDataValue song, float volume, bool 
 
 static void radio_spin(RadioScene *owner, float target) {
     owner->target = target;
-    owner->direction = target >= owner->position ? 1 : -1;
+    owner->direction = target >= owner->position ? 1.0f : -1.0f;
     owner->state = RADIO_AUTOSPINNING;
 }
 

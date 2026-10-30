@@ -243,7 +243,7 @@ static bool in_level(AbClassicAnger *anger, AbDataValue *output, AbError *error)
 }
 
 static bool refill_level(AbClassicAnger *anger, AbError *error) {
-    AbDataValue playing;
+    AbDataValue playing = {0};
     if (!in_level(anger, &playing, error))
         return false;
     if (truthy(playing)) {
@@ -357,7 +357,7 @@ bool ab_classic_anger_event(AbClassicAnger *anger, AbDataTable *event, AbError *
     bool okay = anger->config.load_refill_popup(anger->config.context, error);
     if (okay)
         anger->config.state->used = number(0);
-    AbDataValue playing;
+    AbDataValue playing = {0};
     if (okay)
         okay = in_level(anger, &playing, error);
     if (okay && !truthy(playing) && truthy(anger->config.state->queued)) {

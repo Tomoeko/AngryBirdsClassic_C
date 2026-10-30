@@ -114,7 +114,7 @@ static bool bind_border(const AbDataTable *table, const LayerSources *sources,
         !border_number(table, "alpha", 1, &output->border_alpha, error))
         return false;
     if (sources->provider) {
-        AbSpriteAtlasBinding binding;
+        AbSpriteAtlasBinding binding = {0};
         if (sources->provider->sprite(sources->provider->context, name, &binding))
             output->ordinary = binding.sprite;
         else if (sources->provider->composite &&
@@ -149,7 +149,7 @@ static bool bind_layer(const AbDataTable *table, const LayerSources *sources,
         (name->string.size && !name->string.data)) {
         return ab_fail(error, "Static theme layer requires string sprite identifier");
     }
-    AbSpriteAtlasBinding binding;
+    AbSpriteAtlasBinding binding = {0};
     bool ordinary =
         sources->provider
             ? sources->provider->sprite(sources->provider->context, name->string,

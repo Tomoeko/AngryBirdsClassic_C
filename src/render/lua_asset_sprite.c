@@ -50,7 +50,7 @@ bool ab_lua_asset_sprite_bind(const AbSpriteProvider *provider, AbSpan name,
         (name.size && !name.data))
         return ab_fail(error, "Invalid Lua asset sprite resource binding");
     AbLuaAssetSpriteBinding result = {0};
-    AbSpriteAtlasBinding binding;
+    AbSpriteAtlasBinding binding = {0};
     bool found = name.size && provider->sprite(provider->context, name, &binding);
     if (!found) {
         AbResolvedComposite composite;

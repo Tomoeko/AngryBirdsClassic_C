@@ -656,7 +656,8 @@ static bool game_session_pointer(PreviewMenu *menu, AbSpan action, AbVec2 point,
         game->released_key.value.bits = 1;
         game->held_key.value.bits = 0;
     }
-    game->input.touch_count = menu_route_number(game->held_key.value.bits ? 1 : 0);
+    game->input.touch_count =
+        menu_route_number(game->held_key.value.bits ? 1.0f : 0.0f);
     return true;
 }
 

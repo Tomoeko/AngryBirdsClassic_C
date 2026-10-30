@@ -189,7 +189,7 @@ static bool game_shock_update_one(PreviewShockObject *row, float seconds,
         for (size_t index = 0; index < 2; ++index) {
             AbParticleEmission emission = {
                 .definition = menu_span(names[index]),
-                .amount = index ? 10 : 1,
+                .amount = index ? 10.0f : 1.0f,
                 .position = {row->origin.x * 20, row->origin.y * 20},
                 .ignore_limits = index == 0};
             if (!ab_particles_emit(ab_classic_particles_engine(game->particles),

@@ -423,7 +423,7 @@ bool ab_classic_level_flow_update(AbClassicLevelFlow *flow, AbError *error) {
     if (!flow || flow->updating || !enter(flow, false, error))
         return ab_fail(error, "Invalid or reentrant level-start update");
     flow->updating = true;
-    bool in_game;
+    bool in_game = false;
     bool okay = update_showing(flow, error) && ingame(flow, &in_game, error);
     if (okay && in_game && !flow->showing)
         okay = process_ingame(flow, error);
