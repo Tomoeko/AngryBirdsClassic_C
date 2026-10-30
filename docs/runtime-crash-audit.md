@@ -616,3 +616,42 @@ half`, bounded by `--frames 30`, exits successfully. Native AVFoundation decodin
 reads its 1024x768 half-size Retina video, 0.329843-second duration and 7,104 nonzero
 audio words. The Windows application and parser-test cross-build also pass.
 These checks do not establish complete level wins or native whole-game parity.
+
+## Desktop audio quality and duplicate effects
+
+The user reports simultaneous duplicate effects during destruction and Mighty
+Eagle use. Desktop playback now coalesces identical non-looping resource/gain/track
+requests inside one application frame. Group selection and game callbacks still
+execute; different clips, gains, tracks, later frames, stopped voices and loops
+retain independent playback. The frame window uses unsigned mixer-handle
+distances, including wrap. This is an explicit desktop presentation policy,
+separate from native callback-count fidelity.
+
+The pinned APK audio-header inventory contains 16-kHz mono material, one 16-kHz
+stereo BeachAmbience file, and one 24-kHz powerup_awarded file. The desktop now
+mixes in stereo at 48 kHz and uses a first-party normalized, 64-tap Blackman-windowed
+sinc interpolator for integer ratios two/three. Source PCM is unchanged; integer
+phases preserve its samples. Native equal-rate mixer arithmetic remains the
+default research path. The device and recording use the configured rate, and
+the output queue retains its previous 64-ms target duration.
+
+Tests cover actual wood-destruction and Eagle clips, interleaved gain/track
+requests, later/stopped retriggers, independent stereo channels, high-frequency
+signals, loop boundaries, finite duration and chunk invariance. All original
+decoded registration comparisons still pass. The initial audio checkpoint passes
+813 Release tests in 353.69 seconds and seven focused ASan/UBSan checks in 5.75
+seconds. The final frame-window refinement additionally passes the actual-APK
+bank check under ASan/UBSan. A clean portable build passes all 387 tests; the
+Windows cross-build also passes.
+
+A live bounded macOS recording decodes as 48,000-Hz stereo float PCM with a
+1024x768 half-size Retina video, 0.563488-second duration and 43,828 nonzero audio
+words. The native output reports no underruns. Whole-scene native audio/timing
+parity remains unverified; neither interpolation nor coalescing is claimed as
+recovered Android mixer behavior.
+
+The final stopped-mixer guard and fixture portability edits pass 20 focused
+Release checks and three audio ASan/UBSan checks. The final Windows cross-build
+also passes. A separate `--audio web` recording decodes at 48,000 Hz with two
+channels, 1024x768 video and 46,848 nonzero audio words; native output again
+reports zero underrun frames.

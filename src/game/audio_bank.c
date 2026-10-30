@@ -25,6 +25,8 @@ struct AbAudioBank {
     AbDataEntry channel_entries[7];
     AbAudioResources resources;
     size_t count, capacity, bytes;
+    uint32_t frame_first_voice;
+    bool coalesce_effects;
 };
 
 const AbDataTable *ab_audio_bank_groups(const AbAudioBank *bank) {
@@ -217,6 +219,19 @@ size_t ab_audio_bank_count(const AbAudioBank *bank) {
     return bank ? bank->count : 0;
 }
 
+void ab_audio_bank_begin_frame(AbAudioBank *bank) {
+    if (!bank || !bank->coalesce_effects)
+        return;
+    bank->frame_first_voice = ab_audio_mixer_view(bank->config.mixer).next_id;
+}
+
+void ab_audio_bank_coalesce_frame_effects(AbAudioBank *bank, bool enabled) {
+    if (!bank)
+        return;
+    bank->coalesce_effects = enabled;
+    ab_audio_bank_begin_frame(bank);
+}
+
 bool ab_audio_bank_clip(const AbAudioBank *bank, AbSpan name, AbAudioBankClip *output) {
     if (!bank || !output || (name.size && !name.data))
         return false;
@@ -296,15 +311,49 @@ bool ab_audio_bank_play(AbAudioBank *bank, AbAudioPlay request, uint32_t *handle
                                        handle, error);
 }
 
+static bool frame_effect(AbAudioBank *bank, uint32_t clip, float gain, uint32_t track,
+                         uint32_t *handle) {
+    AbAudioMixerView view = ab_audio_mixer_view(bank->config.mixer);
+    if (!view.started)
+        return false;
+    uint32_t admitted = view.next_id - bank->frame_first_voice;
+    const AbAudioVoice *sets[] = {view.active, view.pending};
+    size_t counts[] = {view.active_count, view.pending_count};
+    for (size_t set = 0; set < 2; ++set) {
+        for (size_t index = 0; index < counts[set]; ++index) {
+            const AbAudioVoice *voice = sets[set] + index;
+            /* Unsigned distances preserve the frame window across handle wrap. */
+            uint32_t distance = voice->id - bank->frame_first_voice;
+            if (distance < admitted && voice->clip_id == clip && voice->gain == gain &&
+                voice->track == track &&
+                !(voice->flags & (AB_AUDIO_VOICE_ENDED | AB_AUDIO_VOICE_LOOP))) {
+                *handle = voice->id;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 bool ab_audio_bank_play_resource(AbAudioBank *bank, AbSpan name, float gain, bool loop,
                                  uint32_t track, uint32_t *handle, AbError *error) {
     if (!bank || !handle || (name.size && !name.data))
         return ab_fail(error, "Invalid direct audio resource playback");
-    const BankClip *clip = find_clip(bank, name);
-    if (clip && clip->pcm.sample_rate != 16000)
+    BankClip *clip = find_clip(bank, name);
+    if (clip && clip->pcm.sample_rate != 16000 &&
+        ab_audio_mixer_view(bank->config.mixer).sample_rate != 48000)
         return ab_fail(error, "Unrecovered playback rate for registered audio clip");
-    return ab_audio_resources_play(&bank->resources, name, gain, loop, track, handle,
-                                   error);
+    if (!clip)
+        return ab_audio_resources_play(&bank->resources, name, gain, loop, track,
+                                       handle, error);
+    uint32_t clip_id = (uint32_t)(clip - bank->clips);
+    if (bank->coalesce_effects && !loop &&
+        frame_effect(bank, clip_id, gain, track, handle))
+        return true;
+    return ab_audio_mixer_play_rate(
+        bank->config.mixer, clip_id,
+        (AbPcm16View){clip->pcm.samples, clip->pcm.frames, clip->pcm.channels},
+        clip->pcm.sample_rate, gain, loop, track, handle, error);
 }
 
 bool ab_audio_bank_default_sling_launch(AbAudioBank *bank, uint32_t *handle,

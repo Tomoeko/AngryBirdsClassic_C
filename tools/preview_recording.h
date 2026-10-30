@@ -43,12 +43,13 @@ static bool preview_recording_open(CcPlatform *platform, AbAudioOutput *audio,
         return ab_fail(error, "The requested recording audio mode is unavailable");
     if (audio && !ab_audio_output_pause(audio, error))
         return false;
-    CcRecordingOptions options = {.platform = platform,
-                                  .sample_rate = 16000,
-                                  .video_rate = 60,
-                                  .half_size = half_size,
-                                  .audio_mode = mode,
-                                  .filename_prefix = "AngryBirds"};
+    CcRecordingOptions options = {
+        .platform = platform,
+        .sample_rate = audio ? ab_audio_output_view(audio).sample_rate : 48000,
+        .video_rate = 60,
+        .half_size = half_size,
+        .audio_mode = mode,
+        .filename_prefix = "AngryBirds"};
     if (audio)
         options.audio =
             (CcRecordingAudioSource){.context = audio,

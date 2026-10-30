@@ -268,6 +268,76 @@ static bool bank_check(AbAudioBank *bank, AbAudioMixer *mixer, AbRandom48 *rando
     return true;
 }
 
+static bool desktop_quality(AbAudioBank *bank, AbAudioMixer *mixer, AbError *error) {
+    CHECK(ab_audio_mixer_all_action(mixer, AB_AUDIO_STOP, error));
+    CHECK(ab_audio_mixer_mix(mixer, 0, NULL, 0, error));
+    ab_audio_bank_coalesce_frame_effects(bank, true);
+    uint32_t first, duplicate, later;
+    AbAudioBankClip wood = {0};
+    AbSpan wood_path = span("assets/data/audio/sfx/wood destroyed a1.mp3");
+    for (size_t index = 0; index < ab_audio_bank_count(bank); ++index) {
+        AbAudioBankClip clip;
+        CHECK(ab_audio_bank_at(bank, index, &clip));
+        if (clip.path.size == wood_path.size &&
+            !memcmp(clip.path.data, wood_path.data, wood_path.size))
+            wood = clip;
+    }
+    CHECK(wood.pcm.samples);
+    CHECK(ab_audio_bank_play_resource(bank, wood.name, .7f, false, 3, &first, error));
+    CHECK(ab_audio_bank_play_resource(bank, wood.name, .5f, false, 3, &later, error));
+    CHECK(first != later);
+    CHECK(
+        ab_audio_bank_play_resource(bank, wood.name, .7f, false, 3, &duplicate, error));
+    CHECK(duplicate == first && ab_audio_mixer_view(mixer).pending_count == 2);
+    CHECK(ab_audio_bank_play_resource(bank, wood.name, .7f, false, 2, &later, error));
+    CHECK(later != first && ab_audio_mixer_view(mixer).pending_count == 3);
+    CHECK(ab_audio_mixer_all_action(mixer, AB_AUDIO_STOP, error));
+    CHECK(ab_audio_mixer_mix(mixer, 0, NULL, 0, error));
+    ab_audio_bank_begin_frame(bank);
+    AbSpan thump = span("mighty_eagle_thump");
+    CHECK(ab_audio_bank_play_resource(bank, thump, 1, false, 0, &first, error));
+    CHECK(ab_audio_bank_play_resource(bank, thump, 1, false, 0, &duplicate, error));
+    CHECK(first == duplicate && ab_audio_mixer_view(mixer).pending_count == 1);
+    CHECK(ab_audio_mixer_start(mixer, false, error));
+    CHECK(ab_audio_bank_play_resource(bank, thump, 1, false, 0, &duplicate, error));
+    CHECK(duplicate == UINT32_MAX);
+    CHECK(ab_audio_mixer_start(mixer, true, error));
+    ab_audio_bank_begin_frame(bank);
+    CHECK(ab_audio_bank_play_resource(bank, thump, 1, false, 0, &later, error));
+    CHECK(later != first && ab_audio_mixer_view(mixer).pending_count == 2);
+    CHECK(ab_audio_bank_stop(bank, thump, error));
+    CHECK(ab_audio_bank_play_resource(bank, thump, 1, false, 0, &duplicate, error));
+    CHECK(duplicate != later);
+    CHECK(ab_audio_mixer_all_action(mixer, AB_AUDIO_STOP, error));
+    CHECK(ab_audio_mixer_mix(mixer, 0, NULL, 0, error));
+    CHECK(ab_audio_mixer_start(mixer, false, error));
+    CHECK(ab_audio_mixer_configure_output(mixer, 48000, 2, error));
+    CHECK(ab_audio_mixer_start(mixer, true, error));
+    AbAudioBankClip award = {0}, ambience = {0};
+    for (size_t index = 0; index < ab_audio_bank_count(bank); ++index) {
+        AbAudioBankClip clip;
+        CHECK(ab_audio_bank_at(bank, index, &clip));
+        if (clip.sample_rate == 24000)
+            award = clip;
+        if (clip.pcm.channels == 2)
+            ambience = clip;
+    }
+    CHECK(award.pcm.samples && ambience.pcm.samples);
+    CHECK(ab_audio_bank_play_resource(bank, award.name, .5f, false, 0, &first, error));
+    CHECK(
+        ab_audio_bank_play_resource(bank, ambience.name, .5f, true, 7, &later, error));
+    int16_t output[1024];
+    CHECK(ab_audio_mixer_mix(mixer, 512, output, 1024, error));
+    AbAudioMixerView view = ab_audio_mixer_view(mixer);
+    CHECK(view.active_count == 2 && view.active[0].sample_rate == 24000 &&
+          view.active[0].cursor_frames == 256 && view.active[1].sample_rate == 16000 &&
+          view.active[1].cursor_frames == 170 && view.active[1].rate_phase == 2);
+    puts("Desktop audio bank: duplicate Eagle effects share one voice per frame; "
+         "later/stopped effects retrigger, and original 24-kHz/stereo PCM plays at 48 "
+         "kHz.");
+    return true;
+}
+
 int main(int argc, char **argv) {
     if (argc != 3) {
         fputs("Usage: ab_audio_bank_tests PINNED_APK NATIVE_MP3_FORMAT_CORPUS\n",
@@ -298,6 +368,7 @@ int main(int argc, char **argv) {
     okay = okay && bank_check(bank, mixer, &random, reference);
     okay = okay &&
            pause_actions(&archive, (AbSpan){key, sizeof(key)}, bank, mixer, &error);
+    okay = okay && desktop_quality(bank, mixer, &error);
     memset(key, 0, sizeof(key));
     if (!okay && error.message[0])
         fprintf(stderr, "%s\n", error.message);

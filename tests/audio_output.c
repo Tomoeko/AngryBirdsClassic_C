@@ -13,7 +13,7 @@ static CcAudioOutput *device;
 static bool fail_start;
 
 CcAudioOutput *cc_audio_output_open(const CcAudioOutputOptions *options) {
-    if (!options || options->sample_rate != 16000 ||
+    if (!options || (options->sample_rate != 16000 && options->sample_rate != 48000) ||
         options->mode != CC_AUDIO_OUTPUT_DIRECT || device)
         return NULL;
     device = calloc(1, sizeof(*device));
@@ -113,8 +113,28 @@ int main(void) {
     ab_audio_output_close(output);
     CHECK(!device && !ab_audio_mixer_view(mixer).started);
     ab_audio_mixer_close(mixer);
-    puts(
-        "Native audio adapter: 16-kHz format, mono/stereo mapping, variable callbacks, "
-        "queue wrap, underrun recovery and startup failure cleanup.");
+    mixer = NULL;
+    output = NULL;
+    CHECK(ab_audio_mixer_open((AbAudioMixerLimits){4, 512, 1, 65536}, &mixer, &error));
+    CHECK(ab_audio_mixer_configure_output(mixer, 48000, 2, &error));
+    CHECK(ab_audio_output_open(mixer, &output, &error));
+    CHECK(device->options.sample_rate == 48000 &&
+          ab_audio_output_view(output).sample_rate == 48000);
+    device->options.render(device->options.context, stereo, 3072);
+    const int16_t distinct[] = {12000, -6000, 12000, -6000};
+    CHECK(ab_audio_mixer_play(mixer, 2, (AbPcm16View){distinct, 2, 2}, 1, true, 0,
+                              &handle, &error));
+    CHECK(ab_audio_output_pump(output, &error));
+    device->options.render(device->options.context, stereo, 129);
+    for (size_t index = 0; index < 129; ++index) {
+        CHECK(fabsf(stereo[index * 2] - 12000.0f / 32768) < .0001f);
+        CHECK(fabsf(stereo[index * 2 + 1] + 6000.0f / 32768) < .0001f);
+    }
+    CHECK(!ab_audio_output_view(output).underrun_frames);
+    ab_audio_output_close(output);
+    ab_audio_mixer_close(mixer);
+    puts("Native audio adapter: 16/48-kHz formats, mono/stereo mapping, variable "
+         "callbacks, "
+         "queue wrap, underrun recovery and startup failure cleanup.");
     return 0;
 }

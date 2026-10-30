@@ -368,6 +368,7 @@ add_library(ab_game STATIC src/game/object_definition.c src/game/object_physics.
     src/game/damage_sprite.c src/game/audio_group.c src/game/audio_play.c
     src/game/audio_mix.c
     src/game/audio_mixer.c
+    src/game/audio_resample.c
     src/game/audio_resources.c
     src/game/classic_audio.c
     src/game/slingshot_reload.c src/game/level_flow.c src/game/level_bonus.c
@@ -3483,6 +3484,9 @@ if(BUILD_TESTING)
     add_executable(ab_audio_mixer_tests tests/audio_mixer.c)
     target_link_libraries(ab_audio_mixer_tests PRIVATE ab_game)
     add_test(NAME game_audio_mixer_edges COMMAND ab_audio_mixer_tests)
+    add_executable(ab_audio_resample_tests tests/audio_resample.c)
+    target_link_libraries(ab_audio_resample_tests PRIVATE ab_game)
+    add_test(NAME game_audio_resample_quality COMMAND ab_audio_resample_tests)
     add_executable(ab_audio_resources_tests tests/audio_resources.c)
     target_link_libraries(ab_audio_resources_tests PRIVATE ab_game)
     add_test(NAME game_audio_resources_edges COMMAND ab_audio_resources_tests)

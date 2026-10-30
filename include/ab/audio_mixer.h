@@ -25,6 +25,7 @@ typedef struct {
     float gain;
     uint32_t track;
     uint32_t flags;
+    uint32_t sample_rate, rate_phase;
 } AbAudioVoice;
 
 typedef struct {
@@ -44,19 +45,30 @@ typedef struct {
     float master_gain;
     uint32_t next_id;
     bool started;
+    uint32_t sample_rate;
+    uint16_t channels;
 } AbAudioMixerView;
 
 /* Own fixed active/pending voice arrays and PCM/float scratch. Bound all retained
  * allocations by storage_bytes. Start stopped, with master/track gains one and
- * eight unlimited tracks. One/two output channels, signed16, equal rate and unit
- * speed only. No fades, delays, decoder, threads or device output. Clip PCM stays
+ * eight unlimited tracks. One/two output channels, signed16 and unit speed.
+ * Default equal-rate behavior preserves native mixer traces; configured desktop
+ * output may interpolate the APK's source rates. No fades, delays, decoder,
+ * threads or device output. Clip PCM stays
  * borrowed until every referencing voice is removed and any snapshots expire.
- * Caller serializes access. No allocations occur after open. Output starts NULL;
+ * Caller serializes access. No allocations occur after output configuration.
+ * Output starts NULL;
  * fully clean up failure. */
 bool ab_audio_mixer_open(AbAudioMixerLimits limits, AbAudioMixer **output,
                          AbError *error);
 void ab_audio_mixer_close(AbAudioMixer *mixer);
 AbAudioMixerView ab_audio_mixer_view(const AbAudioMixer *mixer);
+
+/* Configure stopped, empty output before opening a device. Native fixtures keep
+ * their default 16-kHz format. Desktop output may select 48-kHz stereo to retain
+ * the APK's original mono/stereo data and both supplied source rates. */
+bool ab_audio_mixer_configure_output(AbAudioMixer *mixer, uint32_t sample_rate,
+                                     uint16_t channels, AbError *error);
 
 bool ab_audio_mixer_start(AbAudioMixer *mixer, bool started, AbError *error);
 /* Queue an independent cursor over nonempty PCM. id is an asset identity supplied
@@ -67,6 +79,11 @@ bool ab_audio_mixer_start(AbAudioMixer *mixer, bool started, AbError *error);
 bool ab_audio_mixer_play(AbAudioMixer *mixer, uint32_t id, AbPcm16View source,
                          float gain, bool loop, uint32_t track, uint32_t *handle,
                          AbError *error);
+/* Preserve original source frames/rate. Equal-rate playback follows the native
+ * path; 16/24-kHz sources use integer-phase interpolation for 48-kHz output. */
+bool ab_audio_mixer_play_rate(AbAudioMixer *mixer, uint32_t id, AbPcm16View source,
+                              uint32_t sample_rate, float gain, bool loop,
+                              uint32_t track, uint32_t *handle, AbError *error);
 bool ab_audio_mixer_voice_action(AbAudioMixer *mixer, uint32_t handle,
                                  AbAudioVoiceAction action, AbError *error);
 bool ab_audio_mixer_all_action(AbAudioMixer *mixer, AbAudioVoiceAction action,

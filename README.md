@@ -60,6 +60,8 @@ F toggles fullscreen. Escape pauses/resumes the game or leaves a result screen;
 outside gameplay it leaves fullscreen. Close the window to quit.
 Drag to aim or move the camera; use the scroll wheel to zoom within each level's
 camera limits. The pointer stays visible.
+Desktop audio uses 48 kHz stereo output, preserves the APK's source channels and
+sample timing, and merges identical effects requested in the same frame.
 Options may go before or after the APK path. `--window-size 1280x720` sets the
 initial window size. `--inf` or `--infinite` gives unlimited power-up inventory and Mighty Eagle
 access without a purchase or cooldown, while preserving per-level activation rules.

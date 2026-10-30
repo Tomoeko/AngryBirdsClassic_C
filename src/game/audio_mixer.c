@@ -1,4 +1,5 @@
 #include "ab/audio_mixer.h"
+#include "ab/audio_resample.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -17,6 +18,8 @@ struct AbAudioMixer {
     float master_gain;
     uint32_t next_id;
     bool started;
+    uint32_t sample_rate;
+    AbAudioResampler *resampler;
 };
 
 void ab_audio_mixer_close(AbAudioMixer *mixer) {
@@ -24,6 +27,7 @@ void ab_audio_mixer_close(AbAudioMixer *mixer) {
         return;
     }
     free(mixer->scratch);
+    free(mixer->resampler);
     free(mixer->accumulation);
     free(mixer->pending);
     free(mixer->active);
@@ -54,6 +58,7 @@ bool ab_audio_mixer_open(AbAudioMixerLimits limits, AbAudioMixer **output,
         return ab_fail(error, "Cannot allocate audio mixer");
     }
     mixer->limits = limits;
+    mixer->sample_rate = 16000;
     mixer->active = calloc(limits.voices, sizeof(*mixer->active));
     mixer->pending = calloc(limits.voices, sizeof(*mixer->pending));
     mixer->scratch = calloc(limits.frames * 2, sizeof(*mixer->scratch));
@@ -77,9 +82,40 @@ AbAudioMixerView ab_audio_mixer_view(const AbAudioMixer *mixer) {
         return (AbAudioMixerView){0};
     }
     return (AbAudioMixerView){
-        mixer->active,        mixer->active_count, mixer->pending,
-        mixer->pending_count, mixer->track_gains,  mixer->track_limits,
-        mixer->master_gain,   mixer->next_id,      mixer->started};
+        mixer->active,        mixer->active_count,   mixer->pending,
+        mixer->pending_count, mixer->track_gains,    mixer->track_limits,
+        mixer->master_gain,   mixer->next_id,        mixer->started,
+        mixer->sample_rate,   mixer->limits.channels};
+}
+
+bool ab_audio_mixer_configure_output(AbAudioMixer *mixer, uint32_t sample_rate,
+                                     uint16_t channels, AbError *error) {
+    if (!mixer || mixer->started || mixer->active_count || mixer->pending_count ||
+        (sample_rate != 16000 && sample_rate != 48000) || channels < 1 || channels > 2)
+        return ab_fail(error, "Invalid stopped audio output configuration");
+    size_t bytes = sizeof(*mixer) + mixer->limits.voices * 2 * sizeof(AbAudioVoice);
+    size_t frame_bytes = 2 * sizeof(int16_t) + channels * sizeof(float);
+    size_t filter_bytes = sample_rate == 48000 ? sizeof(AbAudioResampler) : 0;
+    if (bytes > mixer->limits.storage_bytes ||
+        filter_bytes > mixer->limits.storage_bytes - bytes ||
+        mixer->limits.frames >
+            (mixer->limits.storage_bytes - bytes - filter_bytes) / frame_bytes)
+        return ab_fail(error, "Audio output format exceeds retained storage limit");
+    float *accumulation = calloc(mixer->limits.frames * channels, sizeof(float));
+    AbAudioResampler *resampler = filter_bytes ? malloc(filter_bytes) : NULL;
+    if (!accumulation || (filter_bytes && !resampler) ||
+        (resampler && !ab_audio_resampler_init(resampler, error))) {
+        free(accumulation);
+        free(resampler);
+        return ab_fail(error, "Cannot prepare audio output format");
+    }
+    free(mixer->accumulation);
+    free(mixer->resampler);
+    mixer->accumulation = accumulation;
+    mixer->resampler = resampler;
+    mixer->limits.channels = channels;
+    mixer->sample_rate = sample_rate;
+    return true;
 }
 
 bool ab_audio_mixer_start(AbAudioMixer *mixer, bool started, AbError *error) {
@@ -130,6 +166,13 @@ bool ab_audio_mixer_is_playing(const AbAudioMixer *mixer, uint32_t handle) {
 bool ab_audio_mixer_play(AbAudioMixer *mixer, uint32_t id, AbPcm16View source,
                          float gain, bool loop, uint32_t track, uint32_t *handle,
                          AbError *error) {
+    return ab_audio_mixer_play_rate(mixer, id, source, mixer ? mixer->sample_rate : 0,
+                                    gain, loop, track, handle, error);
+}
+
+bool ab_audio_mixer_play_rate(AbAudioMixer *mixer, uint32_t id, AbPcm16View source,
+                              uint32_t sample_rate, float gain, bool loop,
+                              uint32_t track, uint32_t *handle, AbError *error) {
     if (!mixer || !handle) {
         return ab_fail(error, "Missing audio mixer or playback output");
     }
@@ -151,12 +194,22 @@ bool ab_audio_mixer_play(AbAudioMixer *mixer, uint32_t id, AbPcm16View source,
         source.frames > (size_t)INT32_MAX / (source.channels * 2u)) {
         return ab_fail(error, "Invalid equal-rate audio clip");
     }
+    if (sample_rate != mixer->sample_rate &&
+        !(mixer->sample_rate == 48000 &&
+          (sample_rate == 16000 || sample_rate == 24000)))
+        return ab_fail(error, "Unsupported source/output audio rate");
     if (mixer->active_count + mixer->pending_count == mixer->limits.voices) {
         return ab_fail(error, "Audio voice storage is full");
     }
     uint32_t next = mixer->next_id++;
-    mixer->pending[mixer->pending_count++] = (AbAudioVoice){
-        next, id, source, 0, gain, track, loop ? AB_AUDIO_VOICE_LOOP : 0};
+    mixer->pending[mixer->pending_count++] =
+        (AbAudioVoice){.id = next,
+                       .clip_id = id,
+                       .source = source,
+                       .gain = gain,
+                       .track = track,
+                       .flags = loop ? AB_AUDIO_VOICE_LOOP : 0,
+                       .sample_rate = sample_rate};
     *handle = next;
     return true;
 }
@@ -354,6 +407,35 @@ static bool fetch_source(AbAudioVoice *voice, size_t frames, int16_t *scratch,
     return true;
 }
 
+static bool fetch_resampled(AbAudioMixer *mixer, AbAudioVoice *voice, size_t frames,
+                            AbError *error) {
+    unsigned ratio = mixer->sample_rate / voice->sample_rate;
+    size_t channels = voice->source.channels;
+    bool loop = (voice->flags & AB_AUDIO_VOICE_LOOP) != 0;
+    memset(mixer->scratch, 0, frames * channels * sizeof(int16_t));
+    size_t copied = 0;
+    for (; copied < frames; ++copied) {
+        if (voice->cursor_frames == voice->source.frames) {
+            if (!loop)
+                break;
+            voice->cursor_frames = 0;
+        }
+        for (unsigned channel = 0; channel < channels; ++channel)
+            if (!ab_audio_resampler_sample(
+                    mixer->resampler, voice->source, voice->cursor_frames,
+                    voice->rate_phase, ratio, channel, loop,
+                    mixer->scratch + copied * channels + channel, error))
+                return false;
+        if (++voice->rate_phase == ratio) {
+            voice->rate_phase = 0;
+            ++voice->cursor_frames;
+        }
+    }
+    if (!copied && !loop)
+        voice->flags |= AB_AUDIO_VOICE_ENDED;
+    return true;
+}
+
 bool ab_audio_mixer_mix(AbAudioMixer *mixer, size_t frames, int16_t *output,
                         size_t capacity, AbError *error) {
     if (!mixer || frames > mixer->limits.frames ||
@@ -370,7 +452,10 @@ bool ab_audio_mixer_mix(AbAudioMixer *mixer, size_t frames, int16_t *output,
         if (voice->flags & (AB_AUDIO_VOICE_PAUSED | AB_AUDIO_VOICE_ENDED)) {
             continue;
         }
-        if (!fetch_source(voice, frames, mixer->scratch, error)) {
+        bool fetched = voice->sample_rate == mixer->sample_rate
+                           ? fetch_source(voice, frames, mixer->scratch, error)
+                           : fetch_resampled(mixer, voice, frames, error);
+        if (!fetched) {
             return false;
         }
         AbPcm16View source = {mixer->scratch, frames, voice->source.channels};

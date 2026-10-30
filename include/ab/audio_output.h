@@ -8,13 +8,14 @@ typedef struct AbAudioOutput AbAudioOutput;
 typedef struct {
     uint32_t queued_frames;
     uint64_t rendered_frames, nonzero_samples, underrun_frames;
+    uint32_t sample_rate;
 } AbAudioOutputView;
 
-/* Native stereo output over the target's mono signed16 mixer. The application
+/* Native stereo output over the configured signed16 mixer. The application
  * thread exclusively owns mixer calls and pumps a bounded SPSC queue; the
- * device callback only consumes prepared floats. Duplicate the mono channel
- * to both device channels at signed16/32768 gain, without resampling.
- * Open starts the real mixer/device at 16000 Hz. Missing output fails explicitly.
+ * device callback only consumes prepared floats. Preserve stereo channels or
+ * duplicate mono at signed16/32768 gain. The device uses the configured rate.
+ * Missing output fails explicitly.
  * No callback allocations, decoding, locks or game-state access. Close joins
  * device callbacks before releasing queue storage; the borrowed mixer outlives it.
  * Pump at each application frame, including menus and paused game scenes.

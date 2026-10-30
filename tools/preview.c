@@ -245,9 +245,9 @@ static bool present_preview(CcPlatform *platform, AbCommonRenderer *renderer,
     if (menu && options.frames) {
         AbAudioOutputView audio = ab_audio_output_view(menu->audio_output);
         fprintf(stdout,
-                "Native audio: 16000 Hz, %llu frames, %llu nonzero samples, "
+                "Native audio: %u Hz, %llu frames, %llu nonzero samples, "
                 "%llu underrun frames.\n",
-                (unsigned long long)audio.rendered_frames,
+                (unsigned)audio.sample_rate, (unsigned long long)audio.rendered_frames,
                 (unsigned long long)audio.nonzero_samples,
                 (unsigned long long)audio.underrun_frames);
     }
@@ -358,9 +358,13 @@ int main(int argc, char **argv) {
     menu.launch_enabled = options.main_menu;
     if (options.main_menu && !menu_background_open(&menu, &error))
         goto release_preview;
-    if (options.main_menu &&
-        !ab_audio_output_open(menu.mixer, &menu.audio_output, &error))
-        goto release_preview;
+    if (options.main_menu) {
+        if (!ab_audio_mixer_configure_output(menu.mixer, 48000, 2, &error))
+            goto release_preview;
+        ab_audio_bank_coalesce_frame_effects(menu.audio, true);
+        if (!ab_audio_output_open(menu.mixer, &menu.audio_output, &error))
+            goto release_preview;
+    }
     if (options.fullscreen && !cc_platform_set_fullscreen(platform, true)) {
         ab_fail(&error, "Cannot enter native fullscreen");
         goto release_preview;

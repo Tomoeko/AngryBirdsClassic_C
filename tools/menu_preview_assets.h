@@ -588,6 +588,7 @@ static bool menu_preview_pointer(PreviewMenu *menu, AbSpan event, AbVec2 point,
 }
 
 static bool menu_preview_draw(PreviewMenu *menu, float seconds, AbError *error) {
+    ab_audio_bank_begin_frame(menu->audio);
     if (!ab_classic_root_double_click(&menu->root_clicks, menu->root_pressed,
                                       menu->root_released, seconds, error))
         return false;

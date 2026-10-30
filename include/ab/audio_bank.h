@@ -23,7 +23,7 @@ typedef struct {
 
 /* Own the pinned audio catalog, named metadata and decoded PCM for all original
  * registrations. Borrow the archive/key during open only; store no key. Borrow
- * the real mono 16-kHz mixer/shared script RNG for later calls. Apply the pinned
+ * the real mixer/shared script RNG for later calls. Apply the pinned
  * loadAudioAssets channel-volume/count-limit policy after loading. No RNG draw,
  * mixer start, native device opening or playback occurs during open.
  *
@@ -31,9 +31,10 @@ typedef struct {
  * separate per-entry bounds. A conservative four-byte/frame admission bound
  * reserves room before decoding either supported channel count. This is not a
  * peak-memory limit. Streaming registrations are decoded ahead of playback;
- * native stream refill timing is not reproduced. The 24-kHz registration is
- * retained but rejects at playback until its target rate handling is recovered.
- * Other clips preserve the original one/two-channel mapping into mono.
+ * native stream refill timing is not reproduced. The default native research
+ * format keeps the recovered equal-rate channel mapping. Configured 48-kHz
+ * desktop output preserves source channels and supports both 16/24-kHz assets
+ * through the separately tested presentation resampler.
  *
  * Later operations allocate/decode nothing. Serialize mixer/RNG access. Stop
  * and drain or destroy every borrowing mixer voice before close; close itself
@@ -45,6 +46,11 @@ bool ab_audio_bank_open(const AbZip *archive, AbSpan key, AbAudioBankConfig conf
 void ab_audio_bank_close(AbAudioBank *bank);
 size_t ab_audio_bank_bytes(const AbAudioBank *bank);
 size_t ab_audio_bank_count(const AbAudioBank *bank);
+/* Optional desktop presentation policy: merge identical non-looping clip/gain/
+ * track requests inside one application frame. Group RNG and game callbacks
+ * still run normally. Later frames and stopped voices remain independent. */
+void ab_audio_bank_coalesce_frame_effects(AbAudioBank *bank, bool enabled);
+void ab_audio_bank_begin_frame(AbAudioBank *bank);
 bool ab_audio_bank_clip(const AbAudioBank *bank, AbSpan name, AbAudioBankClip *output);
 /* Sorted name order, with the same stable borrowed view as a name lookup. */
 bool ab_audio_bank_at(const AbAudioBank *bank, size_t index, AbAudioBankClip *output);

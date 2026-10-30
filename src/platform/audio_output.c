@@ -5,16 +5,18 @@
 #include <stdatomic.h>
 #include <stdlib.h>
 
-enum { QUEUE_FRAMES = 8192, TARGET_FRAMES = 1024, MIX_FRAMES = 512 };
+enum { QUEUE_FRAMES = 8192, MIX_FRAMES = 512 };
 
 struct AbAudioOutput {
     AbAudioMixer *mixer;
     CcAudioOutput *device;
     CcAudioBuffer *capture;
-    float samples[QUEUE_FRAMES];
+    float samples[QUEUE_FRAMES * 2];
     atomic_uint read_position, write_position;
     atomic_uint_fast64_t rendered, nonzero, underrun;
     bool failed, running;
+    uint32_t sample_rate;
+    unsigned channels, target_frames;
 };
 
 static void render(void *context, float *stereo, size_t frames) {
@@ -26,9 +28,10 @@ static void render(void *context, float *stereo, size_t frames) {
     size_t count = frames < available ? frames : available;
     uint64_t nonzero = 0;
     for (size_t index = 0; index < count; ++index) {
-        float value = output->samples[(read + (unsigned)index) % QUEUE_FRAMES];
-        stereo[index * 2] = stereo[index * 2 + 1] = value;
-        nonzero += value != 0;
+        size_t source = ((read + (unsigned)index) % QUEUE_FRAMES) * 2;
+        stereo[index * 2] = output->samples[source];
+        stereo[index * 2 + 1] = output->samples[source + 1];
+        nonzero += stereo[index * 2] != 0 || stereo[index * 2 + 1] != 0;
     }
     for (size_t index = count; index < frames; ++index)
         stereo[index * 2] = stereo[index * 2 + 1] = 0;
@@ -51,17 +54,21 @@ bool ab_audio_output_pump(AbAudioOutput *output, AbError *error) {
         output->failed = true;
         return ab_fail(error, "Invalid native audio queue distance");
     }
-    int16_t pcm[MIX_FRAMES];
-    while (queued < TARGET_FRAMES) {
-        unsigned count = TARGET_FRAMES - queued;
+    int16_t pcm[MIX_FRAMES * 2];
+    while (queued < output->target_frames) {
+        unsigned count = output->target_frames - queued;
         if (count > MIX_FRAMES)
             count = MIX_FRAMES;
-        if (!ab_audio_mixer_mix(output->mixer, count, pcm, MIX_FRAMES, error)) {
+        if (!ab_audio_mixer_mix(output->mixer, count, pcm, MIX_FRAMES * 2, error)) {
             output->failed = true;
             return false;
         }
-        for (unsigned index = 0; index < count; ++index)
-            output->samples[(write + index) % QUEUE_FRAMES] = (float)pcm[index] / 32768;
+        for (unsigned index = 0; index < count; ++index) {
+            size_t target = ((write + index) % QUEUE_FRAMES) * 2;
+            output->samples[target] = (float)pcm[index * output->channels] / 32768;
+            output->samples[target + 1] =
+                (float)pcm[index * output->channels + output->channels - 1] / 32768;
+        }
         write += count;
         queued += count;
         atomic_store_explicit(&output->write_position, write, memory_order_release);
@@ -79,6 +86,15 @@ bool ab_audio_output_open(AbAudioMixer *mixer, AbAudioOutput **output, AbError *
     if (!owner)
         return ab_fail(error, "Cannot allocate native audio queue");
     owner->mixer = mixer;
+    AbAudioMixerView format = ab_audio_mixer_view(mixer);
+    owner->sample_rate = format.sample_rate;
+    owner->channels = format.channels;
+    owner->target_frames = (format.sample_rate * 64) / 1000;
+    if (format.channels < 1 || format.channels > 2 || !owner->target_frames ||
+        owner->target_frames > QUEUE_FRAMES) {
+        free(owner);
+        return ab_fail(error, "Invalid native audio output format");
+    }
     atomic_init(&owner->read_position, 0);
     atomic_init(&owner->write_position, 0);
     atomic_init(&owner->rendered, 0);
@@ -94,7 +110,7 @@ bool ab_audio_output_open(AbAudioMixer *mixer, AbAudioOutput **output, AbError *
         return ab_fail(error, "Native audio needs lock-free queue counters");
     }
     owner->device =
-        cc_audio_output_open(&(CcAudioOutputOptions){.sample_rate = 16000,
+        cc_audio_output_open(&(CcAudioOutputOptions){.sample_rate = owner->sample_rate,
                                                      .render = render,
                                                      .context = owner,
                                                      .mode = CC_AUDIO_OUTPUT_DIRECT});
@@ -165,7 +181,8 @@ AbAudioOutputView ab_audio_output_view(const AbAudioOutput *output) {
             atomic_load_explicit(&output->rendered, memory_order_relaxed),
         .nonzero_samples = atomic_load_explicit(&output->nonzero, memory_order_relaxed),
         .underrun_frames =
-            atomic_load_explicit(&output->underrun, memory_order_relaxed)};
+            atomic_load_explicit(&output->underrun, memory_order_relaxed),
+        .sample_rate = output->sample_rate};
 }
 
 void ab_audio_output_close(AbAudioOutput *output) {
