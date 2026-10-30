@@ -141,7 +141,7 @@ static bool ordinary_level_stars(const AbEpisodeStatistics *statistics,
             else {
                 if (!numeric(field(thresholds, "silverScore"), &limit, error))
                     return false;
-                earned = score >= limit ? 2 : 1;
+                earned = score >= limit ? 2.0f : 1.0f;
             }
         }
     }
@@ -170,7 +170,7 @@ bool ab_episode_statistics_level_stars(const AbEpisodeStatistics *statistics,
 static bool golden_stars(const AbEpisodeStatistics *statistics, bool three,
                          float *earned, float *available, AbError *error) {
     float done = 0, total = 0;
-    float weight = three ? 3 : 1;
+    float weight = three ? 3.0f : 1.0f;
     size_t episodes;
     if (!array(statistics->episode_ids, &episodes, error))
         return false;

@@ -360,8 +360,9 @@ bool ab_gles2_render(AbGles2 *renderer, const AbDrawList *list, uint32_t width,
         api->Uniform4fv(renderer->color_uniform, 1, command->color);
         api->Uniform1f(renderer->opacity_uniform, command->opacity);
         api->Uniform1f(renderer->coordinates_uniform,
-                       command->coordinates == AB_DRAW_CLIP);
-        api->Uniform1f(renderer->mask_enabled_uniform, command->mask.texture ? 1 : 0);
+                       command->coordinates == AB_DRAW_CLIP ? 1.0f : 0.0f);
+        api->Uniform1f(renderer->mask_enabled_uniform,
+                       command->mask.texture ? 1.0f : 0.0f);
         AbRenderVertex vertices[4];
         ab_render_vertices(command, vertices);
         api->BufferSubData(GL_VERTEX_BUFFER, 0, (intptr_t)sizeof(vertices), vertices);

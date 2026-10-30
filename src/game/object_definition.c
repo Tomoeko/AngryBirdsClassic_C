@@ -118,7 +118,7 @@ static AbDataValue draw_order(const AbObjectDefinition *definition,
         return number(4);
     }
     value = ab_object_property(definition, (AbSpan){(const uint8_t *)"density", 7});
-    return number(numeric_equal(value, number(0)) ? 0 : 2);
+    return number(numeric_equal(value, number(0)) ? 0.0f : 2.0f);
 }
 
 bool ab_object_definition_open(const AbDataTable *catalog, AbSpan name,
