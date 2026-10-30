@@ -172,7 +172,7 @@ static bool compare_cases(FILE *file, AbStringMap *map, const AbSpan keys[64],
         COMPARE(words(file, &hint, 1) && ab_string_map_reset(map, hint, NULL));
         for (size_t step = 0; step < 256; ++step) {
             uint32_t command[3];
-            COMPARE(words(file, command, 3) && command[0] < (gc_mode ? 8 : 6) &&
+            COMPARE(words(file, command, 3) && command[0] < (gc_mode ? 8u : 6u) &&
                     command[1] < 64);
             uint32_t removed[64];
             size_t removed_count = 0;

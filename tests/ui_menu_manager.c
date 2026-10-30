@@ -255,8 +255,8 @@ static bool tree_method(void *context, AbUiFrameNode *node, AbUiFrameMethod meth
     for (size_t index = 0; index < 4; ++index) {
         if (provider->navigation.frames[index].tree == node) {
             return menu_method(context, provider->nodes + index,
-                               (AbUiMenuMethod)(method + AB_UI_MENU_ENTRY), 0, 0,
-                               error);
+                               (AbUiMenuMethod)((int)method + (int)AB_UI_MENU_ENTRY), 0,
+                               0, error);
         }
     }
     return false;

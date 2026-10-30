@@ -762,7 +762,7 @@ static bool ability_test_repeated_blues(PreviewMenu *menu, AbMetal *renderer,
             ++splits;
             if (!runtime.blues->has_result ||
                 level.bodies->count != initial + 3 * splits ||
-                game->shot.birds_shot != splits)
+                game->shot.birds_shot != (float)splits)
                 return ab_fail(
                     error,
                     "Repeated Blues mouse split %zu failed: bodies %zu/%zu, "

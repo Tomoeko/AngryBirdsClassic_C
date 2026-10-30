@@ -39,7 +39,8 @@ static bool tree_method(void *context, AbUiFrameNode *node, AbUiFrameMethod oper
     for (size_t index = 0; index < 3; ++index) {
         if (provider->frames[index].tree == node) {
             return method(context, provider->frames[index].menu,
-                          (AbUiMenuMethod)(operation + AB_UI_MENU_ENTRY), 0, 0, error);
+                          (AbUiMenuMethod)((int)operation + (int)AB_UI_MENU_ENTRY), 0,
+                          0, error);
         }
     }
     return false;

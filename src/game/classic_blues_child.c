@@ -194,7 +194,8 @@ static bool transform(AbClassicBluesChild *owner, const AbDataTable *parent,
     const AbDataValue collider_arguments[] = {name, raw};
     trace(owner, AB_BLUES_CHILD_COLLIDER, collider_arguments, 2);
     if (!numeric(raw, &collider, error) || collider < 0 ||
-        collider >= AB_GAME_COLLIDER_TYPES || collider != (float)(uint32_t)collider)
+        collider >= (float)AB_GAME_COLLIDER_TYPES ||
+        collider != (float)(uint32_t)collider)
         return ab_fail(error, "Unsupported Blues child collider");
     /* Native setColliderType only changes GameObject metadata. Lua collider was
      * copied earlier; fixture filtering is not rewritten by this boundary. */

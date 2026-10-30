@@ -157,7 +157,7 @@ bool ab_classic_superseed_resize(AbClassicSuperSeed *seed, size_t object,
                                     object, (AbVec2){radius / base, radius / base},
                                     error) ||
         !numeric(field(&old, "collider"), &collider, error) || collider < 0 ||
-        collider >= AB_GAME_COLLIDER_TYPES || collider != truncf(collider))
+        collider >= (float)AB_GAME_COLLIDER_TYPES || collider != truncf(collider))
         return ab_fail(error, "Invalid Super Seeds native scale or collider");
     level.bodies->objects[object].physics.collider = field(&old, "collider");
     level.frame->objects[object].collider = (uint32_t)collider;

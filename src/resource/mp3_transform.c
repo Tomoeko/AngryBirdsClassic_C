@@ -87,7 +87,7 @@ bool ab_mp3_transform_init(AbMp3TransformCoefficients *output, AbError *error) {
         return ab_fail(error, "Missing MP3 long-transform coefficient storage");
     }
     const double pi = 3.14159265358979323846264338327950288;
-    AbMp3TransformCoefficients table;
+    AbMp3TransformCoefficients table = {0};
     for (size_t index = 0; index < 9; ++index) {
         table.cosine[index] = (float)bounded_cosine((double)index * pi / 18.0);
         table.half_cosine[index] =
@@ -102,7 +102,7 @@ bool ab_mp3_synthesis_transform_init(AbMp3SynthesisTransform *output, AbError *e
         return ab_fail(error, "Missing MP3 synthesis-transform coefficient storage");
     }
     const double pi = 3.14159265358979323846264338327950288;
-    AbMp3SynthesisTransform table;
+    AbMp3SynthesisTransform table = {0};
     size_t destination = 0;
     for (size_t width = 32; width > 1; width /= 2) {
         for (size_t index = 0; index < width / 2; ++index) {

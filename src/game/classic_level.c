@@ -277,7 +277,7 @@ static bool collider_index(AbDataValue value, uint32_t *output) {
     float number;
     memcpy(&number, &value.bits, sizeof(number));
     if (value.kind != AB_DATA_NUMBER || !isfinite(number) || number < 0 ||
-        number >= AB_GAME_COLLIDER_TYPES || number != (float)(uint32_t)number) {
+        number >= (float)AB_GAME_COLLIDER_TYPES || number != (float)(uint32_t)number) {
         return false;
     }
     *output = (uint32_t)number;
@@ -1070,7 +1070,8 @@ static bool create_defined_object(AbClassicLevel *level, AbSpan name,
     float collider, z_order;
     memcpy(&collider, &definition.collider.bits, sizeof(collider));
     memcpy(&z_order, &definition.z_order.bits, sizeof(z_order));
-    if (!isfinite(collider) || collider < 0 || collider >= AB_GAME_COLLIDER_TYPES ||
+    if (!isfinite(collider) || collider < 0 ||
+        collider >= (float)AB_GAME_COLLIDER_TYPES ||
         collider != (float)(uint32_t)collider)
         return ab_fail(error, "Invalid defined object collider");
     AbDataValue collision =
@@ -1142,7 +1143,7 @@ static bool create_defined_object(AbClassicLevel *level, AbSpan name,
                               error))
             return false;
     }
-    if (collider != AB_COLLIDER_STATIC) {
+    if (collider != (float)AB_COLLIDER_STATIC) {
         AbObjectPropertyAccess access = {
             .physics_object = {.kind = AB_DATA_TABLE,
                                .table = &level->properties.dynamic}};

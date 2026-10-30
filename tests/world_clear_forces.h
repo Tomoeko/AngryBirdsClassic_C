@@ -58,8 +58,8 @@ static bool clear_force_native_checks(FILE *file, AbPhysicsWorld *world) {
         AbWorldStorage storage = prepare_storage(&memory, 4, 0);
         for (size_t body = 0; body < 4; ++body) {
             AbBodyDefinition definition = {.type = (AbBodyType)(body % 3),
-                                           .awake = (item & (1u << body)) != 0,
-                                           .active = (item & (2u << body)) != 0};
+                                           .awake = (item & ((size_t)1 << body)) != 0,
+                                           .active = (item & ((size_t)2 << body)) != 0};
             CHECK(ab_body_initialize(&definition, &memory.bodies[body].motion));
         }
         AbError error = {0};

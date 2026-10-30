@@ -76,7 +76,7 @@ static bool resolve(AbClassicMuseumCollisions *owner, AbSpan name, MuseumObject 
                                    &result.definition, error) ||
         !finite_number(result.definition.collider, &collider, error))
         return false;
-    if (collider < 0 || collider >= AB_GAME_COLLIDER_TYPES ||
+    if (collider < 0 || collider >= (float)AB_GAME_COLLIDER_TYPES ||
         floorf(collider) != collider)
         return ab_fail(error, "Invalid Museum definition collider");
     result.collider = (uint32_t)collider;

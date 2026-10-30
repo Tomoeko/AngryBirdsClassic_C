@@ -128,7 +128,7 @@ static bool first_level(const AbEpisodeStatistics *statistics, AbDataTable *high
         float earned;
         if (!ab_episode_statistics_level_stars(statistics, number(1), 1, level, &earned,
                                                error) ||
-            earned != index)
+            earned != (float)index)
             return ab_fail(error, "Real Level1 threshold boundary differs");
     }
     record->entries[1].value.bits = 0;

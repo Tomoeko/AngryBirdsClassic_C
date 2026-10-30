@@ -140,7 +140,7 @@ static bool physics_replay_widgets(PreviewMenu *menu, AbMetal *renderer,
         PreviewGame *game = menu->game;
         AbClassicBirdView birds =
             ab_classic_birds_view(ab_classic_game_runtime_view(game->game).birds);
-        if (birds.other_birds->capacity != 4 * game->shot.bird_count + 4)
+        if (birds.other_birds->capacity != 4 * (size_t)game->shot.bird_count + 4)
             return ab_fail(error, "Replay has an invalid other-bird identity budget");
         size_t notices = 0;
         AbEventListener listener = {menu_span("PhysicsReplay"), &notices,

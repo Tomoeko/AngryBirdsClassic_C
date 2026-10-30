@@ -60,8 +60,8 @@ static bool read_segments(AbVp8Boolean *reader, AbVp8Segments *segments,
     }
     if (segments->update_map) {
         for (size_t probability = 0; probability < 3; ++probability) {
-            bool present;
-            uint32_t value;
+            bool present = false;
+            uint32_t value = 0;
             if (!read_flag(reader, &present, error) ||
                 (present && !ab_vp8_boolean_value(reader, 8, &value, error))) {
                 return false;
@@ -170,7 +170,7 @@ static bool read_probabilities(AbVp8Boolean *reader, AbVp8Header *header,
     memcpy(header->coefficient_probabilities, ab_vp8_coefficient_defaults,
            sizeof(header->coefficient_probabilities));
     for (size_t index = 0; index < AB_VP8_COEFFICIENT_PROBABILITIES; ++index) {
-        uint32_t present, value;
+        uint32_t present = 0, value = 0;
         if (!ab_vp8_boolean_bit(reader, ab_vp8_coefficient_updates[index], &present,
                                 error) ||
             (present && !ab_vp8_boolean_value(reader, 8, &value, error))) {

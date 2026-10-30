@@ -552,11 +552,11 @@ static bool contact_damage(AbClassicBlockCollisions *owner, AbGameContactCall *c
         objects[side] = view->context;
         float collider = 0;
         if (!finite_number(objects[side]->resolved.collider, &collider, error) ||
-            collider < 0 || collider >= AB_GAME_COLLIDER_TYPES ||
+            collider < 0 || collider >= (float)AB_GAME_COLLIDER_TYPES ||
             floorf(collider) != collider)
             return ab_fail(error, "Invalid block damage definition collider");
-        if (collider == AB_COLLIDER_BIRD || collider == AB_COLLIDER_EAGLE ||
-            collider == AB_COLLIDER_GLUE)
+        if (collider == (float)AB_COLLIDER_BIRD ||
+            collider == (float)AB_COLLIDER_EAGLE || collider == (float)AB_COLLIDER_GLUE)
             return ab_fail(error,
                            "Block damage requires the enclosing bird/glue route");
         if (!damage_body(objects[side], bodies + side, error))
