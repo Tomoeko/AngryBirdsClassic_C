@@ -15,7 +15,7 @@ file(WRITE "${AB_BUILD_DIRECTORY}/ci-build.log" "${build_output}${build_error}")
 if(NOT build_result STREQUAL "0")
     # Keep compiler diagnostics available in Actions annotations as well as the
     # full job log. Escape command data before publishing an error message.
-    string(REGEX MATCHALL "[^\r\n]*([Ee]rror|[Uu]ndefined (symbols|reference))[^\r\n]*"
+    string(REGEX MATCHALL "[^\r\n]*([Ee]rror|[Ww]arning C[0-9]+|[Uu]ndefined (symbols|reference))[^\r\n]*"
         diagnostics "${build_output}\n${build_error}")
     list(REMOVE_DUPLICATES diagnostics)
     set(count 0)

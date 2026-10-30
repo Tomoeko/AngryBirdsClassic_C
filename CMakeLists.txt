@@ -37,6 +37,8 @@ option(AB_WARNINGS_AS_ERRORS "Treat project warnings as errors" ON)
 add_library(ab_options INTERFACE)
 if(MSVC)
     target_compile_options(ab_options INTERFACE /W4 /fp:strict)
+    # Keep portable C11 stdio; MSVC's secure-CRT alternatives are not standard C.
+    target_compile_definitions(ab_options INTERFACE _CRT_SECURE_NO_WARNINGS)
     if(AB_WARNINGS_AS_ERRORS)
         target_compile_options(ab_options INTERFACE /WX)
     endif()

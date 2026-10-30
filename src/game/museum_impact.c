@@ -157,8 +157,8 @@ bool ab_museum_impact_contact(AbMuseumImpact *state, AbPhysicsWorld *world,
     float colliders[] = {value_number(&a->physics.collider),
                          value_number(&b->physics.collider)};
     if (!isfinite(colliders[0]) || !isfinite(colliders[1]) || colliders[0] < 0 ||
-        colliders[1] < 0 || colliders[0] >= AB_GAME_COLLIDER_TYPES ||
-        colliders[1] >= AB_GAME_COLLIDER_TYPES ||
+        colliders[1] < 0 || colliders[0] >= (float)AB_GAME_COLLIDER_TYPES ||
+        colliders[1] >= (float)AB_GAME_COLLIDER_TYPES ||
         floorf(colliders[0]) != colliders[0] || floorf(colliders[1]) != colliders[1]) {
         return ab_fail(error, "Unsupported museum impact collider");
     }
